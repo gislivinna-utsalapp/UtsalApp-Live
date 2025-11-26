@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { apiFetch } from "@/lib/api"; // ← MIKILVÆGT
+
 type UserRole = "user" | "store" | "admin";
 
 type StoreInfo = {
@@ -34,6 +36,11 @@ type AuthContextType = {
   isAdmin: boolean;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  registerStore: (data: {
+    name: string;
+    email: string;
+    password: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -46,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Hlaða sessjón úr localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem(AUTH_KEY);
@@ -62,13 +70,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // LOGIN (nota apiFetch)
   async function login(email: string, password: string) {
     setLoading(true);
     setAuthUser(null);
 
-    const res = await fetch("/api/v1/auth/login", {
+    const res = await apiFetch("/api/v1/auth/login", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
 
@@ -76,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!res.ok) {
       setLoading(false);
-      throw new Error(data?.message || "Innskráning mistókst");
+      throw new Error(data?.message || "Innskráning mistókst.");
     }
 
     if (!data?.user || !data?.token) {
@@ -96,6 +104,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }
 
+  // REGISTER STORE (nota apiFetch)
+  async function registerStore(data: {
+    name: string;
+    email: string;
+    password: string;
+  }) {
+    const res = await apiFetch("/api/v1/auth/register-store", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || "Tókst ekki að búa til verslun.");
+    }
+  }
+
+  // LOG OUT
   async function logout() {
     localStorage.removeItem(AUTH_KEY);
     localStorage.removeItem(TOKEN_KEY);
@@ -108,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin: authUser?.user?.role === "admin",
     loading,
     login,
+    registerStore,
     logout,
   };
 

@@ -1,41 +1,91 @@
-import { Home, Search, Grid3x3, User } from 'lucide-react';
-import { Link, useLocation } from 'wouter';
-import { cn } from '@/lib/utils';
-import { is } from '@/i18n/is';
+// client/src/App.tsx
 
-const navItems = [
-  { href: '/', icon: Home, label: is.nav.home, testId: 'nav-home' },
-  { href: '/leit', icon: Search, label: is.nav.search, testId: 'nav-search' },
-  { href: '/flokkar', icon: Grid3x3, label: is.nav.categories, testId: 'nav-categories' },
-  { href: '/profill', icon: User, label: is.nav.profile, testId: 'nav-profile' },
-];
+import { Routes, Route, Link, useLocation } from "react-router-dom";
 
-export function BottomNav() {
-  const [location] = useLocation();
+import Home from "./pages/Home";
+import SearchPage from "./pages/SearchPage";
+import CategoriesPage from "./pages/CategoriesPage";
+import Login from "./pages/Login";
+import RegisterStore from "./pages/RegisterStore";
+import CreatePost from "./pages/CreatePost";
+import EditPost from "./pages/EditPost";
+import PostDetail from "./pages/PostDetail";
+import Profile from "./pages/Profile";
+import About from "./pages/About";
+import NotFound from "./pages/not-found";
+
+function BottomNav() {
+  const location = useLocation();
+  const tab = location.pathname;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-card-border pb-safe">
-      <div className="flex items-center justify-around h-16">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location === item.href;
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#fc7102] text-white z-20 shadow-lg">
+      <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
+        <Link
+          to="/"
+          className={`flex-1 text-center ${
+            tab === "/" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Heim
+        </Link>
 
-          return (
-            <Link key={item.href} href={item.href}>
-              <button
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-4 py-2 min-w-[48px] min-h-[48px] transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                )}
-                data-testid={item.testId}
-              >
-                <Icon size={24} strokeWidth={isActive ? 2.5 : 2} />
-                <span className="text-xs font-medium">{item.label}</span>
-              </button>
-            </Link>
-          );
-        })}
+        <Link
+          to="/search"
+          className={`flex-1 text-center ${
+            tab === "/search" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Leita
+        </Link>
+
+        <Link
+          to="/categories"
+          className={`flex-1 text-center ${
+            tab === "/categories" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Flokkar
+        </Link>
+
+        <Link
+          to="/profile"
+          className={`flex-1 text-center ${
+            tab === "/profile" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Prófíll
+        </Link>
       </div>
     </nav>
+  );
+}
+
+export default function App() {
+  return (
+    <div className="min-h-screen pb-20 bg-background">
+      <Routes>
+        {/* Opin svæði */}
+        <Route path="/" element={<Home />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/post/:id" element={<PostDetail />} />
+        <Route path="/about" element={<About />} />
+
+        {/* Auth */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register-store" element={<RegisterStore />} />
+
+        {/* Prófíll & tilboð (auth check gerum við inni á síðum) */}
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/create" element={<CreatePost />} />
+        <Route path="/edit/:id" element={<EditPost />} />
+
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      <BottomNav />
+    </div>
   );
 }

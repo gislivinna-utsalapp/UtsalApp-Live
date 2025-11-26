@@ -1,53 +1,91 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/lib/auth";
-import { BottomNav } from "@/components/BottomNav";
-import Home from "@/pages/Home";
-import PostDetail from "@/pages/PostDetail";
-import Store from "@/pages/Store";
-import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import CreatePost from "@/pages/CreatePost";
-import SearchPage from "@/pages/SearchPage";
-import CategoriesPage from "@/pages/CategoriesPage";
-import Profile from "@/pages/Profile";
-import About from "@/pages/About";
-import NotFound from "@/pages/not-found";
+// client/src/App.tsx
 
-function Router() {
+import { Routes, Route, Link, useLocation } from "react-router-dom";
+
+import Home from "./pages/Home";
+import SearchPage from "./pages/SearchPage";
+import CategoriesPage from "./pages/CategoriesPage";
+import Login from "./pages/Login";
+import RegisterStore from "./pages/RegisterStore";
+import CreatePost from "./pages/CreatePost";
+import EditPost from "./pages/EditPost";
+import PostDetail from "./pages/PostDetail";
+import Profile from "./pages/Profile";
+import About from "./pages/About";
+import NotFound from "./pages/not-found";
+
+function BottomNav() {
+  const location = useLocation();
+  const tab = location.pathname;
+
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/post/:id" component={PostDetail} />
-      <Route path="/store/:id" component={Store} />
-      <Route path="/innskraning" component={Login} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/stofna" component={CreatePost} />
-      <Route path="/breyta/:id" component={CreatePost} />
-      <Route path="/leit" component={SearchPage} />
-      <Route path="/flokkar" component={CategoriesPage} />
-      <Route path="/profill" component={Profile} />
-      <Route path="/um" component={About} />
-      <Route component={NotFound} />
-    </Switch>
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#fc7102] text-white z-20 shadow-lg">
+      <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
+        <Link
+          to="/"
+          className={`flex-1 text-center ${
+            tab === "/" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Heim
+        </Link>
+
+        <Link
+          to="/search"
+          className={`flex-1 text-center ${
+            tab === "/search" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Leita
+        </Link>
+
+        <Link
+          to="/categories"
+          className={`flex-1 text-center ${
+            tab === "/categories" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Flokkar
+        </Link>
+
+        <Link
+          to="/profile"
+          className={`flex-1 text-center ${
+            tab === "/profile" ? "opacity-100 font-semibold" : "opacity-80"
+          }`}
+        >
+          Prófíll
+        </Link>
+      </div>
+    </nav>
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-          <BottomNav />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <div className="min-h-screen pb-20 bg-background">
+      <Routes>
+        {/* Opin svæði */}
+        <Route path="/" element={<Home />} />
+        <Route path="/search" element={<SearchPage />} />
+        <Route path="/categories" element={<CategoriesPage />} />
+        <Route path="/post/:id" element={<PostDetail />} />
+        <Route path="/about" element={<About />} />
+
+        {/* Auth */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register-store" element={<RegisterStore />} />
+
+        {/* Prófíll & tilboð (auth check gerum við inni á síðum) */}
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/create" element={<CreatePost />} />
+        <Route path="/edit/:id" element={<EditPost />} />
+
+        {/* 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+
+      <BottomNav />
+    </div>
   );
 }
-
-export default App;

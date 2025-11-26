@@ -1,120 +1,136 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { SearchBar } from '@/components/SearchBar';
-import { FilterPanel, type Filters } from '@/components/FilterPanel';
-import { SalePostCard } from '@/components/SalePostCard';
-import { Badge } from '@/components/ui/badge';
-import { is } from '@/i18n/is';
-import type { SalePostWithDetails } from '@shared/schema';
-import { Skeleton } from '@/components/ui/skeleton';
+// client/src/pages/Home.tsx
+import { useQuery } from "@tanstack/react-query";
+import type { SalePostWithDetails } from "@shared/schema";
+import { Card } from "@/components/ui/card";
+import { formatPrice, getTimeRemaining, calculateDiscount } from "@/lib/utils";
 
-const categories = [
-  { value: 'all', label: is.categories.all },
-  { value: 'fatnad', label: is.categories.fatnad },
-  { value: 'husgogn', label: is.categories.husgogn },
-  { value: 'raftaeki', label: is.categories.raftaeki },
-  { value: 'matvorur', label: is.categories.matvorur },
-  { value: 'annad', label: is.categories.annad },
-];
+async function fetchHomePosts(): Promise<SalePostWithDetails[]> {
+  const res = await fetch("/api/v1/posts");
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Tókst ekki að sækja útsölur.");
+  }
+  return res.json() as Promise<SalePostWithDetails[]>;
+}
 
 export default function Home() {
-  const [search, setSearch] = useState('');
-  const [showFilters, setShowFilters] = useState(false);
-  const [filters, setFilters] = useState<Filters>({
-    category: null,
-    minPrice: 0,
-    maxPrice: 1000000,
-    minDiscount: 0,
-    activeOnly: false,
-    sortBy: 'recent',
-  });
-
-  const { data: posts, isLoading } = useQuery<SalePostWithDetails[]>({
-    queryKey: ['/api/v1/posts', { 
-      q: search, 
-      category: filters.category,
-      activeOnly: filters.activeOnly,
-      sort: filters.sortBy,
-    }],
-  });
-
-  const filteredPosts = posts?.filter(post => {
-    if (filters.minPrice > 0 && post.priceSale < filters.minPrice) return false;
-    if (filters.maxPrice < 1000000 && post.priceSale > filters.maxPrice) return false;
-    if (filters.minDiscount > 0 && post.discountPercent < filters.minDiscount) return false;
-    return true;
+  const {
+    data: posts,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<SalePostWithDetails[]>({
+    queryKey: ["home-posts"],
+    queryFn: fetchHomePosts,
   });
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="p-4 space-y-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground" data-testid="text-title">
-              {is.home.title}
-            </h1>
-            <p className="text-sm text-muted-foreground">{is.home.subtitle}</p>
-          </div>
-          
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            onFilterClick={() => setShowFilters(true)}
+    <div className="min-h-screen pb-24">
+      {/* Haus – bara logo */}
+      <header className="px-4 pt-6 pb-4 border-b border-border">
+        <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
+          <img
+            src="/utsalapp-logo.jpg"
+            alt="ÚtsalApp"
+            className="w-48 h-auto mb-3"
           />
-
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-            {categories.map((cat) => (
-              <Badge
-                key={cat.value}
-                variant={
-                  (cat.value === 'all' && !filters.category) || filters.category === cat.value
-                    ? "default"
-                    : "secondary"
-                }
-                className="cursor-pointer hover-elevate active-elevate-2 whitespace-nowrap px-4 py-2"
-                onClick={() => setFilters(f => ({ ...f, category: cat.value === 'all' ? null : cat.value }))}
-                data-testid={`badge-category-${cat.value}`}
-              >
-                {cat.label}
-              </Badge>
-            ))}
-          </div>
         </div>
       </header>
 
-      <main className="p-4">
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="aspect-[4/3] w-full rounded-2xl" />
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : !filteredPosts || filteredPosts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground" data-testid="text-no-results">
-              {is.home.noResults}
+      {/* Efni */}
+      <main className="p-3 max-w-4xl mx-auto space-y-3">
+        {isError && (
+          <Card className="p-3 text-xs text-destructive">
+            Villa við að sækja útsölur: {(error as Error)?.message}
+          </Card>
+        )}
+
+        {isLoading && !isError && (
+          <p className="text-xs text-muted-foreground">Sæki útsölur...</p>
+        )}
+
+        {!isLoading && !isError && posts && posts.length === 0 && (
+          <Card className="p-5 text-center space-y-2">
+            <p className="font-medium text-sm">
+              Engar útsölur skráðar í augnablikinu.
             </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredPosts.map((post) => (
-              <SalePostCard key={post.id} post={post} />
-            ))}
+            <p className="text-xs text-muted-foreground">
+              Verslanir geta skráð sig inn og sett inn útsölutilboð sem birtast
+              hér.
+            </p>
+          </Card>
+        )}
+
+        {!isLoading && !isError && posts && posts.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            {posts.map((post) => {
+              const mainImage = post.images?.[0];
+              const discount = calculateDiscount(
+                post.priceOriginal,
+                post.priceSale,
+              );
+              const timeRemaining = getTimeRemaining(post.endsAt);
+              const detailHref = `/post/${post.id}`;
+
+              return (
+                <a key={post.id} href={detailHref} className="block">
+                  <Card className="p-2 space-y-1 rounded-xl border border-border bg-background hover:shadow-md transition-shadow">
+                    {/* MyndarammI – 1:1 fyrir “grid look” eins og Boozt */}
+                    <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-muted">
+                      {mainImage ? (
+                        <img
+                          src={mainImage.url}
+                          alt={mainImage.alt ?? post.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
+                          Engin mynd
+                        </div>
+                      )}
+
+                      {discount > 0 && (
+                        <div className="absolute top-1.5 right-1.5 bg-pink-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                          -{discount}%
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Textaupplýsingar */}
+                    <div className="mt-1.5 space-y-0.5">
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {post.store?.name ?? "Ótilgreind verslun"}
+                      </div>
+                      <div className="font-semibold text-xs line-clamp-2">
+                        {post.title}
+                      </div>
+                      {post.description && (
+                        <div className="text-[11px] text-muted-foreground line-clamp-2">
+                          {post.description}
+                        </div>
+                      )}
+                      <div className="mt-0.5 flex items-baseline gap-1.5">
+                        <span className="text-sm font-bold text-pink-600">
+                          {formatPrice(post.priceSale ?? post.price)}
+                        </span>
+                        {post.priceOriginal != null && (
+                          <span className="text-[11px] text-muted-foreground line-through">
+                            {formatPrice(post.priceOriginal)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>{timeRemaining}</span>
+                        <span>{post.viewCount ?? 0} skoðanir</span>
+                      </div>
+                    </div>
+                  </Card>
+                </a>
+              );
+            })}
           </div>
         )}
       </main>
-
-      {showFilters && (
-        <FilterPanel
-          filters={filters}
-          onFiltersChange={setFilters}
-          onClose={() => setShowFilters(false)}
-        />
-      )}
     </div>
   );
 }

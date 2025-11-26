@@ -1,168 +1,139 @@
-import { useState } from 'react';
-import { useLocation } from 'wouter';
-import { useMutation } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/lib/auth';
-import { apiRequest } from '@/lib/queryClient';
-import { is } from '@/i18n/is';
-import { ShoppingBag } from 'lucide-react';
+// client/src/pages/Home.tsx
+import { useQuery } from "@tanstack/react-query";
+import type { SalePostWithDetails } from "@shared/schema";
+import { Card } from "@/components/ui/card";
+import { formatPrice, getTimeRemaining, calculateDiscount } from "@/lib/utils";
+import { apiFetch } from "@/lib/api"; // ← BÆTT VIÐ
 
-export default function Login() {
-  const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [storeName, setStoreName] = useState('');
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const { setAuthUser } = useAuth();
+async function fetchHomePosts(): Promise<SalePostWithDetails[]> {
+  const res = await apiFetch("/api/v1/posts"); // ← NOTUM apiFetch
 
-  const loginMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest('POST', '/api/v1/auth/login', { email, password });
-    },
-    onSuccess: (data) => {
-      setAuthUser(data);
-      toast({
-        title: 'Innskráning tókst',
-        description: `Velkomin ${data.user.email}`,
-      });
-      setLocation('/dashboard');
-    },
-    onError: (error: any) => {
-      toast({
-        variant: 'destructive',
-        title: 'Villa',
-        description: error.message || is.auth.errors.invalidCredentials,
-      });
-    },
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Tókst ekki að sækja útsölur.");
+  }
+
+  return res.json() as Promise<SalePostWithDetails[]>;
+}
+
+export default function Home() {
+  const {
+    data: posts,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<SalePostWithDetails[]>({
+    queryKey: ["home-posts"],
+    queryFn: fetchHomePosts,
   });
-
-  const registerMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest('POST', '/api/v1/auth/register-store', {
-        email,
-        password,
-        storeName,
-      });
-    },
-    onSuccess: (data) => {
-      setAuthUser(data);
-      toast({
-        title: 'Nýskráning tókst',
-        description: `Verslunin ${storeName} hefur verið skráð`,
-      });
-      setLocation('/dashboard');
-    },
-    onError: (error: any) => {
-      toast({
-        variant: 'destructive',
-        title: 'Villa',
-        description: error.message || is.auth.errors.emailExists,
-      });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isRegister) {
-      registerMutation.mutate();
-    } else {
-      loginMutation.mutate();
-    }
-  };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-6 space-y-6">
-        <div className="text-center space-y-2">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary text-primary-foreground p-4 rounded-2xl">
-              <ShoppingBag size={32} />
-            </div>
-          </div>
-          <h1 className="text-2xl font-bold" data-testid="text-title">
-            {isRegister ? is.auth.registerTitle : is.auth.loginTitle}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {is.common.appName}
-          </p>
+    <div className="min-h-screen pb-24">
+      {/* Haus – bara logo */}
+      <header className="px-4 pt-6 pb-4 border-b border-border">
+        <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
+          <img
+            src="/utsalapp-logo.jpg"
+            alt="ÚtsalApp"
+            className="w-48 h-auto mb-3"
+          />
         </div>
+      </header>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isRegister && (
-            <div className="space-y-2">
-              <Label htmlFor="storeName">{is.auth.storeName}</Label>
-              <Input
-                id="storeName"
-                type="text"
-                value={storeName}
-                onChange={(e) => setStoreName(e.target.value)}
-                required
-                data-testid="input-store-name"
-              />
-            </div>
-          )}
+      {/* Efni */}
+      <main className="p-3 max-w-4xl mx-auto space-y-3">
+        {isError && (
+          <Card className="p-3 text-xs text-destructive">
+            Villa við að sækja útsölur: {(error as Error)?.message}
+          </Card>
+        )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">{is.auth.email}</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              data-testid="input-email"
-            />
+        {isLoading && !isError && (
+          <p className="text-xs text-muted-foreground">Sæki útsölur...</p>
+        )}
+
+        {!isLoading && !isError && posts && posts.length === 0 && (
+          <Card className="p-5 text-center space-y-2">
+            <p className="font-medium text-sm">
+              Engar útsölur skráðar í augnablikinu.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Verslanir geta skráð sig inn og sett inn útsölutilboð sem birtast
+              hér.
+            </p>
+          </Card>
+        )}
+
+        {!isLoading && !isError && posts && posts.length > 0 && (
+          <div className="grid grid-cols-2 gap-3">
+            {posts.map((post) => {
+              const mainImage = post.images?.[0];
+              const discount = calculateDiscount(
+                post.priceOriginal,
+                post.priceSale,
+              );
+              const timeRemaining = getTimeRemaining(post.endsAt);
+              const detailHref = `/post/${post.id}`;
+
+              return (
+                <a key={post.id} href={detailHref} className="block">
+                  <Card className="p-2 space-y-1 rounded-xl border border-border bg-background hover:shadow-md transition-shadow">
+                    {/* MyndarammI – 1:1 grid look */}
+                    <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-muted">
+                      {mainImage ? (
+                        <img
+                          src={mainImage.url}
+                          alt={mainImage.alt ?? post.title}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
+                          Engin mynd
+                        </div>
+                      )}
+
+                      {discount > 0 && (
+                        <div className="absolute top-1.5 right-1.5 bg-pink-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
+                          -{discount}%
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Textaupplýsingar */}
+                    <div className="mt-1.5 space-y-0.5">
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {post.store?.name ?? "Ótilgreind verslun"}
+                      </div>
+                      <div className="font-semibold text-xs line-clamp-2">
+                        {post.title}
+                      </div>
+                      {post.description && (
+                        <div className="text-[11px] text-muted-foreground line-clamp-2">
+                          {post.description}
+                        </div>
+                      )}
+                      <div className="mt-0.5 flex items-baseline gap-1.5">
+                        <span className="text-sm font-bold text-pink-600">
+                          {formatPrice(post.priceSale ?? post.price)}
+                        </span>
+                        {post.priceOriginal != null && (
+                          <span className="text-[11px] text-muted-foreground line-through">
+                            {formatPrice(post.priceOriginal)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>{timeRemaining}</span>
+                        <span>{post.viewCount ?? 0} skoðanir</span>
+                      </div>
+                    </div>
+                  </Card>
+                </a>
+              );
+            })}
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">{is.auth.password}</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              data-testid="input-password"
-            />
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loginMutation.isPending || registerMutation.isPending}
-            data-testid="button-submit"
-          >
-            {isRegister ? is.auth.registerButton : is.auth.loginButton}
-          </Button>
-        </form>
-
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => setIsRegister(!isRegister)}
-            className="text-sm text-primary hover:underline"
-            data-testid="button-toggle-mode"
-          >
-            {isRegister ? is.auth.hasAccount : is.auth.noAccount}
-          </button>
-        </div>
-
-        <div className="text-center">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation('/')}
-            data-testid="button-home"
-          >
-            {is.errors.goHome}
-          </Button>
-        </div>
-      </Card>
+        )}
+      </main>
     </div>
   );
 }

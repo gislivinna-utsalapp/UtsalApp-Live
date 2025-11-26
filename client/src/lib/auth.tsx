@@ -1,63 +1,123 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { User, Store } from '@shared/schema';
+// client/src/lib/auth.ts
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  type ReactNode,
+} from "react";
 
-interface AuthUser {
+type UserRole = "user" | "store" | "admin";
+
+type StoreInfo = {
+  id: string;
+  name: string;
+  planType?: "basic" | "pro" | "premium";
+  trialEndsAt?: string | null;
+  billingActive?: boolean;
+};
+
+type User = {
+  id: string;
+  email: string;
+  role: UserRole;
+};
+
+export type AuthUser = {
   user: User;
-  store?: Store;
-  token: string;
-}
+  store?: StoreInfo | null;
+};
 
-interface AuthContextType {
+type AuthContextType = {
   authUser: AuthUser | null;
-  setAuthUser: (user: AuthUser | null) => void;
-  logout: () => void;
   isStore: boolean;
   isAdmin: boolean;
-}
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_KEY = "utsalapp_auth_user";
+const TOKEN_KEY = "utsalapp_token";
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [authUser, setAuthUserState] = useState<AuthUser | null>(null);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('authUser');
-    if (stored) {
-      try {
-        setAuthUserState(JSON.parse(stored));
-      } catch (e) {
-        localStorage.removeItem('authUser');
+    try {
+      const stored = localStorage.getItem(AUTH_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as AuthUser;
+        setAuthUser(parsed);
       }
+    } catch (err) {
+      console.error("Gat ekki lesið authUser úr localStorage", err);
+      localStorage.removeItem(AUTH_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  const setAuthUser = (user: AuthUser | null) => {
-    setAuthUserState(user);
-    if (user) {
-      localStorage.setItem('authUser', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('authUser');
-    }
-  };
-
-  const logout = () => {
+  async function login(email: string, password: string) {
+    setLoading(true);
     setAuthUser(null);
+
+    const res = await fetch("/api/v1/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      setLoading(false);
+      throw new Error(data?.message || "Innskráning mistókst");
+    }
+
+    if (!data?.user || !data?.token) {
+      setLoading(false);
+      throw new Error("Ógilt svar frá server við innskráningu.");
+    }
+
+    const authData: AuthUser = {
+      user: data.user,
+      store: data.store ?? null,
+    };
+
+    localStorage.setItem(TOKEN_KEY, data.token);
+    localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
+
+    setAuthUser(authData);
+    setLoading(false);
+  }
+
+  async function logout() {
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+    setAuthUser(null);
+  }
+
+  const value: AuthContextType = {
+    authUser,
+    isStore: authUser?.user?.role === "store",
+    isAdmin: authUser?.user?.role === "admin",
+    loading,
+    login,
+    logout,
   };
 
-  const isStore = authUser?.user.role === 'store';
-  const isAdmin = authUser?.user.role === 'admin';
-
-  return (
-    <AuthContext.Provider value={{ authUser, setAuthUser, logout, isStore, isAdmin }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+export function useAuth(): AuthContextType {
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an AuthProvider");
   }
-  return context;
+  return ctx;
 }

@@ -1,16 +1,17 @@
+// server/routes.ts
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
-import { storage } from "./storage";
+import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import sharp from "sharp";
-import rateLimit from "express-rate-limit";
-import cors from "cors";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
+
+import { storage } from "./storage-db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
@@ -23,558 +24,806 @@ interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
-    role: string;
+    role: "user" | "store" | "admin";
     storeId?: string;
   };
 }
 
-const authMiddleware = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Ekki innskráður' });
-  }
+// Cache til að koma í veg fyrir tvöfalda talningu á sama IP + tilboð á stuttum tíma
+const lastViewCache: Record<string, number> = {};
+const VIEW_DEDUP_WINDOW_MS = 5_000; // 5 sekúndur
 
-  const token = authHeader.substring(7);
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    req.user = decoded;
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: 'Ógildur auðkenningarlykill' });
-  }
-};
+const TRIAL_DAYS = 7;
+const TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
 
-const requireRole = (role: string) => {
+// ------------------------- AUTH MIDDLEWARE -------------------------
+
+function auth(requiredRole?: "store" | "admin") {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
-    if (!req.user || req.user.role !== role) {
-      return res.status(403).json({ message: 'Ekki heimild' });
+    const header = req.headers.authorization;
+    if (!header || !header.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Ekki innskráður" });
     }
-    next();
+
+    try {
+      const decoded = jwt.verify(
+        header.substring(7),
+        JWT_SECRET,
+      ) as AuthRequest["user"];
+      req.user = decoded;
+
+      if (requiredRole && decoded.role !== requiredRole) {
+        return res.status(403).json({ message: "Ekki heimild" });
+      }
+
+      next();
+    } catch {
+      return res.status(401).json({ message: "Ógildur token" });
+    }
   };
-};
-
-const uploadStorage = multer.memoryStorage();
-const upload = multer({
-  storage: uploadStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Ógild skráartegund'));
-    }
-  },
-});
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Of margar tilraunir, reyndu aftur síðar',
-});
-
-const viewLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  message: 'Of margar beiðnir',
-});
-
-function hashIP(ip: string): string {
-  return crypto.createHash('sha256').update(ip).digest('hex').substring(0, 16);
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  app.use(cors());
-  app.use('/uploads', cors());
+function isTrialExpired(store: any): boolean {
+  if (!store) return true;
+  if (store.billingStatus === "active") return false;
+  if (!store.trialEndsAt) return false;
 
-  app.post('/api/v1/auth/register-store', authLimiter, async (req, res) => {
-    try {
-      const { email, password, storeName } = req.body;
+  const ts = new Date(store.trialEndsAt).getTime();
+  if (!Number.isFinite(ts)) return false;
 
-      if (!email || !password || !storeName) {
-        return res.status(400).json({ message: 'Vantar upplýsingar' });
-      }
+  return Date.now() > ts;
+}
 
-      const existing = await storage.getUserByEmail(email);
-      if (existing) {
-        return res.status(400).json({ message: 'Netfang er þegar í notkun' });
-      }
-
-      const passwordHash = await bcrypt.hash(password, 10);
-      const user = await storage.createUser(email, passwordHash, 'store');
-
-      const store = await storage.createStore({
-        name: storeName,
-        description: null,
-        logoUrl: null,
-        address: null,
-        geoLat: null,
-        geoLng: null,
-        phone: null,
-        website: null,
-        ownerUserId: user.id,
-      });
-
-      const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, storeId: store.id },
-        JWT_SECRET,
-        { expiresIn: '30d' }
-      );
-
-      res.json({
-        user: { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt },
-        store,
-        token,
-      });
-    } catch (error: any) {
-      console.error('Register error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
+// Middleware: verslun þarf að vera í trial eða active til að búa til tilboð
+async function requireActiveOrTrialStore(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.user?.storeId) {
+      return res
+        .status(400)
+        .json({ message: "Engin tengd verslun fannst fyrir notanda" });
     }
-  });
 
-  app.post('/api/v1/auth/login', authLimiter, async (req, res) => {
+    let store = await storage.getStoreById(req.user.storeId);
+    if (!store) {
+      return res.status(404).json({ message: "Verslun fannst ekki" });
+    }
+
+    // Ef verslun hefur ekki fengið trial áður og er ekki expired → gefum 7 daga frá núna
+    if (
+      !(store as any).trialEndsAt &&
+      (store as any).billingStatus !== "expired"
+    ) {
+      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+      const updated = await storage.updateStore(store.id, {
+        trialEndsAt,
+        billingStatus: (store as any).billingStatus ?? "trial",
+      } as any);
+      if (updated) {
+        store = updated;
+      }
+    }
+
+    // Ef trial er útrunnið og ekki active → stoppa
+    if (isTrialExpired(store)) {
+      if ((store as any).billingStatus !== "expired") {
+        await storage.updateStore(store.id, {
+          billingStatus: "expired",
+        } as any);
+      }
+
+      return res.status(403).json({
+        message:
+          "Fríviku þinni er lokið. Hafðu samband við ÚtsalApp til að virkja áskrift.",
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("requireActiveOrTrialStore error", err);
+    res.status(500).json({ message: "Villa kom upp" });
+  }
+}
+
+// ------------------------- UPLOAD -------------------------
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// ------------------------- MAPPA POST Í FRONTEND FORMAT -------------------------
+
+async function mapPostToFrontend(p: any) {
+  const store = p.storeId ? await storage.getStoreById(p.storeId) : null;
+
+  const plan = (store as any)?.plan ?? (store as any)?.planType ?? "basic";
+  const billingStatus =
+    (store as any)?.billingStatus ??
+    ((store as any)?.billingActive ? "active" : "trial");
+
+  return {
+    id: p.id,
+    title: p.title,
+    description: p.description,
+    category: p.category,
+
+    priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
+    priceSale: Number(p.price ?? p.priceSale ?? 0),
+
+    images: p.imageUrl ? [{ url: p.imageUrl, alt: p.title }] : [],
+
+    startsAt: p.startsAt ?? null,
+    endsAt: p.endsAt ?? null,
+
+    buyUrl: p.buyUrl ?? null,
+    viewCount: p.viewCount ?? 0,
+
+    store: store
+      ? {
+          id: store.id,
+          name: store.name,
+          plan,
+          planType: plan, // fyrir eldri client
+          billingStatus,
+        }
+      : null,
+  };
+}
+
+// ------------------------- HJÁLPARFALL FYRIR RÖÐUN -------------------------
+
+function getPlanRankForPost(
+  post: any,
+  storesById: Record<string, any>,
+): number {
+  const store = post.storeId ? storesById[post.storeId] : null;
+  const plan = store?.plan ?? store?.planType;
+
+  if (plan === "premium") return 3;
+  if (plan === "pro") return 2;
+  return 1; // basic eða ekkert skilgreint
+}
+
+// ------------------------- ROUTES START -------------------------
+
+export function registerRoutes(app: Express): Server {
+  app.use(cors());
+  app.use(express.json());
+  app.use("/uploads", express.static(UPLOAD_DIR));
+
+  // ------------------ AUTH: REGISTER STORE ------------------
+  app.post(
+    "/api/v1/auth/register-store",
+    async (req: Request, res: Response) => {
+      try {
+        const { storeName, email, password, address, phone, website } =
+          req.body as {
+            storeName?: string;
+            email?: string;
+            password?: string;
+            address?: string;
+            phone?: string;
+            website?: string;
+          };
+
+        if (!storeName || !email || !password) {
+          return res.status(400).json({ message: "Vantar upplýsingar" });
+        }
+
+        const existing = await storage.findUserByEmail(email);
+        if (existing) {
+          return res.status(400).json({ message: "Netfang er þegar í notkun" });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+
+        // Ný verslun fær strax 7 daga fríviku
+        const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+
+        const store = await storage.createStore({
+          name: storeName,
+          address: (address ?? "").trim(),
+          phone: (phone ?? "").trim(),
+          website: (website ?? "").trim(),
+          logoUrl: "",
+          ownerEmail: email,
+          plan: "basic",
+          trialEndsAt,
+          billingStatus: "trial",
+        } as any);
+
+        const user = await storage.createUser({
+          email,
+          passwordHash,
+          role: "store",
+          storeId: store.id,
+        } as any);
+
+        const billingActive = true; // trial er virkt
+
+        return res.json({
+          message: "Verslun skráð",
+          user: { id: user.id, email: user.email, role: user.role },
+          store: {
+            id: store.id,
+            name: store.name,
+            address: (store as any).address ?? "",
+            phone: (store as any).phone ?? "",
+            website: (store as any).website ?? "",
+            plan: (store as any).plan ?? "basic",
+            planType: (store as any).plan ?? "basic",
+            trialEndsAt: (store as any).trialEndsAt ?? null,
+            billingStatus: (store as any).billingStatus ?? "trial",
+            billingActive,
+          },
+        });
+      } catch (err) {
+        console.error("register-store error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
+  // ------------------ AUTH: LOGIN ------------------
+  app.post("/api/v1/auth/login", async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body;
 
-      if (!email || !password) {
-        return res.status(400).json({ message: 'Vantar upplýsingar' });
-      }
-
-      const user = await storage.getUserByEmail(email);
+      const user = await storage.findUserByEmail(email);
       if (!user) {
-        return res.status(401).json({ message: 'Rangt netfang eða lykilorð' });
+        return res.status(401).json({ message: "Rangt netfang eða lykilorð" });
       }
 
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) {
-        return res.status(401).json({ message: 'Rangt netfang eða lykilorð' });
+      const ok = await bcrypt.compare(password, user.passwordHash);
+      if (!ok) {
+        return res.status(401).json({ message: "Rangt netfang eða lykilorð" });
       }
 
-      const store = await storage.getStoreByOwnerId(user.id);
+      let store = user.storeId
+        ? await storage.getStoreById(user.storeId)
+        : null;
+
+      // Ef verslun er til og hefur ekki trialEndsAt og er ekki expired → gefum 7 daga frá login
+      if (
+        store &&
+        !(store as any).trialEndsAt &&
+        (store as any).billingStatus !== "expired"
+      ) {
+        const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+        const updated = await storage.updateStore(store.id, {
+          trialEndsAt,
+          billingStatus: (store as any).billingStatus ?? "trial",
+        } as any);
+        if (updated) {
+          store = updated;
+        }
+      }
 
       const token = jwt.sign(
-        { id: user.id, email: user.email, role: user.role, storeId: store?.id },
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          storeId: (user as any).storeId,
+        },
         JWT_SECRET,
-        { expiresIn: '30d' }
+        { expiresIn: "7d" },
       );
 
-      res.json({
-        user: { id: user.id, email: user.email, role: user.role, createdAt: user.createdAt },
-        store: store || undefined,
+      let storePayload: any = null;
+
+      if (store) {
+        const plan = (store as any).plan ?? (store as any).planType ?? "basic";
+        const billingStatus =
+          (store as any).billingStatus ??
+          ((store as any).billingActive ? "active" : "trial");
+
+        const billingActive =
+          billingStatus === "active" || billingStatus === "trial";
+
+        storePayload = {
+          id: store.id,
+          name: store.name,
+          address: (store as any).address ?? "",
+          phone: (store as any).phone ?? "",
+          website: (store as any).website ?? "",
+          plan,
+          planType: plan,
+          trialEndsAt: (store as any).trialEndsAt ?? null,
+          billingStatus,
+          billingActive,
+        };
+      }
+
+      return res.json({
+        user: { id: user.id, email: user.email, role: user.role },
+        store: storePayload,
         token,
       });
-    } catch (error: any) {
-      console.error('Login error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
+    } catch (err) {
+      console.error("login error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
-  app.get('/api/v1/stores/:id', async (req, res) => {
-    try {
-      const store = await storage.getStore(req.params.id);
-      if (!store) {
-        return res.status(404).json({ message: 'Verslun fannst ekki' });
+  // ------------------ AUTH: ME ------------------
+  app.get(
+    "/api/v1/auth/me",
+    auth(),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ message: "Ekki innskráður" });
+        }
+
+        let store = req.user.storeId
+          ? await storage.getStoreById(req.user.storeId)
+          : null;
+
+        // Sama trial-start lógík og í login
+        if (
+          store &&
+          !(store as any).trialEndsAt &&
+          (store as any).billingStatus !== "expired"
+        ) {
+          const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+          const updated = await storage.updateStore(store.id, {
+            trialEndsAt,
+            billingStatus: (store as any).billingStatus ?? "trial",
+          } as any);
+          if (updated) {
+            store = updated;
+          }
+        }
+
+        let storePayload: any = null;
+
+        if (store) {
+          const plan =
+            (store as any).plan ?? (store as any).planType ?? "basic";
+          const billingStatus =
+            (store as any).billingStatus ??
+            ((store as any).billingActive ? "active" : "trial");
+
+          const billingActive =
+            billingStatus === "active" || billingStatus === "trial";
+
+          storePayload = {
+            id: store.id,
+            name: store.name,
+            address: (store as any).address ?? "",
+            phone: (store as any).phone ?? "",
+            website: (store as any).website ?? "",
+            plan,
+            planType: plan,
+            trialEndsAt: (store as any).trialEndsAt ?? null,
+            billingStatus,
+            billingActive,
+          };
+        }
+
+        return res.json({
+          user: {
+            id: req.user.id,
+            email: req.user.email,
+            role: req.user.role,
+          },
+          store: storePayload,
+        });
+      } catch (err) {
+        console.error("auth/me error", err);
+        res.status(500).json({ message: "Villa kom upp" });
       }
-      res.json(store);
-    } catch (error: any) {
-      console.error('Get store error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
+    },
+  );
+
+  // ------------------ STORES: BILLING INFO FYRIR VERSLUN ------------------
+  app.get(
+    "/api/v1/stores/me/billing",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user?.storeId) {
+          return res
+            .status(400)
+            .json({ message: "Engin tengd verslun fannst" });
+        }
+
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+
+        const trialEndsAt = (store as any).trialEndsAt ?? null;
+        const billingStatus =
+          (store as any).billingStatus ??
+          ((store as any).billingActive ? "active" : "trial");
+
+        let daysLeft: number | null = null;
+        if (trialEndsAt) {
+          const endMs = new Date(trialEndsAt).getTime();
+          if (Number.isFinite(endMs)) {
+            const diff = endMs - Date.now();
+            daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
+          }
+        }
+
+        const plan = (store as any).plan ?? (store as any).planType ?? "basic";
+
+        return res.json({
+          plan,
+          trialEndsAt,
+          billingStatus,
+          trialExpired: isTrialExpired(store),
+          daysLeft,
+        });
+      } catch (err) {
+        console.error("stores/me/billing error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
+  // ------------------ STORES: ACTIVATE PLAN / FRÍVIKA ------------------
+  app.post(
+    "/api/v1/stores/activate-plan",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        const bodyPlan = (req.body.plan ?? req.body.planType) as
+          | string
+          | undefined;
+        const allowed = ["basic", "pro", "premium"];
+
+        if (!bodyPlan || !allowed.includes(bodyPlan)) {
+          return res.status(400).json({ message: "Ógild pakkategund" });
+        }
+
+        if (!req.user?.storeId) {
+          return res
+            .status(400)
+            .json({ message: "Engin tengd verslun fannst" });
+        }
+
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+
+        const now = Date.now();
+        const existingTrialEnds = (store as any).trialEndsAt
+          ? new Date((store as any).trialEndsAt).getTime()
+          : null;
+
+        let trialEndsAt: string | null = (store as any).trialEndsAt ?? null;
+
+        // Ef verslun hefur EKKI fengið fríviku áður → gefum 7 daga frá núna
+        if (!existingTrialEnds) {
+          trialEndsAt = new Date(now + TRIAL_MS).toISOString();
+        }
+
+        const updated = await storage.updateStore(store.id, {
+          plan: bodyPlan,
+          trialEndsAt,
+          billingStatus: (store as any).billingStatus ?? "trial",
+        } as any);
+
+        if (!updated) {
+          return res
+            .status(500)
+            .json({ message: "Tókst ekki að uppfæra pakka" });
+        }
+
+        const plan =
+          (updated as any).plan ?? (updated as any).planType ?? "basic";
+        const billingStatus =
+          (updated as any).billingStatus ??
+          ((updated as any).billingActive ? "active" : "trial");
+
+        const billingActive =
+          billingStatus === "active" || billingStatus === "trial";
+
+        return res.json({
+          id: updated.id,
+          name: updated.name,
+          address: (updated as any).address ?? "",
+          phone: (updated as any).phone ?? "",
+          website: (updated as any).website ?? "",
+          plan,
+          planType: plan,
+          trialEndsAt: (updated as any).trialEndsAt ?? null,
+          billingStatus,
+          billingActive,
+        });
+      } catch (err) {
+        console.error("activate-plan error:", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
+  // ------------------ STORES: LIST ALL ------------------
+  app.get("/api/v1/stores", async (_req, res) => {
+    try {
+      const stores = await storage.listStores();
+      res.json(stores);
+    } catch (err) {
+      console.error("stores list error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
-  app.put('/api/v1/stores/:id', authMiddleware, async (req: AuthRequest, res) => {
+  // ------------------ STORES: POSTS FOR ONE STORE (PROFILE) ------------------
+  app.get("/api/v1/stores/:storeId/posts", async (req, res) => {
     try {
-      const store = await storage.getStore(req.params.id);
-      if (!store) {
-        return res.status(404).json({ message: 'Verslun fannst ekki' });
-      }
-
-      if (store.ownerUserId !== req.user?.id && req.user?.role !== 'admin') {
-        return res.status(403).json({ message: 'Ekki heimild' });
-      }
-
-      const updated = await storage.updateStore(req.params.id, req.body);
-      res.json(updated);
-    } catch (error: any) {
-      console.error('Update store error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
+      const storeId = req.params.storeId;
+      const posts = await storage.getPostsByStore(storeId);
+      const mapped = await Promise.all(posts.map(mapPostToFrontend));
+      res.json(mapped);
+    } catch (err) {
+      console.error("store posts error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
-  app.get('/api/v1/stores/:id/posts', async (req, res) => {
+  // ------------------ POSTS: LIST ALL (MEÐ PLAN RÖÐUN) ------------------
+  app.get("/api/v1/posts", async (req, res) => {
     try {
-      const posts = await storage.getSalePostsWithDetails({
-        storeId: req.params.id,
-        isActive: req.query.activeOnly === 'true',
+      const q = (req.query.q as string)?.toLowerCase() || "";
+
+      // Sækjum öll tilboð + allar verslanir (fyrir plan)
+      const [posts, stores] = await Promise.all([
+        storage.listPosts(),
+        storage.listStores(),
+      ]);
+
+      const storesById: Record<string, any> = {};
+      for (const s of stores as any[]) {
+        storesById[s.id] = s;
+      }
+
+      // Filter eftir leitarstreng ef til
+      const filtered = q
+        ? posts.filter((p: any) => (p.title || "").toLowerCase().includes(q))
+        : posts;
+
+      // RÖÐUN:
+      // 1) plan: premium > pro > basic
+      // 2) innan pakka: nýjustu createdAt efst
+      filtered.sort((a: any, b: any) => {
+        const pa = getPlanRankForPost(a, storesById);
+        const pb = getPlanRankForPost(b, storesById);
+
+        if (pb !== pa) {
+          return pb - pa; // hærri plan rank ofar
+        }
+
+        const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+        return bd - ad; // nýjustu efst
       });
-      res.json(posts);
-    } catch (error: any) {
-      console.error('Get store posts error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
+
+      const mapped = await Promise.all(filtered.map(mapPostToFrontend));
+      res.json(mapped);
+    } catch (err) {
+      console.error("list posts error", err);
+      res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
-  app.get('/api/v1/posts', async (req, res) => {
+  // ------------------ POSTS: DETAIL (MEÐ “ANTI DOUBLE COUNT”) ------------------
+  app.get("/api/v1/posts/:id", async (req, res) => {
     try {
-      const filters: any = {};
-
-      if (req.query.category) filters.category = req.query.category;
-      if (req.query.q) filters.search = req.query.q;
-      if (req.query.activeOnly) filters.isActive = req.query.activeOnly === 'true';
-
-      let posts = await storage.getSalePostsWithDetails(filters);
-
-      if (req.query.sort === 'discount') {
-        posts = posts.sort((a, b) => b.discountPercent - a.discountPercent);
-      } else {
-        posts = posts.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      }
-
-      res.json(posts);
-    } catch (error: any) {
-      console.error('Get posts error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
-    }
-  });
-
-  app.get('/api/v1/posts/:id', async (req, res) => {
-    try {
-      const post = await storage.getSalePostWithDetails(req.params.id);
+      const all = await storage.listPosts();
+      const post = all.find((p: any) => p.id === req.params.id);
       if (!post) {
-        return res.status(404).json({ message: 'Færsla fannst ekki' });
+        return res.status(404).json({ message: "Tilboð fannst ekki" });
       }
-      res.json(post);
-    } catch (error: any) {
-      console.error('Get post error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
+
+      // Einföld IP-greining
+      const ipHeader = (req.headers["x-forwarded-for"] as string) || "";
+      const clientIp = ipHeader.split(",")[0]?.trim() || req.ip || "unknown_ip";
+
+      const key = `${clientIp}:${req.params.id}`;
+      const now = Date.now();
+      const last = lastViewCache[key] ?? 0;
+
+      let effective = post;
+
+      // Ef liðið er meira en VIEW_DEDUP_WINDOW_MS frá síðustu talningu → teljum sem nýja skoðun
+      if (now - last > VIEW_DEDUP_WINDOW_MS) {
+        const currentCount = (post as any).viewCount ?? 0;
+        const updated = await storage.updatePost(post.id, {
+          viewCount: currentCount + 1,
+        } as any);
+
+        if (updated) {
+          effective = updated;
+        }
+        lastViewCache[key] = now;
+      }
+
+      const mapped = await mapPostToFrontend(effective);
+      res.json(mapped);
+    } catch (err) {
+      console.error("post detail error", err);
+      res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
-  app.post('/api/v1/posts', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      if (req.user?.role !== 'store' && req.user?.role !== 'admin') {
-        return res.status(403).json({ message: 'Ekki heimild' });
+  // ------------------ POSTS: CREATE ------------------
+  app.post(
+    "/api/v1/posts",
+    auth("store"),
+    requireActiveOrTrialStore,
+    async (req: AuthRequest, res) => {
+      try {
+        const {
+          title,
+          description,
+          category,
+          priceOriginal,
+          priceSale,
+          buyUrl,
+          startsAt,
+          endsAt,
+          images,
+        } = req.body;
+
+        if (!title || priceOriginal == null || priceSale == null || !category) {
+          return res.status(400).json({ message: "Vantar upplýsingar" });
+        }
+
+        const imageUrl =
+          Array.isArray(images) && images.length > 0 ? images[0].url : "";
+
+        const newPost = await storage.createPost({
+          title,
+          description,
+          category,
+          price: Number(priceSale),
+          oldPrice: Number(priceOriginal),
+          imageUrl,
+          storeId: req.user!.storeId!,
+          buyUrl: buyUrl || null,
+          startsAt: startsAt || null,
+          endsAt: endsAt || null,
+          createdAt: new Date().toISOString(),
+          viewCount: 0,
+        } as any);
+
+        const mapped = await mapPostToFrontend(newPost);
+        res.json(mapped);
+      } catch (err) {
+        console.error("create post error", err);
+        res.status(500).json({ message: "Villa kom upp" });
       }
+    },
+  );
 
-      const store = await storage.getStoreByOwnerId(req.user.id);
-      if (!store && req.user.role === 'store') {
-        return res.status(404).json({ message: 'Verslun fannst ekki' });
+  // ------------------ POSTS: UPDATE ------------------
+  app.put(
+    "/api/v1/posts/:id",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        const postId = req.params.id;
+        const all = await storage.listPosts();
+        const existing = all.find((p: any) => p.id === postId);
+
+        if (!existing) {
+          return res.status(404).json({ message: "Færsla fannst ekki" });
+        }
+
+        if (existing.storeId !== req.user?.storeId) {
+          return res.status(403).json({ message: "Ekki heimild" });
+        }
+
+        const {
+          title,
+          description,
+          category,
+          priceOriginal,
+          priceSale,
+          buyUrl,
+          startsAt,
+          endsAt,
+          images,
+        } = req.body;
+
+        const updates: any = {};
+
+        if (title !== undefined) updates.title = title;
+        if (description !== undefined) updates.description = description;
+        if (category !== undefined) updates.category = category;
+        if (priceOriginal !== undefined)
+          updates.oldPrice = Number(priceOriginal);
+        if (priceSale !== undefined) updates.price = Number(priceSale);
+        if (buyUrl !== undefined) updates.buyUrl = buyUrl || null;
+        if (startsAt !== undefined) updates.startsAt = startsAt || null;
+        if (endsAt !== undefined) updates.endsAt = endsAt || null;
+
+        if (Array.isArray(images) && images.length > 0 && images[0].url) {
+          updates.imageUrl = images[0].url;
+        }
+
+        const updated = await storage.updatePost(postId, updates);
+        if (!updated) {
+          return res.status(500).json({ message: "Tókst ekki að uppfæra" });
+        }
+
+        const mapped = await mapPostToFrontend(updated);
+        res.json(mapped);
+      } catch (err) {
+        console.error("update post error", err);
+        res.status(500).json({ message: "Villa kom upp" });
       }
+    },
+  );
 
-      const { title, description, category, priceOriginal, priceSale, startsAt, endsAt, images } = req.body;
+  // ------------------ POSTS: DELETE (STORE OWN) ------------------
+  app.delete(
+    "/api/v1/posts/:id",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        const postId = req.params.id;
+        const all = await storage.listPosts();
+        const target = all.find((p: any) => p.id === postId);
 
-      if (!title || !category || !priceOriginal || !priceSale || !startsAt || !endsAt || !images || images.length === 0) {
-        return res.status(400).json({ message: 'Vantar upplýsingar' });
+        if (!target) {
+          return res.status(404).json({ message: "Færsla fannst ekki" });
+        }
+
+        if (target.storeId !== req.user?.storeId) {
+          return res.status(403).json({ message: "Ekki heimild" });
+        }
+
+        const deleted = await storage.deletePost(postId);
+        res.json({ success: deleted });
+      } catch (err) {
+        console.error("delete post error", err);
+        res.status(500).json({ message: "Villa kom upp" });
       }
+    },
+  );
 
-      const post = await storage.createSalePost({
-        storeId: store!.id,
-        title,
-        description: description || null,
-        category,
-        priceOriginal: parseFloat(priceOriginal),
-        priceSale: parseFloat(priceSale),
-        startsAt: new Date(startsAt),
-        endsAt: new Date(endsAt),
-        isActive: true,
-      });
+  // ------------------ IMAGE UPLOAD ------------------
+  app.post(
+    "/api/v1/uploads",
+    auth("store"),
+    upload.single("image"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ message: "Engin mynd" });
+        }
 
-      await storage.createImages(post.id, images);
+        const filename = `${crypto.randomUUID()}.jpg`;
+        const filepath = path.join(UPLOAD_DIR, filename);
 
-      const postWithDetails = await storage.getSalePostWithDetails(post.id);
-      res.status(201).json(postWithDetails);
-    } catch (error: any) {
-      console.error('Create post error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
-    }
-  });
+        await sharp(req.file.buffer)
+          .resize(1200, 1200, {
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 80 })
+          .toFile(filepath);
 
-  app.put('/api/v1/posts/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const post = await storage.getSalePost(req.params.id);
-      if (!post) {
-        return res.status(404).json({ message: 'Færsla fannst ekki' });
+        res.json({ url: `/uploads/${filename}` });
+      } catch (err) {
+        console.error("upload error", err);
+        res.status(500).json({ message: "Villa kom upp" });
       }
-
-      const store = await storage.getStore(post.storeId);
-      if (!store || (store.ownerUserId !== req.user?.id && req.user?.role !== 'admin')) {
-        return res.status(403).json({ message: 'Ekki heimild' });
-      }
-
-      const { title, description, category, priceOriginal, priceSale, startsAt, endsAt, images } = req.body;
-
-      const updates: any = {};
-      if (title) updates.title = title;
-      if (description !== undefined) updates.description = description || null;
-      if (category) updates.category = category;
-      if (priceOriginal) updates.priceOriginal = parseFloat(priceOriginal);
-      if (priceSale) updates.priceSale = parseFloat(priceSale);
-      if (startsAt) updates.startsAt = new Date(startsAt);
-      if (endsAt) updates.endsAt = new Date(endsAt);
-
-      await storage.updateSalePost(req.params.id, updates);
-
-      if (images) {
-        await storage.deleteImagesBySalePostId(req.params.id);
-        await storage.createImages(req.params.id, images);
-      }
-
-      const updated = await storage.getSalePostWithDetails(req.params.id);
-      res.json(updated);
-    } catch (error: any) {
-      console.error('Update post error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
-    }
-  });
-
-  app.delete('/api/v1/posts/:id', authMiddleware, async (req: AuthRequest, res) => {
-    try {
-      const post = await storage.getSalePost(req.params.id);
-      if (!post) {
-        return res.status(404).json({ message: 'Færsla fannst ekki' });
-      }
-
-      const store = await storage.getStore(post.storeId);
-      if (!store || (store.ownerUserId !== req.user?.id && req.user?.role !== 'admin')) {
-        return res.status(403).json({ message: 'Ekki heimild' });
-      }
-
-      await storage.deleteSalePost(req.params.id);
-      res.json({ message: 'Færslu eytt' });
-    } catch (error: any) {
-      console.error('Delete post error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
-    }
-  });
-
-  app.post('/api/v1/posts/:id/view', viewLimiter, async (req, res) => {
-    try {
-      const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || 
-                  req.socket.remoteAddress || 
-                  'unknown';
-      const ipHash = hashIP(ip);
-
-      await storage.createViewEvent(req.params.id, ipHash);
-      res.json({ message: 'Skoðun skráð' });
-    } catch (error: any) {
-      console.error('View event error:', error);
-      res.status(500).json({ message: 'Villa kom upp' });
-    }
-  });
-
-  app.post('/api/v1/uploads', authMiddleware, upload.single('image'), async (req: AuthRequest, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: 'Engin mynd fannst' });
-      }
-
-      const filename = `${Date.now()}-${crypto.randomBytes(6).toString('hex')}.webp`;
-      const filepath = path.join(UPLOAD_DIR, filename);
-
-      await sharp(req.file.buffer)
-        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: 85 })
-        .toFile(filepath);
-
-      const url = `/uploads/${filename}`;
-      res.json({ url });
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      res.status(500).json({ message: 'Villa kom upp við upphleðslu' });
-    }
-  });
-
-  app.use('/uploads', express.static(UPLOAD_DIR));
-
-  const httpServer = createServer(app);
-
-  await seedData();
-
-  return httpServer;
-}
-
-async function seedData() {
-  const existingUsers = await Promise.all([
-    storage.getUserByEmail('litabudin@example.is'),
-    storage.getUserByEmail('gaedaskor@example.is'),
-    storage.getUserByEmail('heima@example.is'),
-  ]);
-
-  if (existingUsers.some(u => u)) {
-    console.log('Seed data already exists');
-    return;
-  }
-
-  console.log('Creating seed data...');
-
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const admin = await storage.createUser('admin@utsalapp.is', adminPassword, 'admin');
-
-  const storeData = [
-    {
-      email: 'litabudin@example.is',
-      password: 'store123',
-      storeName: 'LitaBúðin',
-      description: 'Falleg og litríkföt fyrir alla fjölskylduna',
-      address: 'Laugavegur 45, 101 Reykjavík',
-      phone: '581-2345',
-      website: 'https://litabudin.is',
     },
-    {
-      email: 'gaedaskór@example.is',
-      password: 'store123',
-      storeName: 'GæðaSkór',
-      description: 'Vandað skófatnaður fyrir alla',
-      address: 'Kringlan 4-12, 103 Reykjavík',
-      phone: '568-9876',
-      website: 'https://gaedaskor.is',
-    },
-    {
-      email: 'heima@example.is',
-      password: 'store123',
-      storeName: 'Heima&Heilsa',
-      description: 'Húsgögn og heilsuvörur',
-      address: 'Smáralind, 201 Kópavogur',
-      phone: '554-3210',
-      website: 'https://heimaheilsa.is',
-    },
-  ];
+  );
 
-  const stores: any[] = [];
-  for (const data of storeData) {
-    const passwordHash = await bcrypt.hash(data.password, 10);
-    const user = await storage.createUser(data.email, passwordHash, 'store');
-    const store = await storage.createStore({
-      name: data.storeName,
-      description: data.description,
-      logoUrl: null,
-      address: data.address,
-      geoLat: null,
-      geoLng: null,
-      phone: data.phone,
-      website: data.website,
-      ownerUserId: user.id,
-    });
-    stores.push(store);
-  }
-
-  const posts = [
-    {
-      storeId: stores[0].id,
-      title: 'Sumarútsala - Kjólar',
-      description: 'Fallegir sumarkjólar með allt að 50% afslætti. Margir litir og stærðir í boði.',
-      category: 'fatnad' as const,
-      priceOriginal: 12990,
-      priceSale: 6490,
-      images: [{ url: '/placeholder-dress.jpg', alt: 'Sumarkjóll' }],
-    },
-    {
-      storeId: stores[0].id,
-      title: 'Barnafatnaður - 40% afsláttur',
-      description: 'Allur barnafatnaður með 40% afslætti í takmarkaðan tíma.',
-      category: 'fatnad' as const,
-      priceOriginal: 5990,
-      priceSale: 3590,
-      images: [{ url: '/placeholder-kids.jpg', alt: 'Barnafatnaður' }],
-    },
-    {
-      storeId: stores[0].id,
-      title: 'Úlpur og jakkar',
-      description: 'Vetrarvörur á frábæru verði. Hlýir og fallegir.',
-      category: 'fatnad' as const,
-      priceOriginal: 24990,
-      priceSale: 14990,
-      images: [{ url: '/placeholder-jacket.jpg', alt: 'Úlpur' }],
-    },
-    {
-      storeId: stores[1].id,
-      title: 'Leðurskór - 35% afsláttur',
-      description: 'Vandaðir leðurskór fyrir konur og karla. Margir stílar.',
-      category: 'fatnad' as const,
-      priceOriginal: 19990,
-      priceSale: 12990,
-      images: [{ url: '/placeholder-shoes.jpg', alt: 'Leðurskór' }],
-    },
-    {
-      storeId: stores[1].id,
-      title: 'Íþróttaskór á tilboði',
-      description: 'Hlaupaskór og þjálfunarskór frá fremstu framleiðendum.',
-      category: 'fatnad' as const,
-      priceOriginal: 14990,
-      priceSale: 9990,
-      images: [{ url: '/placeholder-sneakers.jpg', alt: 'Íþróttaskór' }],
-    },
-    {
-      storeId: stores[2].id,
-      title: 'Sófasett - 30% afsláttur',
-      description: 'Þægileg 3ja sæta sófasett með hægindastól. Margir litir.',
-      category: 'husgogn' as const,
-      priceOriginal: 189990,
-      priceSale: 132990,
-      images: [{ url: '/placeholder-sofa.jpg', alt: 'Sófasett' }],
-    },
-    {
-      storeId: stores[2].id,
-      title: 'Matborðssett',
-      description: 'Fallegt matborð með 6 stólum. Úr eik.',
-      category: 'husgogn' as const,
-      priceOriginal: 149990,
-      priceSale: 99990,
-      images: [{ url: '/placeholder-table.jpg', alt: 'Matborð' }],
-    },
-    {
-      storeId: stores[2].id,
-      title: 'Rúm og dýnur',
-      description: 'Heilsurúm með dýnu og kodda. Margar stærðir.',
-      category: 'husgogn' as const,
-      priceOriginal: 129990,
-      priceSale: 89990,
-      images: [{ url: '/placeholder-bed.jpg', alt: 'Rúm' }],
-    },
-    {
-      storeId: stores[0].id,
-      title: 'Peysor og bolir',
-      description: 'Vorvörur með 25% afslætti. Mörg munstur.',
-      category: 'fatnad' as const,
-      priceOriginal: 7990,
-      priceSale: 5990,
-      images: [{ url: '/placeholder-sweater.jpg', alt: 'Peysa' }],
-    },
-    {
-      storeId: stores[1].id,
-      title: 'Sandalar og slipur',
-      description: 'Sumarskór á frábæru verði.',
-      category: 'fatnad' as const,
-      priceOriginal: 8990,
-      priceSale: 4990,
-      images: [{ url: '/placeholder-sandals.jpg', alt: 'Sandalar' }],
-    },
-  ];
-
-  const now = new Date();
-  const weekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const monthLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-
-  for (const postData of posts) {
-    const post = await storage.createSalePost({
-      ...postData,
-      startsAt: now,
-      endsAt: Math.random() > 0.5 ? weekLater : monthLater,
-      isActive: true,
-    });
-
-    await storage.createImages(post.id, postData.images);
-
-    const viewCount = Math.floor(Math.random() * 100) + 10;
-    for (let i = 0; i < viewCount; i++) {
-      await storage.createViewEvent(post.id, `hash-${i}`);
-    }
-  }
-
-  console.log('Seed data created successfully!');
-  console.log('Store accounts:');
-  storeData.forEach(s => console.log(`  ${s.email} / ${s.password}`));
-  console.log(`Admin account: admin@utsalapp.is / admin123`);
+  // ------------------ START SERVER ------------------
+  const server = createServer(app);
+  return server;
 }

@@ -1,139 +1,126 @@
-// client/src/pages/Home.tsx
-import { useQuery } from "@tanstack/react-query";
-import type { SalePostWithDetails } from "@shared/schema";
+// client/src/pages/Login.tsx
+import { useState, useEffect, FormEvent } from "react";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { formatPrice, getTimeRemaining, calculateDiscount } from "@/lib/utils";
-import { apiFetch } from "@/lib/api"; // ← BÆTT VIÐ
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/lib/auth";
 
-async function fetchHomePosts(): Promise<SalePostWithDetails[]> {
-  const res = await apiFetch("/api/v1/posts"); // ← NOTUM apiFetch
+export default function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { authUser, login, loading } = useAuth();
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || "Tókst ekki að sækja útsölur.");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Ef notandi er þegar innskráður → senda beint á /profile
+  useEffect(() => {
+    if (authUser) {
+      navigate("/profile", { replace: true });
+    }
+  }, [authUser, navigate]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSubmitting(true);
+
+    try {
+      // notar login() úr auth.ts
+      await login(email, password);
+
+      // Sækjum "from" frá PrivateRoute ef til er
+      const from =
+        (location.state as any)?.from &&
+        (location.state as any).from !== "/login"
+          ? (location.state as any).from
+          : "/profile";
+
+      navigate(from, { replace: true });
+    } catch (err) {
+      console.error(err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Innskráning mistókst. Vinsamlegast reyndu aftur.";
+      setErrorMsg(msg);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  return res.json() as Promise<SalePostWithDetails[]>;
-}
-
-export default function Home() {
-  const {
-    data: posts,
-    isLoading,
-    isError,
-    error,
-  } = useQuery<SalePostWithDetails[]>({
-    queryKey: ["home-posts"],
-    queryFn: fetchHomePosts,
-  });
-
   return (
-    <div className="min-h-screen pb-24">
-      {/* Haus – bara logo */}
-      <header className="px-4 pt-6 pb-4 border-b border-border">
-        <div className="max-w-4xl mx-auto flex flex-col items-center text-center">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gray-50">
+      <Card className="w-full max-w-md p-6 space-y-6">
+        <div className="text-center space-y-2">
           <img
             src="/utsalapp-logo.jpg"
             alt="ÚtsalApp"
-            className="w-48 h-auto mb-3"
+            className="mx-auto w-40 h-auto mb-1"
           />
+          <h1 className="text-lg font-semibold">Innskráning verslunar</h1>
+          <p className="text-xs text-muted-foreground">
+            Skráðu þig inn til að setja inn útsölutilboð og stýra auglýsingunum
+            þínum.
+          </p>
         </div>
-      </header>
 
-      {/* Efni */}
-      <main className="p-3 max-w-4xl mx-auto space-y-3">
-        {isError && (
-          <Card className="p-3 text-xs text-destructive">
-            Villa við að sækja útsölur: {(error as Error)?.message}
-          </Card>
-        )}
-
-        {isLoading && !isError && (
-          <p className="text-xs text-muted-foreground">Sæki útsölur...</p>
-        )}
-
-        {!isLoading && !isError && posts && posts.length === 0 && (
-          <Card className="p-5 text-center space-y-2">
-            <p className="font-medium text-sm">
-              Engar útsölur skráðar í augnablikinu.
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Verslanir geta skráð sig inn og sett inn útsölutilboð sem birtast
-              hér.
-            </p>
-          </Card>
-        )}
-
-        {!isLoading && !isError && posts && posts.length > 0 && (
-          <div className="grid grid-cols-2 gap-3">
-            {posts.map((post) => {
-              const mainImage = post.images?.[0];
-              const discount = calculateDiscount(
-                post.priceOriginal,
-                post.priceSale,
-              );
-              const timeRemaining = getTimeRemaining(post.endsAt);
-              const detailHref = `/post/${post.id}`;
-
-              return (
-                <a key={post.id} href={detailHref} className="block">
-                  <Card className="p-2 space-y-1 rounded-xl border border-border bg-background hover:shadow-md transition-shadow">
-                    {/* MyndarammI – 1:1 grid look */}
-                    <div className="relative w-full aspect-square overflow-hidden rounded-lg bg-muted">
-                      {mainImage ? (
-                        <img
-                          src={mainImage.url}
-                          alt={mainImage.alt ?? post.title}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
-                          Engin mynd
-                        </div>
-                      )}
-
-                      {discount > 0 && (
-                        <div className="absolute top-1.5 right-1.5 bg-pink-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                          -{discount}%
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Textaupplýsingar */}
-                    <div className="mt-1.5 space-y-0.5">
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {post.store?.name ?? "Ótilgreind verslun"}
-                      </div>
-                      <div className="font-semibold text-xs line-clamp-2">
-                        {post.title}
-                      </div>
-                      {post.description && (
-                        <div className="text-[11px] text-muted-foreground line-clamp-2">
-                          {post.description}
-                        </div>
-                      )}
-                      <div className="mt-0.5 flex items-baseline gap-1.5">
-                        <span className="text-sm font-bold text-pink-600">
-                          {formatPrice(post.priceSale ?? post.price)}
-                        </span>
-                        {post.priceOriginal != null && (
-                          <span className="text-[11px] text-muted-foreground line-through">
-                            {formatPrice(post.priceOriginal)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
-                        <span>{timeRemaining}</span>
-                        <span>{post.viewCount ?? 0} skoðanir</span>
-                      </div>
-                    </div>
-                  </Card>
-                </a>
-              );
-            })}
+        {errorMsg && (
+          <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+            {errorMsg}
           </div>
         )}
-      </main>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="email">Netfang</Label>
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="verslun@daemi.is"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="password">Lykilorð</Label>
+            <Input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
+            disabled={submitting || loading}
+          >
+            {submitting || loading ? "Skrái inn..." : "Skrá inn"}
+          </Button>
+        </form>
+
+        <div className="text-center text-xs text-muted-foreground space-y-1">
+          <p>Ertu ekki með aðgang?</p>
+          <Link
+            to="/register-store"
+            className="text-[#FF7300] font-medium hover:underline"
+          >
+            Stofna verslun í ÚtsalApp
+          </Link>
+        </div>
+      </Card>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 modules = ["nodejs-20", "web", "postgresql-16"]
-run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
+
+# Run takkinn keyrir bæði server og Vite
+run = "bash -lc 'npx tsx server/index.ts & npx vite --host 0.0.0.0 --port 5173 --strictPort'"
 
 [nix]
 channel = "stable-24_05"
@@ -8,36 +10,26 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+run = [
+  "bash",
+  "-lc",
+  "npx tsx server/index.ts & npx vite preview --host 0.0.0.0 --port 5173 --strictPort",
+]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 40081
+localPort = 5173
 externalPort = 3000
+
+[[ports]]
+localPort = 24678
+externalPort = 3001
 
 [env]
 PORT = "5000"
 
 [workflows]
-runButton = "Project"
-
-[[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm run dev"
-waitForPort = 5000
+runButton = ".replit run command"

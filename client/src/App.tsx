@@ -1,5 +1,4 @@
 // client/src/App.tsx
-
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 
 import Home from "./pages/Home";
@@ -14,12 +13,14 @@ import Profile from "./pages/Profile";
 import About from "./pages/About";
 import NotFound from "./pages/not-found";
 
+import PrivateRoute from "./lib/PrivateRoute";
+
 function BottomNav() {
   const location = useLocation();
   const tab = location.pathname;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#fc7102] text-white z-20 shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#FF7300] text-white z-20 shadow-lg">
       <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
         <Link
           to="/"
@@ -27,34 +28,35 @@ function BottomNav() {
             tab === "/" ? "opacity-100 font-semibold" : "opacity-80"
           }`}
         >
-          Heim
+          Forsíða
         </Link>
-
         <Link
-          to="/search"
+          to="/leit"
           className={`flex-1 text-center ${
-            tab === "/search" ? "opacity-100 font-semibold" : "opacity-80"
+            tab.startsWith("/leit") ? "opacity-100 font-semibold" : "opacity-80"
           }`}
         >
-          Leita
+          Leit
         </Link>
-
         <Link
-          to="/categories"
+          to="/flokkar"
           className={`flex-1 text-center ${
-            tab === "/categories" ? "opacity-100 font-semibold" : "opacity-80"
+            tab.startsWith("/flokkar")
+              ? "opacity-100 font-semibold"
+              : "opacity-80"
           }`}
         >
           Flokkar
         </Link>
-
         <Link
           to="/profile"
           className={`flex-1 text-center ${
-            tab === "/profile" ? "opacity-100 font-semibold" : "opacity-80"
+            tab.startsWith("/profile")
+              ? "opacity-100 font-semibold"
+              : "opacity-80"
           }`}
         >
-          Prófíll
+          Verslun
         </Link>
       </div>
     </nav>
@@ -63,27 +65,50 @@ function BottomNav() {
 
 export default function App() {
   return (
-    <div className="min-h-screen pb-20 bg-background">
-      <Routes>
-        {/* Opin svæði */}
-        <Route path="/" element={<Home />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/categories" element={<CategoriesPage />} />
-        <Route path="/post/:id" element={<PostDetail />} />
-        <Route path="/about" element={<About />} />
+    <div className="min-h-screen pb-12 bg-gray-50">
+      <div className="max-w-4xl mx-auto">
+        <Routes>
+          {/* Opnar síður */}
+          <Route path="/" element={<Home />} />
+          <Route path="/leit" element={<SearchPage />} />
+          <Route path="/flokkar" element={<CategoriesPage />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/post/:id" element={<PostDetail />} />
 
-        {/* Auth */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register-store" element={<RegisterStore />} />
+          {/* Auth síður – EKKI verndaðar */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register-store" element={<RegisterStore />} />
 
-        {/* Prófíll & tilboð (auth check gerum við inni á síðum) */}
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/create" element={<CreatePost />} />
-        <Route path="/edit/:id" element={<EditPost />} />
+          {/* Verndaðar verslunarsíður */}
+          <Route
+            path="/profile"
+            element={
+              <PrivateRoute>
+                <Profile />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/create-post"
+            element={
+              <PrivateRoute>
+                <CreatePost />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/edit-post/:id"
+            element={
+              <PrivateRoute>
+                <EditPost />
+              </PrivateRoute>
+            }
+          />
 
-        {/* 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          {/* 404 */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
 
       <BottomNav />
     </div>

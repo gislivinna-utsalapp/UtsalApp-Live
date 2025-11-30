@@ -109,7 +109,7 @@ export default function CategoriesPage() {
       : normalizedPosts.filter((p) => p._normCategory === selectedCategory);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-24 pt-4 space-y-4">
+    <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
       <header className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-white">Flokkar</h1>
@@ -210,6 +210,6 @@ export default function CategoriesPage() {
           </section>
         </>
       )}
-    </div>
+    </main>
   );
 }

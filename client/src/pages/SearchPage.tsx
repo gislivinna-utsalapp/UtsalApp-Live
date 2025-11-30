@@ -33,7 +33,7 @@ export default function SearchPage() {
   const activeTerm = searchTerm.trim();
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-24 pt-4 space-y-4">
+    <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
       <header className="space-y-2">
         <h1 className="text-lg font-semibold text-white">Leit</h1>
         <p className="text-xs text-neutral-400">
@@ -65,7 +65,7 @@ export default function SearchPage() {
       )}
 
       {activeTerm.length > 0 && !isLoading && !error && (
-        <>
+        <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white">
               Niðurstöður fyrir: {activeTerm}
@@ -92,8 +92,8 @@ export default function SearchPage() {
               ))}
             </div>
           )}
-        </>
+        </section>
       )}
-    </div>
+    </main>
   );
 }

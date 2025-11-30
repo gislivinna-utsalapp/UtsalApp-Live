@@ -1,25 +1,23 @@
 modules = ["nodejs-20", "web", "postgresql-16"]
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
-# Run takkinn keyrir bæði server og Vite
-run = "bash -lc 'npx tsx server/index.ts & npx vite --host 0.0.0.0 --port 5173 --strictPort'"
+# Run takkinn keyrir production serverinn (node dist/index.js í gegnum npm start)
+run = "bash -lc 'npm start'"
 
 [nix]
 channel = "stable-24_05"
+packages = ["ps"]
 
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = [
-  "bash",
-  "-lc",
-  "npx tsx server/index.ts & npx vite preview --host 0.0.0.0 --port 5173 --strictPort",
-]
+run = ["bash", "-lc", "npm start"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
+# Höldum þessum fyrir mögulega Vite-dev síðar, skaðar ekki þó enginn hlusti á þá núna
 [[ports]]
 localPort = 5173
 externalPort = 3000

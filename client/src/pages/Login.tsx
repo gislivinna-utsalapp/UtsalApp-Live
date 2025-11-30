@@ -1,6 +1,6 @@
 // client/src/pages/Login.tsx
-import { useState, useEffect, FormEvent } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useState, FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,65 +8,54 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 
 export default function Login() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { authUser, login, loading } = useAuth();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Ef notandi er þegar innskráður → senda beint á /profile
-  useEffect(() => {
-    if (authUser) {
-      navigate("/profile", { replace: true });
-    }
-  }, [authUser, navigate]);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setErrorMsg(null);
-    setSubmitting(true);
 
+    if (!email.trim() || !password.trim()) {
+      setErrorMsg("Vantar netfang og lykilorð.");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      // notar login() úr auth.ts
-      await login(email, password);
+      // Notum central login úr AuthProvider
+      await login(email.trim(), password.trim());
 
-      // Sækjum "from" frá PrivateRoute ef til er
-      const from =
-        (location.state as any)?.from &&
-        (location.state as any).from !== "/login"
-          ? (location.state as any).from
-          : "/profile";
-
-      navigate(from, { replace: true });
+      // Eftir vel heppnaða innskráningu:
+      // Farðu frekar á /profile (ekki forsíðu)
+      navigate("/profile", { replace: true });
     } catch (err) {
-      console.error(err);
-      const msg =
+      console.error("login error:", err);
+      let msg =
         err instanceof Error
           ? err.message
-          : "Innskráning mistókst. Vinsamlegast reyndu aftur.";
+          : "Tókst ekki að skrá inn. Vinsamlegast reyndu aftur.";
+
       setErrorMsg(msg);
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gray-50">
-      <Card className="w-full max-w-md p-6 space-y-6">
+      <Card className="w-full max-w-xs sm:max-w-sm p-6 space-y-6">
         <div className="text-center space-y-2">
           <img
             src="/utsalapp-logo.jpg"
             alt="ÚtsalApp"
-            className="mx-auto w-40 h-auto mb-1"
+            className="mx-auto w-32 h-auto mb-1"
           />
-          <h1 className="text-lg font-semibold">Innskráning verslunar</h1>
-          <p className="text-xs text-muted-foreground">
-            Skráðu þig inn til að setja inn útsölutilboð og stýra auglýsingunum
-            þínum.
-          </p>
         </div>
 
         {errorMsg && (
@@ -105,19 +94,19 @@ export default function Login() {
           <Button
             type="submit"
             className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
-            disabled={submitting || loading}
+            disabled={isSubmitting}
           >
-            {submitting || loading ? "Skrái inn..." : "Skrá inn"}
+            {isSubmitting ? "Skrái inn..." : "Skrá inn"}
           </Button>
         </form>
 
         <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>Ertu ekki með aðgang?</p>
+          <p>Áttirðu ekki aðgang áður?</p>
           <Link
             to="/register-store"
             className="text-[#FF7300] font-medium hover:underline"
           >
-            Stofna verslun í ÚtsalApp
+            Skrá verslun
           </Link>
         </div>
       </Card>

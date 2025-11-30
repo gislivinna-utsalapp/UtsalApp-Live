@@ -1,349 +1,343 @@
 // client/src/pages/CreatePost.tsx
+import { FormEvent, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { FormEvent, useState, ChangeEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/lib/auth";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+// Flokkar sem notandinn velur úr (uppfært: Raftæki + Happy Hour)
+const CATEGORY_OPTIONS = [
+  "Fatnaður - Konur",
+  "Fatnaður - Karlar",
+  "Fatnaður - Börn",
+  "Skór",
+  "Íþróttavörur",
+  "Heimili & húsgögn",
+  "Raftæki",
+  "Snyrtivörur",
+  "Leikföng & börn",
+  "Matur & veitingar",
+  "Happy Hour",
+  "Annað",
+];
+
+type CreatePostPayload = {
+  title: string;
+  description: string;
+  category: string;
+  priceOriginal: number;
+  priceSale: number;
+  buyUrl?: string | null;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  images: { url: string }[];
+};
+
+// Hjálparfall til að hlaða upp mynd með token
+async function uploadImage(file: File): Promise<string> {
+  const token =
+    localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
+
+  if (!token) {
+    throw new Error("Enginn token fannst. Skráðu þig út og inn aftur.");
+  }
+
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const res = await fetch("/api/v1/uploads", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      // EKKI setja Content-Type hér – browser sér um boundary fyrir FormData
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.error("Upload response text:", text);
+    if (res.status === 401) {
+      throw new Error("Ekki innskráður. Skráðu þig inn aftur.");
+    }
+    throw new Error("Tókst ekki að hlaða upp mynd.");
+  }
+
+  const data = (await res.json().catch(() => null)) as { url?: string } | null;
+  if (!data?.url) {
+    throw new Error("Server skilaði ekki myndaslóð.");
+  }
+
+  return data.url;
+}
 
 export default function CreatePost() {
-  const { authUser, loading } = useAuth();
   const navigate = useNavigate();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("annad");
+  const [category, setCategory] = useState("");
   const [priceOriginal, setPriceOriginal] = useState("");
   const [priceSale, setPriceSale] = useState("");
   const [buyUrl, setBuyUrl] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  // ---------- Auth gating ----------
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  if (loading) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">
-        Hleð innskráningarstöðu...
-      </div>
-    );
-  }
-
-  // Ekki innskráð(ur) sem verslun
-  if (!authUser || authUser.user.role !== "store") {
-    return (
-      <div className="p-4 space-y-4">
-        <h1 className="text-2xl font-bold">Búa til nýtt tilboð</h1>
-        <p className="text-sm text-muted-foreground">
-          Þú þarft að vera innskráð(ur) sem verslun til að búa til útsölutilboð.
-        </p>
-        <div className="space-y-2">
-          <Link to="/login">
-            <Button className="w-full">Skrá inn</Button>
-          </Link>
-          <Link to="/register-store">
-            <Button className="w-full" variant="outline">
-              Stofna verslun
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Verslun en ekki búin að virkja fríviku/pakka
-  const billingActive = (authUser.store as any)?.billingActive ?? false;
-
-  if (!billingActive) {
-    return (
-      <div className="min-h-screen pb-24">
-        <header className="p-4 border-b border-border">
-          <h1 className="text-2xl font-bold">Búa til nýtt tilboð</h1>
-        </header>
-
-        <main className="p-4 max-w-xl mx-auto">
-          <Card className="p-4 space-y-3">
-            <h2 className="text-lg font-semibold">Virkjaðu fríviku fyrst</h2>
-            <p className="text-sm text-muted-foreground">
-              Til að geta búið til útsölutilboð þarftu fyrst að virkja 7 daga
-              fríviku og velja pakka á prófílsíðunni þinni.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Farðu á <span className="font-medium">Prófíl</span> &rarr;{" "}
-              <span className="font-medium">„Áskrift &amp; frívika“</span> og
-              smelltu á{" "}
-              <span className="font-medium">„Virkja pakka og fríviku“</span>.
-              Eftir það geturðu búið til tilboð.
-            </p>
-
-            <Link to="/profile">
-              <Button className="w-full">
-                Fara á prófíl og virkja fríviku
-              </Button>
-            </Link>
-          </Card>
-        </main>
-      </div>
-    );
-  }
-
-  // ---------- Mynd preview ----------
-
-  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setImageFile(file);
-
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setImagePreview(url);
-    } else {
+  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setImageFile(null);
       setImagePreview(null);
+      return;
     }
-  }
-
-  async function uploadImageIfNeeded(): Promise<string | null> {
-    if (!imageFile) return null;
-
-    const formData = new FormData();
-    formData.append("image", imageFile);
-
-    const token = localStorage.getItem("utsalapp_token");
-
-    const res = await fetch("/api/v1/uploads", {
-      method: "POST",
-      body: formData,
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.message || "Tókst ekki að hlaða upp mynd.");
-    }
-
-    if (!data.url) {
-      throw new Error("Myndaupphleðsla skilaði engri slóð.");
-    }
-
-    return data.url as string;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError(null);
-    setSuccess(null);
-    setIsLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!title.trim()) {
+      setErrorMsg("Titill vantar.");
+      return;
+    }
+
+    if (!category.trim()) {
+      setErrorMsg("Veldu flokk fyrir tilboðið.");
+      return;
+    }
+
+    const original = Number(priceOriginal.replace(",", "."));
+    const sale = Number(priceSale.replace(",", "."));
+
+    if (!Number.isFinite(original) || !Number.isFinite(sale)) {
+      setErrorMsg("Verð þarf að vera tölur.");
+      return;
+    }
+
+    if (!imageFile) {
+      setErrorMsg("Veldu mynd fyrir tilboðið.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
-      const token = localStorage.getItem("utsalapp_token");
+      // 1. Hlaða upp mynd og fá URL
+      const imageUrl = await uploadImage(imageFile);
 
-      let imageUrl: string | null = null;
-      if (imageFile) {
-        imageUrl = await uploadImageIfNeeded();
-      }
-
-      const body: any = {
+      // 2. Búa til payload fyrir /api/v1/posts
+      const payload: CreatePostPayload = {
         title: title.trim(),
         description: description.trim(),
-        category,
-        priceOriginal: Number(priceOriginal),
-        priceSale: Number(priceSale),
+        category: category.trim(),
+        priceOriginal: original,
+        priceSale: sale,
+        buyUrl: buyUrl.trim() || null,
         startsAt: startsAt || null,
         endsAt: endsAt || null,
-        buyUrl: buyUrl.trim() || null,
-        images: imageUrl
-          ? [
-              {
-                url: imageUrl,
-                alt: title.trim() || undefined,
-              },
-            ]
-          : [],
+        images: [{ url: imageUrl }],
       };
 
-      const res = await fetch("/api/v1/posts", {
+      // 3. Senda til server – búa til tilboð
+      const created = await apiFetch<CreatePostPayload>("/api/v1/posts", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      console.log("Post created:", created);
 
-      if (!res.ok) {
-        throw new Error(data.message || "Tókst ekki að búa til tilboð.");
-      }
-
-      setSuccess("Tilboð var búið til.");
+      setSuccessMsg("Tilboð var búið til.");
+      // Smá töf svo notandi sjái skilaboðin, svo á prófíl
       setTimeout(() => {
         navigate("/profile");
-      }, 900);
+      }, 800);
     } catch (err: any) {
-      setError(err?.message || "Villa kom upp.");
+      console.error("Villa við að búa til auglýsingu:", err);
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Tókst ekki að búa til auglýsingu.";
+      setErrorMsg(msg);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
-    <div className="min-h-screen pb-24">
-      <header className="p-4 border-b border-border">
-        <h1 className="text-2xl font-bold">Búa til nýtt tilboð</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Fylltu inn upplýsingar um tilboðið.
-        </p>
-      </header>
+    <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
+      <h1 className="text-lg font-semibold mb-3">Búa til nýtt tilboð</h1>
 
-      <main className="p-4 max-w-xl mx-auto">
-        <Card className="p-4 space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Titill</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="border w-full p-2 rounded text-sm"
-                placeholder="T.d. Vorútsala – Kjólar"
+      <Card className="p-4 space-y-4">
+        {errorMsg && (
+          <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+            {errorMsg}
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="text-xs text-green-700 bg-green-50 border border-green-100 rounded-md px-3 py-2">
+            {successMsg}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Titill */}
+          <div className="space-y-1">
+            <Label htmlFor="title">Titill tilboðs</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Dæmi: 30% afsláttur af vetrarúlpum"
+              required
+            />
+          </div>
+
+          {/* Lýsing */}
+          <div className="space-y-1">
+            <Label htmlFor="description">Lýsing</Label>
+            <textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Stutt lýsing á tilboðinu…"
+              className="w-full border border-black rounded-md px-3 py-2 text-sm text-black bg-white min-h-[80px]"
+            />
+          </div>
+
+          {/* Flokkur - DROPDOWN */}
+          <div className="space-y-1">
+            <Label htmlFor="category">Flokkur</Label>
+            <select
+              id="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full border border-black rounded-md px-3 py-2 text-sm bg-white text-black"
+              required
+            >
+              <option value="">Veldu flokk…</option>
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground">
+              Flokkar eru notaðir á „Flokkar“ síðunni og í leit.
+            </p>
+          </div>
+
+          {/* Verð */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="priceOriginal">Verð áður</Label>
+              <Input
+                id="priceOriginal"
+                value={priceOriginal}
+                onChange={(e) => setPriceOriginal(e.target.value)}
+                placeholder="t.d. 14990"
+                inputMode="decimal"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Lýsing</label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="border w-full p-2 rounded text-sm"
-                placeholder="Stutt lýsing..."
-                rows={4}
+            <div className="space-y-1">
+              <Label htmlFor="priceSale">Tilboðsverð</Label>
+              <Input
+                id="priceSale"
+                value={priceSale}
+                onChange={(e) => setPriceSale(e.target.value)}
+                placeholder="t.d. 9990"
+                inputMode="decimal"
+                required
+              />
+            </div>
+          </div>
+
+          {/* Linkur til kaupa */}
+          <div className="space-y-1">
+            <Label htmlFor="buyUrl">Linkur til að kaupa (vefsíða)</Label>
+            <Input
+              id="buyUrl"
+              value={buyUrl}
+              onChange={(e) => setBuyUrl(e.target.value)}
+              placeholder="https://verslun.is/tilbod"
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Notendur fara á þessa slóð þegar þeir smella á „Smelltu hér til að
+              kaupa“.
+            </p>
+          </div>
+
+          {/* Dagssetningar (valkvætt) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="startsAt">Byrjar (valkvætt)</Label>
+              <Input
+                id="startsAt"
+                type="date"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Flokkur</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="border w-full p-2 rounded text-sm"
-              >
-                <option value="fatnadur">Fatnaður</option>
-                <option value="heimili">Heimili</option>
-                <option value="rafmagn">Raftæki</option>
-                <option value="heilsa">Heilsa</option>
-                <option value="veitingar">Veitingar</option>
-                <option value="snyrtivorur">Snyrtivörur</option>
-                <option value="annad">Annað</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Slóð á vöruna (valkvætt)
-              </label>
-              <input
-                type="url"
-                value={buyUrl}
-                onChange={(e) => setBuyUrl(e.target.value)}
-                className="border w-full p-2 rounded text-sm"
-                placeholder="https://vefverslun.is/vara123"
+            <div className="space-y-1">
+              <Label htmlFor="endsAt">Endar (valkvætt)</Label>
+              <Input
+                id="endsAt"
+                type="date"
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
               />
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Mynd af vörunni
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="text-sm"
-              />
-
-              {imagePreview && (
-                <div className="mt-2">
-                  <img
-                    src={imagePreview}
-                    alt="Forskoðun"
-                    className="w-full max-h-56 object-cover rounded border"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Fyrra verð
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={priceOriginal}
-                  onChange={(e) => setPriceOriginal(e.target.value)}
-                  className="border w-full p-2 rounded text-sm"
-                  placeholder="12990"
-                  required
+          {/* Mynd */}
+          <div className="space-y-2">
+            <Label htmlFor="image">Mynd fyrir tilboðið</Label>
+            <Input
+              id="image"
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+            />
+            {imagePreview && (
+              <div className="mt-2">
+                <p className="text-[11px] text-muted-foreground mb-1">
+                  Forskoðun:
+                </p>
+                <img
+                  src={imagePreview}
+                  alt="Forskoðun"
+                  className="w-full max-h-60 object-cover rounded-md border"
                 />
               </div>
+            )}
+          </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Útsöluverð
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={priceSale}
-                  onChange={(e) => setPriceSale(e.target.value)}
-                  className="border w-full p-2 rounded text-sm"
-                  placeholder="6990"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium mb-1">Byrjar</label>
-                <input
-                  type="date"
-                  value={startsAt}
-                  onChange={(e) => setStartsAt(e.target.value)}
-                  className="border w-full p-2 rounded text-sm"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">Endar</label>
-                <input
-                  type="date"
-                  value={endsAt}
-                  onChange={(e) => setEndsAt(e.target.value)}
-                  className="border w-full p-2 rounded text-sm"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {success && <p className="text-sm text-emerald-600">{success}</p>}
-
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Vista tilboð..." : "Vista tilboð"}
-            </Button>
-          </form>
-        </Card>
-      </main>
+          {/* Submit */}
+          <Button
+            type="submit"
+            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Bý til tilboð..." : "Búa til tilboð"}
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

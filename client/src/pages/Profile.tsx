@@ -1,742 +1,724 @@
 // client/src/pages/Profile.tsx
-
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
 import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
-import type { SalePostWithDetails } from "@shared/schema";
-import { formatPrice, calculateDiscount, getTimeRemaining } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { getTimeRemaining } from "@/lib/utils";
 
-const TOKEN_KEY = "utsalapp_token";
-const AUTH_KEY = "utsalapp_auth_user";
-
-type PlanType = "basic" | "pro" | "premium";
-
-type StoreTrial = {
-  trialEndsAt: string | null;
-  daysLeft: number | null;
-  isExpired: boolean;
-};
-
-type StoreFromApi = {
+type StoreInfo = {
   id: string;
   name: string;
-  plan?: PlanType;
-  planType?: PlanType;
-  billingStatus?: "trial" | "active" | "paused" | "canceled";
-  billingActive?: boolean;
-  trial?: StoreTrial;
+  address?: string;
+  phone?: string;
+  website?: string;
+  plan?: string;
+  planType?: string;
   trialEndsAt?: string | null;
-  address?: string | null;
-  phone?: string | null;
-  website?: string | null;
-  [key: string]: any;
+  billingStatus?: string;
+  billingActive?: boolean;
+  createdAt?: string | null; // BÆTT VIÐ
 };
 
+type BillingInfo = {
+  plan: string | null;
+  trialEndsAt: string | null;
+  billingStatus: string;
+  trialExpired: boolean;
+  daysLeft: number | null;
+  createdAt?: string | null; // BÆTT VIÐ – kemur frá /stores/me/billing
+};
+
+type StorePost = {
+  id: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  priceOriginal?: number;
+  priceSale?: number;
+  buyUrl?: string | null;
+  images?: { url: string; alt?: string }[];
+  viewCount?: number;
+  endsAt?: string | null; // BÆTT VIÐ – lokadagsetning tilboðs
+};
+
+type PlanId = "basic" | "pro" | "premium";
+
+// Reiknum texta fyrir prufuviku út frá trialEndsAt
+function getTrialLabel(trialEndsAt?: string | null) {
+  if (!trialEndsAt) return null;
+
+  const now = new Date();
+  const end = new Date(trialEndsAt);
+  const diffMs = end.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) {
+    return "Frí prufuvika er runnin út";
+  }
+
+  if (diffDays === 1) {
+    return `Frí prufuvika: 1 dagur eftir (til ${end.toLocaleDateString(
+      "is-IS",
+    )})`;
+  }
+
+  return `Frí prufuvika: ${diffDays} dagar eftir (til ${end.toLocaleDateString(
+    "is-IS",
+  )})`;
+}
+
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("is-IS");
+}
+
+// Nýr helper fyrir "X dagar eftir af tilboðinu"
+function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
+  if (!endsAt) return null;
+
+  const remaining = getTimeRemaining(endsAt);
+
+  if (typeof remaining === "string") {
+    // ef util skilar streng, notum hann beint (t.d. "Útsölunni er lokið")
+    return remaining;
+  }
+
+  if (remaining && typeof remaining === "object" && "totalMs" in remaining) {
+    const { days, hours, minutes, totalMs } = remaining as {
+      days: number;
+      hours: number;
+      minutes: number;
+      totalMs: number;
+    };
+
+    if (totalMs <= 0) {
+      return "Útsölunni er lokið";
+    }
+
+    if (days > 1) {
+      return `${days} dagar eftir af tilboðinu`;
+    }
+
+    if (days === 1) {
+      return "1 dagur eftir af tilboðinu";
+    }
+
+    // Engir heilir dagar eftir en samt í gangi
+    if (hours > 0) {
+      return "Endar innan 24 klst";
+    }
+
+    if (minutes > 0) {
+      return "Endar fljótlega";
+    }
+
+    return "Endar fljótlega";
+  }
+
+  return null;
+}
+
+const PLANS: {
+  id: PlanId;
+  name: string;
+  price: string;
+  description: string;
+}[] = [
+  {
+    id: "basic",
+    name: "Basic",
+    price: "12.000 kr/mán",
+    description: "Fyrir minni verslanir sem vilja byrja að prófa ÚtsalApp.",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "22.000 kr/mán",
+    description: "Fyrir verslanir með reglulegar útsölur og meiri sýnileika.",
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    price: "32.000 kr/mán",
+    description:
+      "Fyrir stærri verslanir og keðjur sem vilja hámarksáhrif í ÚtsalApp.",
+  },
+];
+
 export default function Profile() {
-  const { authUser, logout, loading } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { authUser, isStore, logout } = useAuth();
 
-  const [posts, setPosts] = useState<SalePostWithDetails[]>([]);
-  const [postsLoading, setPostsLoading] = useState(false);
-  const [postsError, setPostsError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const store: StoreInfo | null = authUser?.store ?? null;
 
-  // Frívika / pakkar
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>("basic");
-  const [planLoading, setPlanLoading] = useState(false);
-  const [planError, setPlanError] = useState<string | null>(null);
-  const [showPlanEditor, setShowPlanEditor] = useState(false);
+  // Billing + pakki koma frá backend í stað localStorage
+  const [billing, setBilling] = useState<BillingInfo | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
 
-  // Trial / billing staða úr backend
-  const [storeStatus, setStoreStatus] = useState<StoreFromApi | null>(null);
-  const [storeStatusLoading, setStoreStatusLoading] = useState(false);
-  const [storeStatusError, setStoreStatusError] = useState<string | null>(null);
+  // Valinn pakki í UI (það sem user smellir á)
+  const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
 
-  // Upphafsstilla valinn pakka út frá store.planType þegar authUser er til
+  // Staðbundin skilaboð fyrir notanda
+  const [planSuccessMsg, setPlanSuccessMsg] = useState<string | null>(null);
+  const [planErrorMsg, setPlanErrorMsg] = useState<string | null>(null);
+  const [activatingPlanId, setActivatingPlanId] = useState<PlanId | null>(null);
+
+  // Eyðing tilboða
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // Tilboð verslunar
+  const {
+    data: storePosts = [],
+    isLoading: loadingPosts,
+    error: postsError,
+  } = useQuery<StorePost[]>({
+    queryKey: ["store-posts", store?.id],
+    enabled: !!store?.id,
+    queryFn: async () => {
+      if (!store?.id) return [];
+      return apiFetch<StorePost[]>(`/api/v1/stores/${store.id}/posts`);
+    },
+  });
+
+  // Sækjum billing info úr backend þegar verslun er til
   useEffect(() => {
-    const plan = (authUser?.store as any)?.planType as PlanType | undefined;
-    if (plan === "basic" || plan === "pro" || plan === "premium") {
-      setSelectedPlan(plan);
-    }
-  }, [authUser?.store]);
+    if (!store?.id) return;
 
-  // Sækja tilboð verslunarinnar þegar við vitum store.id
-  useEffect(() => {
-    async function fetchStorePosts() {
-      if (!authUser?.store?.id) return;
-
-      setPostsLoading(true);
-      setPostsError(null);
-
+    let cancelled = false;
+    async function loadBilling() {
+      setBillingLoading(true);
+      setBillingError(null);
       try {
-        const res = await fetch(
-          `/api/v1/stores/${authUser.store.id}/posts?activeOnly=false`,
-        );
+        const data = await apiFetch<BillingInfo>("/api/v1/stores/me/billing");
+        if (!cancelled) {
+          setBilling(data);
 
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          throw new Error(text || "Tókst ekki að sækja tilboð verslunar.");
+          // Stillum valinn pakka út frá backend plan
+          const backendPlan = (data.plan || "").toLowerCase();
+          if (
+            backendPlan === "basic" ||
+            backendPlan === "pro" ||
+            backendPlan === "premium"
+          ) {
+            setSelectedPlan(backendPlan as PlanId);
+          } else {
+            setSelectedPlan(null);
+          }
         }
-
-        const data = (await res.json()) as SalePostWithDetails[];
-        setPosts(data);
-      } catch (err: any) {
-        console.error("Fetch store posts error:", err);
-        setPostsError(
-          err?.message || "Villa kom upp við að sækja tilboð verslunar.",
-        );
-      } finally {
-        setPostsLoading(false);
-      }
-    }
-
-    fetchStorePosts();
-  }, [authUser?.store?.id]);
-
-  // Sækja trial/billing stöðu verslunar úr backend (/api/v1/store/me)
-  useEffect(() => {
-    async function fetchStoreStatus() {
-      if (!authUser?.user || authUser.user.role !== "store") return;
-
-      const token = localStorage.getItem(TOKEN_KEY);
-      if (!token) return;
-
-      setStoreStatusLoading(true);
-      setStoreStatusError(null);
-
-      try {
-        const res = await fetch("/api/v1/store/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const text = await res.text().catch(() => "");
-        let data: any = null;
-        try {
-          data = text ? JSON.parse(text) : null;
-        } catch {
-          data = null;
-        }
-
-        if (!res.ok) {
-          throw new Error(
-            data?.message ||
-              text ||
-              "Tókst ekki að sækja upplýsingar um verslun og áskrift.",
+      } catch (err) {
+        console.error("stores/me/billing error:", err);
+        if (!cancelled) {
+          setBillingError(
+            "Tókst ekki að sækja stöðu áskriftar. Reyndu aftur síðar.",
           );
         }
-
-        if (!data || typeof data !== "object") {
-          setStoreStatus(null);
-          return;
-        }
-
-        setStoreStatus(data as StoreFromApi);
-
-        const planFromApi =
-          (data.planType as PlanType | undefined) ??
-          (data.plan as PlanType | undefined);
-        if (
-          planFromApi === "basic" ||
-          planFromApi === "pro" ||
-          planFromApi === "premium"
-        ) {
-          setSelectedPlan(planFromApi);
-        }
-      } catch (err: any) {
-        console.error("Fetch store status error:", err);
-        setStoreStatusError(
-          err?.message ||
-            "Villa kom upp við að sækja upplýsingar um verslun og áskrift.",
-        );
       } finally {
-        setStoreStatusLoading(false);
+        if (!cancelled) {
+          setBillingLoading(false);
+        }
       }
     }
 
-    fetchStoreStatus();
-  }, [authUser?.user?.id, authUser?.user?.role]);
+    loadBilling();
+    return () => {
+      cancelled = true;
+    };
+  }, [store?.id]);
 
-  // Eyða tilboði
-  async function handleDelete(postId: string) {
-    if (!authUser?.store?.id) return;
+  const trialActive =
+    billing !== null && !billing.trialExpired && !!billing.trialEndsAt;
 
-    const sure = window.confirm(
-      "Ertu viss um að þú viljir eyða þessu tilboði? Þessu verður ekki hægt að afturkalla.",
-    );
-    if (!sure) return;
+  const trialLabel =
+    billing && billing.trialExpired
+      ? "Frí prufuvika er runnin út"
+      : billing && billing.trialEndsAt && !billing.trialExpired
+        ? getTrialLabel(billing.trialEndsAt)
+        : null;
 
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setPostsError(
-        "Enginn innskráningarlykill fannst. Reyndu að skrá þig inn aftur.",
-      );
-      return;
-    }
+  const activePlan: PlanId | null =
+    billing &&
+    typeof billing.plan === "string" &&
+    ["basic", "pro", "premium"].includes(billing.plan.toLowerCase())
+      ? (billing.plan.toLowerCase() as PlanId)
+      : null;
 
-    setDeletingId(postId);
-    setPostsError(null);
+  const displayPlan: PlanId | null = activePlan ?? selectedPlan ?? null;
 
-    try {
-      const res = await fetch(`/api/v1/posts/${postId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+  const billingLabel =
+    billing?.billingStatus ||
+    store?.billingStatus ||
+    (store?.billingActive ? "active" : "trial");
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(text || "Tókst ekki að eyða tilboði.");
-      }
+  const mainButtonDisabled =
+    !selectedPlan || billingLoading || !!activatingPlanId;
 
-      setPosts((prev) => prev.filter((p) => p.id !== postId));
-    } catch (err: any) {
-      console.error("Delete post error:", err);
-      setPostsError(err?.message || "Villa kom upp við að eyða tilboði.");
-    } finally {
-      setDeletingId(null);
-    }
-  }
+  const mainButtonLabel = !selectedPlan
+    ? "Veldu áskriftarleið til að byrja fríviku"
+    : trialActive
+      ? "Uppfæra í þennan pakka"
+      : "Virkja fríviku á þessum pakka";
 
   async function handleActivatePlan() {
-    if (!authUser?.store?.id) return;
+    if (!store?.id) return;
+    if (!selectedPlan) return;
 
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setPlanError(
-        "Enginn innskráningarlykill fannst. Reyndu að skrá þig inn aftur.",
-      );
-      return;
-    }
-
-    setPlanLoading(true);
-    setPlanError(null);
+    setPlanErrorMsg(null);
+    setPlanSuccessMsg(null);
+    setActivatingPlanId(selectedPlan);
 
     try {
-      const res = await fetch("/api/v1/stores/activate-plan", {
+      // Virkjum / uppfærum pakka í backend
+      await apiFetch<StoreInfo>("/api/v1/stores/activate-plan", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ planType: selectedPlan, plan: selectedPlan }),
+        body: JSON.stringify({ plan: selectedPlan }),
       });
 
-      const data = await res.json().catch(() => null);
+      // Sækjum nýjustu billing stöðu eftir breytingu
+      const updatedBilling = await apiFetch<BillingInfo>(
+        "/api/v1/stores/me/billing",
+      );
+      setBilling(updatedBilling);
 
-      if (!res.ok) {
-        throw new Error(data?.message || "Tókst ekki að virkja pakka.");
+      const planName =
+        PLANS.find((p) => p.id === selectedPlan)?.name || "pakkann";
+
+      if (trialActive) {
+        setPlanSuccessMsg(`Pakkinn þinn hefur verið uppfærður í ${planName}.`);
+      } else {
+        setPlanSuccessMsg(
+          `Frívika þín hefur verið virkjuð í ${planName} pakka.`,
+        );
       }
 
-      try {
-        const stored = localStorage.getItem(AUTH_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const storeLocal = parsed.store || {};
-          storeLocal.planType = data?.planType ?? selectedPlan;
-          storeLocal.trialEndsAt =
-            data?.trialEndsAt ?? data?.trial?.trialEndsAt ?? null;
-          storeLocal.billingActive =
-            data?.billingActive ??
-            (data?.billingStatus === "active" ? true : true);
-          parsed.store = storeLocal;
-          localStorage.setItem(AUTH_KEY, JSON.stringify(parsed));
+      // Enginn redirect – notandi er áfram á prófílnum
+    } catch (err) {
+      console.error("activate-plan error:", err);
+      let msg =
+        err instanceof Error
+          ? err.message
+          : "Tókst ekki að virkja eða uppfæra pakka. Reyndu aftur síðar.";
+
+      const match = msg.match(/\{.*\}/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.message) {
+            msg = parsed.message;
+          }
+        } catch {
+          // höldum msg óbreyttri ef parse klikkar
         }
-      } catch (e) {
-        console.error("Gat ekki uppfært AUTH_KEY eftir activate-plan", e);
       }
 
-      window.location.reload();
-    } catch (err: any) {
-      console.error("activate plan error:", err);
-      setPlanError(err?.message || "Villa kom upp við að virkja pakka.");
+      setPlanErrorMsg(msg);
     } finally {
-      setPlanLoading(false);
+      setActivatingPlanId(null);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 text-sm text-muted-foreground">Hleð prófíl...</div>
+  async function handleDeletePost(post: StorePost) {
+    if (!post.id) return;
+
+    setDeleteError(null);
+
+    const title = post.title || "tilboði";
+    const confirmed = window.confirm(
+      `Ertu viss um að þú viljir eyða tilboðinu „${title}“?`,
     );
+    if (!confirmed) return;
+
+    try {
+      setDeletingPostId(post.id);
+      await apiFetch<{ success: boolean }>(`/api/v1/posts/${post.id}`, {
+        method: "DELETE",
+      });
+
+      // Uppfærum listann – einfaldast að láta react-query refetcha
+      await queryClient.invalidateQueries({
+        queryKey: ["store-posts", store?.id],
+      });
+    } catch (err) {
+      console.error("delete post error:", err);
+      setDeleteError(
+        "Tókst ekki að eyða tilboðinu. Reyndu aftur eða hafðu samband ef vandinn heldur áfram.",
+      );
+    } finally {
+      setDeletingPostId(null);
+    }
   }
 
-  if (!authUser) {
+  async function handleLogout() {
+    await logout();
+    navigate("/login", { replace: true });
+  }
+
+  if (!authUser || !isStore || !store) {
     return (
-      <div className="p-4 space-y-4">
-        <h2 className="text-xl font-bold">Prófíll</h2>
-        <p className="text-sm text-muted-foreground">Þú ert ekki innskráður.</p>
-
-        <Link to="/login">
-          <Button className="w-full">Skrá inn</Button>
-        </Link>
-
-        <Link to="/register-store">
-          <Button className="w-full mt-2" variant="secondary">
-            Stofna verslun
+      <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
+        <Card className="p-4 space-y-3">
+          <p className="text-sm">
+            Þú þarft að vera innskráður sem verslun til að sjá prófíl.
+          </p>
+          <Button
+            onClick={() => navigate("/login")}
+            className="bg-[#FF7300] hover:bg-[#e56600] text-white text-sm"
+          >
+            Skrá inn
           </Button>
-        </Link>
+        </Card>
       </div>
     );
   }
 
-  const user = authUser.user;
-  const store = authUser.store as any;
+  const canCreateOffers =
+    billing && !billing.trialExpired && !!billing.trialEndsAt;
 
-  const effectiveStore: StoreFromApi | null = storeStatus
-    ? { ...(storeStatus as any) }
-    : store
-      ? { ...(store as any) }
-      : null;
-
-  const trial: StoreTrial | null =
-    effectiveStore?.trial ??
-    (effectiveStore?.trialEndsAt || store?.trialEndsAt
-      ? {
-          trialEndsAt:
-            effectiveStore?.trialEndsAt ??
-            (store?.trialEndsAt as string | null) ??
-            null,
-          daysLeft: null,
-          isExpired: false,
-        }
-      : null);
-
-  const billingActive: boolean = (() => {
-    if (!effectiveStore) return false;
-
-    if (effectiveStore.billingStatus === "active") return true;
-
-    if (trial && trial.trialEndsAt && trial.isExpired === false) {
-      return true;
-    }
-
-    if (typeof effectiveStore.billingActive === "boolean") {
-      return effectiveStore.billingActive;
-    }
-
-    return false;
-  })();
-
-  const currentPlan: PlanType =
-    (effectiveStore?.planType as PlanType | undefined) ??
-    (effectiveStore?.plan as PlanType | undefined) ??
-    "basic";
-
-  const trialEndsAt =
-    trial?.trialEndsAt ??
-    (effectiveStore?.trialEndsAt as string | null | undefined) ??
-    (store?.trialEndsAt as string | null | undefined) ??
-    null;
-
-  const storeAddress =
-    effectiveStore?.address ?? (store?.address as string | undefined);
-  const storePhone =
-    effectiveStore?.phone ?? (store?.phone as string | undefined);
-  const storeWebsite =
-    effectiveStore?.website ?? (store?.website as string | undefined);
-
-  function formatPlanLabel(plan: PlanType) {
-    if (plan === "basic") return "Basic";
-    if (plan === "pro") return "Pro";
-    return "Premium";
-  }
-
-  const renderPlanChoices = (
-    onClickPlan: (p: PlanType) => void,
-    currentSelected: PlanType,
-  ) => (
-    <div className="flex flex-col md:flex-row gap-2 text-sm">
-      <button
-        type="button"
-        className={`flex-1 border rounded p-2 text-left ${
-          currentSelected === "basic" ? "border-pink-600" : "border-border"
-        }`}
-        onClick={() => onClickPlan("basic")}
-      >
-        <div className="font-semibold">Basic</div>
-        <div className="text-xs text-muted-foreground">
-          Fyrir minni verslanir með einföld tilboð.
-        </div>
-      </button>
-
-      <button
-        type="button"
-        className={`flex-1 border rounded p-2 text-left ${
-          currentSelected === "pro" ? "border-pink-600" : "border-border"
-        }`}
-        onClick={() => onClickPlan("pro")}
-      >
-        <div className="font-semibold">Pro</div>
-        <div className="text-xs text-muted-foreground">
-          Fyrir verslanir með reglulegar útsölur.
-        </div>
-      </button>
-
-      <button
-        type="button"
-        className={`flex-1 border rounded p-2 text-left ${
-          currentSelected === "premium" ? "border-pink-600" : "border-border"
-        }`}
-        onClick={() => onClickPlan("premium")}
-      >
-        <div className="font-semibold">Premium</div>
-        <div className="text-xs text-muted-foreground">
-          Fyrir stærri keðjur og mörg útibú.
-        </div>
-      </button>
-    </div>
+  const createdAtLabel = formatDate(
+    store.createdAt ?? billing?.createdAt ?? null,
   );
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Haus */}
-      <header className="p-4 border-b border-border">
-        <h1 className="text-2xl font-bold">Prófíll</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Yfirlit yfir aðganginn þinn og útsölutilboð verslunarinnar.
-        </p>
+    <div className="max-w-3xl mx-auto px-4 pb-24 pt-4 space-y-4">
+      {/* Haus: hver er innskráður */}
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold">Prófíll verslunar</h1>
+          <p className="text-xs text-muted-foreground">
+            Innskráður sem {authUser.user.email} (verslun)
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          onClick={handleLogout}
+        >
+          Útskrá
+        </Button>
       </header>
 
-      <main className="p-4 max-w-4xl mx-auto space-y-4">
-        {/* Upplýsingar um notanda */}
-        <Card className="p-4 space-y-2">
-          <h2 className="font-semibold text-lg">Aðgangsupplýsingar</h2>
+      {/* Upplýsingar um verslun */}
+      <Card className="p-4 space-y-2">
+        <h2 className="text-sm font-semibold mb-1">Verslun</h2>
+        <p className="text-sm">
+          <span className="font-medium">Nafn:</span> {store.name}
+        </p>
+        {store.address && (
           <p className="text-sm">
-            <span className="font-medium">Netfang:</span> {user.email}
+            <span className="font-medium">Heimilisfang:</span> {store.address}
           </p>
+        )}
+        {store.phone && (
           <p className="text-sm">
-            <span className="font-medium">Hlutverk:</span>{" "}
-            {user.role === "store" ? "Verslun" : user.role}
+            <span className="font-medium">Sími:</span> {store.phone}
           </p>
-        </Card>
-
-        {/* Áskrift & frívika */}
-        {store && (
-          <Card className="p-4 space-y-3">
-            <h2 className="font-semibold text-lg">Áskrift & frívika</h2>
-
-            {storeStatusLoading && (
-              <p className="text-xs text-muted-foreground">
-                Sæki áskriftarstöðu...
-              </p>
-            )}
-
-            {storeStatusError && (
-              <p className="text-xs text-destructive">{storeStatusError}</p>
-            )}
-
-            {billingActive ? (
-              <>
-                <p className="text-sm">
-                  <span className="font-medium">Pakkategund:</span>{" "}
-                  {formatPlanLabel(currentPlan)}
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Frívika til:</span>{" "}
-                  {trialEndsAt
-                    ? new Date(trialEndsAt).toLocaleDateString("is-IS")
-                    : "Í fríviku (án dagsetningar)"}
-                </p>
-                {trial?.daysLeft != null && (
-                  <p className="text-xs text-muted-foreground">
-                    {trial.daysLeft > 0
-                      ? `Um ${trial.daysLeft} dagar eftir af fríviku.`
-                      : trial.daysLeft === 0
-                        ? "Síðasti dagurinn í fríviku."
-                        : "Frívika er útrunnin – virkjaðu áskrift til að halda áfram án truflana."}
-                  </p>
-                )}
-                {!trial && (
-                  <p className="text-xs text-green-700">
-                    Aðgangurinn þinn er virkur – þú getur búið til og stýrt
-                    útsölutilboðum.
-                  </p>
-                )}
-
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-muted-foreground">
-                    Þú getur uppfært pakkann þinn hvenær sem er.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowPlanEditor((v) => !v)}
-                  >
-                    {showPlanEditor ? "Loka pakkavali" : "Breyta pakka"}
-                  </Button>
-                </div>
-
-                {showPlanEditor && (
-                  <div className="mt-3 space-y-2">
-                    {renderPlanChoices((p) => setSelectedPlan(p), selectedPlan)}
-
-                    {planError && (
-                      <p className="text-sm text-destructive">{planError}</p>
-                    )}
-
-                    <Button
-                      className="w-full"
-                      onClick={handleActivatePlan}
-                      disabled={planLoading}
-                    >
-                      {planLoading
-                        ? "Uppfæri pakka..."
-                        : `Uppfæra í ${formatPlanLabel(selectedPlan)} pakka`}
-                    </Button>
-
-                    <p className="text-[11px] text-muted-foreground">
-                      Pakkabreyting tekur gildi strax. Reikningsgerð og
-                      greiðslur verða stílaðar í takt við valinn pakka þegar
-                      greiðslukerfið er virkjað.
-                    </p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Veldu pakka til að virkja 7 daga fríviku og fá fullan aðgang
-                  að ÚtsalApp.
-                </p>
-
-                {renderPlanChoices((p) => setSelectedPlan(p), selectedPlan)}
-
-                {planError && (
-                  <p className="text-sm text-destructive">{planError}</p>
-                )}
-
-                <Button
-                  className="w-full"
-                  onClick={handleActivatePlan}
-                  disabled={planLoading}
-                >
-                  {planLoading
-                    ? "Virki pakka..."
-                    : `Virkja ${formatPlanLabel(
-                        selectedPlan,
-                      )} pakka og fríviku`}
-                </Button>
-
-                <p className="text-[11px] text-muted-foreground">
-                  Frívikan er án skuldbindingar. Eftir prufutímann geturðu hætt
-                  þegar er þér hentar.
-                </p>
-              </>
-            )}
-          </Card>
+        )}
+        {store.website && (
+          <p className="text-sm">
+            <span className="font-medium">Vefsíða:</span>{" "}
+            <a
+              href={store.website}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#FF7300] underline"
+            >
+              {store.website}
+            </a>
+          </p>
+        )}
+        {createdAtLabel && (
+          <p className="text-sm">
+            <span className="font-medium">Stofnað í ÚtsalApp:</span>{" "}
+            {createdAtLabel}
+          </p>
         )}
 
-        {/* Verslun + action takkar */}
-        <Card className="p-4 space-y-2">
-          <h2 className="font-semibold text-lg">Verslun</h2>
-          {store ? (
-            <>
-              <p className="text-sm">
-                <span className="font-medium">Nafn verslunar:</span>{" "}
-                {store.name}
-              </p>
-
-              {storeAddress && (
-                <p className="text-sm">
-                  <span className="font-medium">Heimilisfang:</span>{" "}
-                  {storeAddress}
-                </p>
-              )}
-
-              {storePhone && (
-                <p className="text-sm">
-                  <span className="font-medium">Sími:</span> {storePhone}
-                </p>
-              )}
-
-              {storeWebsite && (
-                <p className="text-sm">
-                  <span className="font-medium">Vefsíða:</span>{" "}
-                  <a
-                    href={storeWebsite}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline text-pink-600"
-                  >
-                    {storeWebsite}
-                  </a>
-                </p>
-              )}
-
-              <p className="text-xs text-muted-foreground">
-                Þetta er verslunin sem tilboðin þín tengjast í ÚtsalApp.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Engin verslun er tengd þessum aðgangi.
+        <div className="pt-2 space-y-1 text-sm">
+          <p>
+            <span className="font-medium">Valinn pakki:</span>{" "}
+            {displayPlan === "basic"
+              ? "Basic"
+              : displayPlan === "pro"
+                ? "Pro"
+                : displayPlan === "premium"
+                  ? "Premium"
+                  : "Engin áskrift valin"}
+          </p>
+          {trialLabel && (
+            <p>
+              <span className="font-medium">Prufutímabil:</span> {trialLabel}
             </p>
           )}
-
-          {user.role === "store" && (
-            <>
-              <Link to="/create">
-                <Button
-                  className="w-full mt-3"
-                  disabled={!billingActive}
-                  title={
-                    !billingActive
-                      ? "Virkjaðu fríviku og pakka hér að ofan til að geta búið til útsölutilboð."
-                      : undefined
-                  }
-                >
-                  Búa til nýtt útsölutilboð
-                </Button>
-              </Link>
-              {!billingActive && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Til að geta búið til tilboð þarf fyrst að virkja fríviku og
-                  pakka hér að ofan.
-                </p>
-              )}
-            </>
+          {!trialLabel && (
+            <p className="text-sm text-muted-foreground">
+              Engin frívika virk. Veldu áskriftarleið og smelltu á hnappinn hér
+              fyrir neðan til að byrja.
+            </p>
           )}
+          <p>
+            <span className="font-medium">Greiðslustaða:</span> {billingLabel}
+          </p>
+        </div>
+      </Card>
 
-          <Button
-            variant="destructive"
-            className="w-full mt-2"
-            onClick={async () => {
-              await logout();
-              window.location.href = "/profile";
-            }}
-          >
-            Skrá út
-          </Button>
-        </Card>
+      {/* Pakkar + frívika */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Pakkar og frívika</h2>
+        </div>
 
-        {/* Tilboð verslunarinnar */}
-        {store && (
-          <section className="space-y-3">
-            <h2 className="font-semibold text-lg">
-              Tilboð verslunarinnar ({posts.length})
-            </h2>
-
-            {postsLoading && (
-              <p className="text-sm text-muted-foreground">
-                Sæki tilboð verslunar...
-              </p>
-            )}
-
-            {postsError && (
-              <Card className="p-3 text-sm text-destructive">{postsError}</Card>
-            )}
-
-            {!postsLoading && !postsError && posts.length === 0 && (
-              <Card className="p-4 text-sm text-muted-foreground">
-                Engin tilboð hafa verið skráð fyrir þessa verslun ennþá. Smelltu
-                á „Búa til nýtt útsölutilboð“ til að bæta við.
-              </Card>
-            )}
-
-            {!postsLoading && !postsError && posts.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {posts.map((post) => {
-                  const mainImage = post.images?.[0];
-                  const discount = calculateDiscount(
-                    post.priceOriginal,
-                    post.priceSale,
-                  );
-                  const timeRemaining = getTimeRemaining(post.endsAt);
-                  const detailHref = `/post/${post.id}`;
-                  const isDeleting = deletingId === post.id;
-
-                  return (
-                    <Card
-                      key={post.id}
-                      className="p-3 space-y-2 rounded-xl border border-border bg-background"
-                    >
-                      <Link
-                        to={detailHref}
-                        className="block rounded-xl overflow-hidden"
-                      >
-                        <div className="relative w-full h-40 bg-muted overflow-hidden rounded-lg">
-                          {mainImage ? (
-                            <img
-                              src={mainImage.url}
-                              alt={mainImage.alt ?? post.title}
-                              className="w-full h-full object-cover object-center"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-                              Engin mynd
-                            </div>
-                          )}
-
-                          {discount > 0 && (
-                            <div className="absolute top-2 right-2 bg-pink-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                              -{discount}%
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="mt-2 space-y-1">
-                          <div className="text-[11px] text-muted-foreground">
-                            {store.name}
-                          </div>
-                          <div className="font-semibold text-sm line-clamp-2">
-                            {post.title}
-                          </div>
-                          {post.description && (
-                            <div className="text-xs text-muted-foreground line-clamp-2">
-                              {post.description}
-                            </div>
-                          )}
-                          <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-sm font-bold text-pink-600">
-                              {formatPrice(post.priceSale ?? post.price)}
-                            </span>
-                            {post.priceOriginal != null && (
-                              <span className="text-xs text-muted-foreground line-through">
-                                {formatPrice(post.priceOriginal)}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span>{timeRemaining}</span>
-                            <span>{post.viewCount ?? 0} skoðanir</span>
-                          </div>
-                        </div>
-                      </Link>
-
-                      <div className="flex gap-2 mt-1">
-                        <Link to={`/edit/${post.id}`} className="flex-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full text-sm"
-                            disabled={isDeleting}
-                          >
-                            Breyta tilboði
-                          </Button>
-                        </Link>
-
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="flex-1 text-sm"
-                          disabled={isDeleting}
-                          onClick={() => handleDelete(post.id)}
-                        >
-                          {isDeleting ? "Eyði..." : "Eyða"}
-                        </Button>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+        {billingLoading && (
+          <p className="text-xs text-muted-foreground">Sæki stöðu áskriftar…</p>
         )}
-      </main>
+
+        {billingError && <p className="text-xs text-red-600">{billingError}</p>}
+
+        {!billingLoading && !billingError && !trialActive && (
+          <p className="text-xs text-muted-foreground">
+            Veldu pakka sem hentar versluninni þinni. Smelltu svo á hnappinn hér
+            fyrir neðan til að virkja 7 daga fríviku á valda áskrift.
+          </p>
+        )}
+
+        {!billingLoading && !billingError && trialActive && activePlan && (
+          <p className="text-xs text-[#059669]">
+            Frí prufuvika er virk á pakkann{" "}
+            <span className="font-medium">
+              {activePlan === "basic"
+                ? "Basic"
+                : activePlan === "pro"
+                  ? "Pro"
+                  : "Premium"}
+            </span>
+            .
+          </p>
+        )}
+
+        {planErrorMsg && <p className="text-xs text-red-600">{planErrorMsg}</p>}
+
+        {planSuccessMsg && (
+          <p className="text-xs text-green-600">{planSuccessMsg}</p>
+        )}
+
+        {/* Pakkarnir sjálfir */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {PLANS.map((plan) => {
+            const isSelected = selectedPlan === plan.id;
+            const isActive = activePlan === plan.id;
+            const isActivating = activatingPlanId === plan.id;
+
+            return (
+              <div
+                key={plan.id}
+                className={`border rounded-lg p-3 text-xs flex flex-col gap-2 cursor-pointer ${
+                  isSelected
+                    ? "border-[#FF7300] bg-orange-50"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
+                }`}
+                onClick={() => setSelectedPlan(plan.id)}
+              >
+                <div className="flex items-baseline justify-between">
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                  <span className="font-bold">{plan.price}</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {plan.description}
+                </p>
+                {isSelected && (
+                  <p className="text-[11px] text-[#FF7300] font-medium">
+                    Valin áskriftarleið
+                  </p>
+                )}
+                {isActive && trialActive && (
+                  <p className="text-[11px] text-[#059669] font-medium">
+                    Frívika virk á þessum pakka
+                  </p>
+                )}
+                {isActivating && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Uppfæri pakka…
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* EINN hnappur fyrir neðan pakkana */}
+        <div className="pt-2">
+          <Button
+            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={mainButtonDisabled}
+            onClick={handleActivatePlan}
+          >
+            {mainButtonLabel}
+          </Button>
+        </div>
+      </Card>
+
+      {/* Aðgerðir fyrir verslun */}
+      <Card className="p-4 space-y-3">
+        <h2 className="text-sm font-semibold">Aðgerðir</h2>
+        <div className="flex flex-wrap gap-2 items-center">
+          <Button
+            className="bg-[#FF7300] hover:bg-[#e56600] text-white text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => navigate("/create-post")}
+            disabled={!canCreateOffers}
+          >
+            Búa til nýtt tilboð
+          </Button>
+          {!canCreateOffers && (
+            <p className="text-[11px] text-muted-foreground">
+              Virkjaðu fríviku til að byrja að setja inn tilboð.
+            </p>
+          )}
+        </div>
+      </Card>
+
+      {/* Tilboð verslunar */}
+      <Card className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold">Tilboð verslunar</h2>
+          <p className="text-[11px] text-muted-foreground">
+            {storePosts.length} tilboð
+          </p>
+        </div>
+
+        {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+
+        {loadingPosts && (
+          <p className="text-xs text-muted-foreground">
+            Sæki tilboð verslunar…
+          </p>
+        )}
+
+        {postsError && !loadingPosts && (
+          <p className="text-xs text-red-600">
+            Tókst ekki að sækja tilboð verslunar.
+          </p>
+        )}
+
+        {!loadingPosts && !postsError && storePosts.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Þú ert ekki enn búinn að skrá nein tilboð. Þegar frívikan er virk,
+            getur þú smellt á „Búa til nýtt tilboð“ til að byrja.
+          </p>
+        )}
+
+        {!loadingPosts && !postsError && storePosts.length > 0 && (
+          <div className="space-y-3">
+            {storePosts.map((post) => {
+              const firstImageUrl = post.images?.[0]?.url ?? "";
+              const isDeleting = deletingPostId === post.id;
+              const timeRemainingLabel = getPostTimeRemainingLabel(post.endsAt);
+
+              return (
+                <div
+                  key={post.id}
+                  className="border border-gray-200 rounded-md p-3 text-sm flex gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  onClick={() => navigate(`/post/${post.id}`)}
+                >
+                  {firstImageUrl && (
+                    <img
+                      src={firstImageUrl}
+                      alt={post.images?.[0]?.alt || post.title}
+                      className="w-20 h-20 object-cover rounded-md flex-shrink-0"
+                    />
+                  )}
+
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{post.title}</p>
+                        {post.category && (
+                          <p className="text-[11px] text-muted-foreground truncate">
+                            Flokkur: {post.category}
+                          </p>
+                        )}
+                        {post.description && (
+                          <p className="text-[11px] text-muted-foreground line-clamp-2">
+                            {post.description}
+                          </p>
+                        )}
+                      </div>
+                      {typeof post.viewCount === "number" && (
+                        <p className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
+                          {post.viewCount} skoðanir
+                          {timeRemainingLabel && (
+                            <>
+                              <br />
+                              <span className="text-[10px] text-neutral-500">
+                                {timeRemainingLabel}
+                              </span>
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Ef engar skoðanir en viljum samt sýna dagafjölda */}
+                    {typeof post.viewCount !== "number" &&
+                      timeRemainingLabel && (
+                        <p className="text-[11px] text-neutral-500">
+                          {timeRemainingLabel}
+                        </p>
+                      )}
+
+                    <div className="flex items-center gap-2 text-[11px] pt-1">
+                      {typeof post.priceOriginal === "number" && (
+                        <span className="line-through text-muted-foreground">
+                          {post.priceOriginal.toLocaleString("is-IS")} kr.
+                        </span>
+                      )}
+                      {typeof post.priceSale === "number" && (
+                        <span className="font-semibold">
+                          {post.priceSale.toLocaleString("is-IS")} kr.
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs w-full sm:w-auto"
+                        disabled={isDeleting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/edit-post/${post.id}`);
+                        }}
+                      >
+                        Breyta tilboði
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
+                        disabled={isDeleting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePost(post);
+                        }}
+                      >
+                        {isDeleting ? "Eyði…" : "Eyða tilboði"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
     </div>
   );
 }

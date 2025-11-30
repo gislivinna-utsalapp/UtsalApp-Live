@@ -2,7 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Grunnstíll fyrir appið */
-body {
-  @apply bg-background text-foreground;
+@layer base {
+  :root {
+    --background: 0 0% 0%;
+    /* svartur */
+    --foreground: 0 0% 100%;
+    /* hvítur texti */
+
+    --card: 0 0% 100%;
+    /* hvít kort */
+    --card-foreground: 0 0% 0%;
+    /* svartur texti í kortum */
+
+    --primary: 25 100% 55%;
+    /* appelsínuguli glow-liturinn */
+    --primary-foreground: 0 0% 100%;
+
+    --border: 0 0% 85%;
+    /* ljósgrár rammi */
+    --muted: 0 0% 70%;
+    --muted-foreground: 0 0% 50%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
 }

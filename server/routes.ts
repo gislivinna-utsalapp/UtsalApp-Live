@@ -1,6 +1,5 @@
 // server/routes.ts
 import type { Express, Request, Response, NextFunction } from "express";
-import { createServer, type Server } from "http";
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
@@ -169,6 +168,7 @@ async function mapPostToFrontend(p: any) {
           plan,
           planType: plan, // fyrir eldri client
           billingStatus,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         }
       : null,
   };
@@ -190,9 +190,12 @@ function getPlanRankForPost(
 
 // ------------------------- ROUTES START -------------------------
 
-export function registerRoutes(app: Express): Server {
+export function registerRoutes(app: Express): void {
+  // Grunn middleware
   app.use(cors());
   app.use(express.json());
+
+  // Static fyrir uploads
   app.use("/uploads", express.static(UPLOAD_DIR));
 
   // ------------------ AUTH: REGISTER STORE ------------------
@@ -200,15 +203,24 @@ export function registerRoutes(app: Express): Server {
     "/api/v1/auth/register-store",
     async (req: Request, res: Response) => {
       try {
-        const { storeName, email, password, address, phone, website } =
-          req.body as {
-            storeName?: string;
-            email?: string;
-            password?: string;
-            address?: string;
-            phone?: string;
-            website?: string;
-          };
+        const {
+          storeName,
+          email: rawEmail,
+          password: rawPassword,
+          address,
+          phone,
+          website,
+        } = req.body as {
+          storeName?: string;
+          email?: string;
+          password?: string;
+          address?: string;
+          phone?: string;
+          website?: string;
+        };
+
+        const email = (rawEmail ?? "").trim().toLowerCase();
+        const password = (rawPassword ?? "").trim();
 
         if (!storeName || !email || !password) {
           return res.status(400).json({ message: "Vantar upplýsingar" });
@@ -259,6 +271,7 @@ export function registerRoutes(app: Express): Server {
             trialEndsAt: (store as any).trialEndsAt ?? null,
             billingStatus: (store as any).billingStatus ?? "trial",
             billingActive,
+            createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
           },
         });
       } catch (err) {
@@ -268,10 +281,97 @@ export function registerRoutes(app: Express): Server {
     },
   );
 
+  // ------------------ AUTH: REGISTER STORE (LEGACY ALIAS) ------------------
+  app.post("/api/v1/stores/register", async (req: Request, res: Response) => {
+    try {
+      const {
+        storeName,
+        email: rawEmail,
+        password: rawPassword,
+        address,
+        phone,
+        website,
+      } = req.body as {
+        storeName?: string;
+        email?: string;
+        password?: string;
+        address?: string;
+        phone?: string;
+        website?: string;
+      };
+
+      const email = (rawEmail ?? "").trim().toLowerCase();
+      const password = (rawPassword ?? "").trim();
+
+      if (!storeName || !email || !password) {
+        return res.status(400).json({ message: "Vantar upplýsingar" });
+      }
+
+      const existing = await storage.findUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: "Netfang er þegar í notkun" });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+
+      const store = await storage.createStore({
+        name: storeName,
+        address: (address ?? "").trim(),
+        phone: (phone ?? "").trim(),
+        website: (website ?? "").trim(),
+        logoUrl: "",
+        ownerEmail: email,
+        plan: "basic",
+        trialEndsAt,
+        billingStatus: "trial",
+      } as any);
+
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        role: "store",
+        storeId: store.id,
+      } as any);
+
+      const billingActive = true;
+
+      return res.json({
+        message: "Verslun skráð",
+        user: { id: user.id, email: user.email, role: user.role },
+        store: {
+          id: store.id,
+          name: store.name,
+          address: (store as any).address ?? "",
+          phone: (store as any).phone ?? "",
+          website: (store as any).website ?? "",
+          plan: (store as any).plan ?? "basic",
+          planType: (store as any).plan ?? "basic",
+          trialEndsAt: (store as any).trialEndsAt ?? null,
+          billingStatus: (store as any).billingStatus ?? "trial",
+          billingActive,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+        },
+      });
+    } catch (err) {
+      console.error("stores/register alias error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
   // ------------------ AUTH: LOGIN ------------------
   app.post("/api/v1/auth/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body;
+      const rawEmail = (req.body?.email ?? "") as string;
+      const rawPassword = (req.body?.password ?? "") as string;
+
+      const email = rawEmail.trim().toLowerCase();
+      const password = rawPassword.trim();
+
+      if (!email || !password) {
+        return res.status(400).json({ message: "Vantar netfang og lykilorð" });
+      }
 
       const user = await storage.findUserByEmail(email);
       if (!user) {
@@ -306,7 +406,7 @@ export function registerRoutes(app: Express): Server {
       const token = jwt.sign(
         {
           id: user.id,
-          email: user.email,
+          email,
           role: user.role,
           storeId: (user as any).storeId,
         },
@@ -336,11 +436,12 @@ export function registerRoutes(app: Express): Server {
           trialEndsAt: (store as any).trialEndsAt ?? null,
           billingStatus,
           billingActive,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         };
       }
 
       return res.json({
-        user: { id: user.id, email: user.email, role: user.role },
+        user: { id: user.id, email, role: user.role },
         store: storePayload,
         token,
       });
@@ -403,6 +504,7 @@ export function registerRoutes(app: Express): Server {
             trialEndsAt: (store as any).trialEndsAt ?? null,
             billingStatus,
             billingActive,
+            createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
           };
         }
 
@@ -460,6 +562,7 @@ export function registerRoutes(app: Express): Server {
           billingStatus,
           trialExpired: isTrialExpired(store),
           daysLeft,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         });
       } catch (err) {
         console.error("stores/me/billing error", err);
@@ -538,6 +641,7 @@ export function registerRoutes(app: Express): Server {
           trialEndsAt: (updated as any).trialEndsAt ?? null,
           billingStatus,
           billingActive,
+          createdAt: (updated as any).createdAt ?? null, // BÆTT VIÐ
         });
       } catch (err) {
         console.error("activate-plan error:", err);
@@ -823,7 +927,18 @@ export function registerRoutes(app: Express): Server {
     },
   );
 
-  // ------------------ START SERVER ------------------
-  const server = createServer(app);
-  return server;
+  // ------------------ STATIC FILES & SPA FALLBACK (AÐEINS Í PRODUCTION) ------------------
+  if (process.env.NODE_ENV === "production") {
+    // HÉR ER LAGFÆRINGIN: byggið er undir client/dist
+    const clientDistPath = path.join(process.cwd(), "client", "dist");
+
+    app.use(express.static(clientDistPath));
+
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+        return next();
+      }
+      res.sendFile(path.join(clientDistPath, "index.html"));
+    });
+  }
 }

@@ -1,11 +1,12 @@
 // client/src/pages/RegisterStore.tsx
 import { useState, FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 interface RegisterResponse {
   id?: string;
@@ -14,6 +15,9 @@ interface RegisterResponse {
 }
 
 export default function RegisterStore() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,6 +36,14 @@ export default function RegisterStore() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
+    // Client-side check áður en við förum í server
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      setErrorMsg(
+        "Vantar upplýsingar: nafn verslunar, netfang og lykilorð eru skyldusvæði.",
+      );
+      return;
+    }
+
     if (password !== passwordConfirm) {
       setErrorMsg("Lykilorð passa ekki saman.");
       return;
@@ -40,50 +52,65 @@ export default function RegisterStore() {
     setIsSubmitting(true);
 
     try {
-      // AÐLAGA EF ÞITT API ER ÖÐRUVÍSI
-      // Algeng endpoint nöfn hjá þér geta verið:
-      // - /api/v1/stores/register
-      // - /api/v1/auth/register-store
-      // Veldu það sem þú ert með og breyttu hér ef þarf.
-      const res = await apiFetch("/api/v1/stores/register", {
+      // PASSAR VIÐ BACKEND:
+      // routes.ts → /api/v1/stores/register les storeName, email, password, address, phone, website
+      const payload = {
+        storeName: name.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        address: address.trim() || "",
+        phone: phone.trim() || "",
+        website: website.trim() || "",
+      };
+
+      const data = await apiFetch<RegisterResponse>("/api/v1/stores/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name,
-          email,
-          password,
-          phone,
-          address,
-          website,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(
-          text || "Tókst ekki að skrá verslun. Vinsamlegast reyndu aftur.",
+      setCreatedStoreId(data.storeId || data.id || null);
+
+      // --- Sjálfvirk innskráning eftir skráningu ---
+      try {
+        // Notum sama email/lykilorð og var notað í skráningunni
+        // Gert ráð fyrir að login taki (email, password)
+        await login(email.trim(), password.trim());
+
+        // Förum beint á prófíl verslunar
+        navigate("/profile", { replace: true });
+        return;
+      } catch (loginErr) {
+        console.error("Sjálfvirk innskráning tókst ekki", loginErr);
+        // Ef login klikkar, sýnum venjuleg skilaboð og bjóðum upp á handvirka innskráningu
+        setSuccessMsg(
+          data.message ||
+            "Verslun hefur verið skráð, en sjálfvirk innskráning tókst ekki. Vinsamlegast skráðu þig inn handvirkt.",
         );
       }
 
-      const data = (await res.json()) as RegisterResponse;
-
-      setCreatedStoreId(data.storeId || data.id || null);
-      setSuccessMsg(
-        data.message ||
-          "Verslun hefur verið skráð. Þú getur nú skráð þig inn sem verslun.",
-      );
-
-      // Hreinsa lykilorð úr formi
+      // Hreinsa lykilorð úr formi (ef við endum hér án redirect)
       setPassword("");
       setPasswordConfirm("");
     } catch (err) {
       console.error(err);
-      const msg =
+      let msg =
         err instanceof Error
           ? err.message
           : "Tókst ekki að skrá verslun. Vinsamlegast reyndu aftur.";
+
+      // Reynum að toga út message úr JSON hlutanum, t.d. {"message":"Vantar upplýsingar"}
+      const match = msg.match(/\{.*\}/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.message) {
+            msg = parsed.message;
+          }
+        } catch {
+          // ef parsing klikkar, skiljum msg eins og það er
+        }
+      }
+
       setErrorMsg(msg);
     } finally {
       setIsSubmitting(false);
@@ -124,7 +151,6 @@ export default function RegisterStore() {
               )}
             </div>
 
-            {/* HÉR er “Skrá inn” TAKKIN sem FER ALLTAF Á /login */}
             <div className="flex justify-center">
               <Link to="/login">
                 <Button className="bg-[#FF7300] hover:bg-[#e56600] text-white text-xs">
@@ -135,7 +161,7 @@ export default function RegisterStore() {
           </div>
         )}
 
-        {/* Formið er enn sýnilegt til að laga villur / breyta – það er í lagi */}
+        {/* Formið er áfram sýnilegt til að nota aftur eða laga villur */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">

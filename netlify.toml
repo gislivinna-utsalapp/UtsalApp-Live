@@ -1,10 +1,16 @@
 [build]
-  command = "npm run build"
+  command = "npm run build:frontend"
   publish = "dist"
 
+# Sendir öll /api kall frá Netlify yfir í Replit backend
+[[redirects]]
+  from = "/api/*"
+  to = "https://526cb025-19f3-44f7-8f5d-6f058115b7de-00-1j9hm75tqhard.picard.replit.dev/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback svo routing virki (/#/leit o.s.frv.)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-#test
-#test

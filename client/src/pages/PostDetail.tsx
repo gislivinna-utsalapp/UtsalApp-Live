@@ -1,120 +1,222 @@
 // client/src/pages/PostDetail.tsx
 
-import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import type { SalePostWithDetails } from "@shared/schema";
-import { Card } from "@/components/ui/card";
+import { apiFetch } from "@/lib/api";
+import { formatPrice, calculateDiscount, getTimeRemaining } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { formatPrice, getTimeRemaining, calculateDiscount } from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+
+async function fetchPost(id: string): Promise<SalePostWithDetails> {
+  return apiFetch<SalePostWithDetails>(`/api/v1/posts/${id}`);
+}
 
 export default function PostDetail() {
-  const { id } = useParams();
-  const [post, setPost] = useState<SalePostWithDetails | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await fetch(`/api/v1/posts/${id}`);
-        const data = await res.json();
-        if (!res.ok) {
-          setError(data.message || "Fann ekki útsölutilboð.");
-        } else {
-          setPost(data);
-        }
-      } catch (err) {
-        setError("Villa kom upp við að sækja tilboð.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [id]);
+  const {
+    data: post,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["post", id],
+    enabled: !!id,
+    queryFn: () => fetchPost(id as string),
+  });
 
-  if (loading) {
+  if (!id) {
     return (
-      <div className="min-h-screen p-6 pb-24">
-        <p className="text-sm text-muted-foreground">Sæki tilboð...</p>
+      <div className="max-w-3xl mx-auto p-4 pb-24">
+        <p className="text-center text-sm text-neutral-400">
+          Engin auglýsing fannst (vantar auðkenni).
+        </p>
+        <div className="mt-4 text-center">
+          <Button onClick={() => navigate(-1)}>Til baka</Button>
+        </div>
       </div>
     );
   }
 
-  if (error || !post) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen p-6 pb-24">
-        <Card className="p-4 text-sm text-destructive">{error}</Card>
+      <div className="max-w-3xl mx-auto p-4 pb-24">
+        <p className="text-center text-sm text-neutral-400">Sæki auglýsingu…</p>
       </div>
     );
   }
 
-  const mainImage = post.images?.[0];
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 pb-24">
+        <p className="text-center text-sm text-neutral-300">
+          Tókst ekki að sækja auglýsinguna.
+        </p>
+        <div className="mt-4 text-center">
+          <Button onClick={() => navigate(-1)}>Til baka</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!post) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 pb-24">
+        <p className="text-center text-sm text-neutral-400">
+          Auglýsing finnst ekki.
+        </p>
+        <div className="mt-4 text-center">
+          <Button onClick={() => navigate(-1)}>Til baka</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // PASSAR VIÐ BACKEND:
+  // routes.ts → mapPostToFrontend: priceOriginal, priceSale, endsAt, buyUrl
   const discount = calculateDiscount(post.priceOriginal, post.priceSale);
-  const timeRemaining = getTimeRemaining(post.endsAt);
+
+  const remainingRaw = post.endsAt ? getTimeRemaining(post.endsAt) : null;
+
+  let timeRemainingText: string | null = null;
+  if (typeof remainingRaw === "string") {
+    timeRemainingText = remainingRaw;
+  } else if (
+    remainingRaw &&
+    typeof remainingRaw === "object" &&
+    "totalMs" in remainingRaw
+  ) {
+    const r = remainingRaw as {
+      days: number;
+      hours: number;
+      minutes: number;
+      totalMs: number;
+    };
+
+    if (r.totalMs > 0) {
+      const parts: string[] = [];
+      if (r.days > 0) parts.push(`${r.days} dagar`);
+      if (r.hours > 0) parts.push(`${r.hours} klst`);
+      if (r.minutes > 0) parts.push(`${r.minutes} mín`);
+
+      timeRemainingText =
+        parts.length > 0 ? `Endar eftir ${parts.join(" ")}` : "Endar fljótlega";
+    } else {
+      timeRemainingText = "Útsölunni er lokið";
+    }
+  }
+
+  const mainImage =
+    post.images && post.images.length > 0 ? post.images[0].url : null;
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Haus */}
-      <header className="p-4 border-b border-border">
-        <Link to="/" className="text-sm text-pink-600 font-medium">
+    <div className="max-w-3xl mx-auto pb-24">
+      <header className="sticky top-0 z-10 bg-black/95 backdrop-blur border-b border-neutral-800 px-4 py-3 flex items-center gap-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-neutral-300 hover:text-white"
+        >
           ← Til baka
-        </Link>
-        <h1 className="text-xl font-bold mt-2">{post.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {post.store?.name ?? "Ótilgreind verslun"}
-        </p>
+        </button>
+        <h1 className="text-base font-semibold truncate text-white">
+          {post.title || "Útsölutilboð"}
+        </h1>
       </header>
 
-      {/* Efni */}
-      <main className="p-4 max-w-2xl mx-auto space-y-4">
-        {/* Myndarammi */}
-        <div className="relative w-full h-48 md:h-64 bg-muted overflow-hidden rounded-xl border">
-          {mainImage ? (
-            <img
-              src={mainImage.url}
-              alt={mainImage.alt ?? post.title}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
-              Engin mynd
+      <main className="px-4 py-4 space-y-4">
+        <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
+          {mainImage && (
+            <div className="aspect-[4/3] w-full bg-neutral-100 overflow-hidden">
+              <img
+                src={mainImage}
+                alt={post.title}
+                className="w-full h-full object-cover"
+              />
             </div>
           )}
 
-          {discount > 0 && (
-            <div className="absolute top-3 right-3 bg-pink-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
-              -{discount}%
+          <div className="p-4 space-y-4">
+            {/* Titill + verslun */}
+            <div className="space-y-1">
+              <h2 className="text-xl font-semibold mb-1 text-black">
+                {post.title}
+              </h2>
+              {post.store && (
+                <p className="text-sm text-neutral-600">
+                  {post.store.name} ·{" "}
+                  {(post.store as any).location ||
+                    (post.store as any).address ||
+                    "Staðsetning vantar"}
+                </p>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* Upplýsingar */}
-        <Card className="p-4 space-y-3">
-          <div>
-            <div className="text-lg font-bold text-pink-600">
-              {formatPrice(post.priceSale)}
+            {/* Afsláttur + verð */}
+            <div className="space-y-2">
+              {discount && (
+                <div className="inline-flex items-baseline gap-2 rounded-full bg-black text-white px-3 py-1 border border-black">
+                  <span className="text-xs font-semibold uppercase tracking-wide">
+                    Afsláttur
+                  </span>
+                  <span className="text-sm font-bold">-{discount}%</span>
+                </div>
+              )}
+
+              <div className="flex items-baseline gap-3">
+                <div className="text-2xl font-bold text-black">
+                  {formatPrice(post.priceSale)}
+                </div>
+                {post.priceOriginal && post.priceOriginal > post.priceSale && (
+                  <div className="text-sm text-neutral-500 line-through">
+                    {formatPrice(post.priceOriginal)}
+                  </div>
+                )}
+              </div>
+
+              {timeRemainingText && (
+                <p className="text-xs text-neutral-600 font-medium">
+                  {timeRemainingText}
+                </p>
+              )}
             </div>
-            <div className="text-sm text-muted-foreground line-through">
-              {formatPrice(post.priceOriginal)}
-            </div>
+
+            {/* Lýsing */}
+            {post.description && (
+              <p className="text-sm text-neutral-800 whitespace-pre-line">
+                {post.description}
+              </p>
+            )}
+
+            {/* Flokkur */}
+            {post.category && (
+              <p className="text-xs text-neutral-500">
+                Flokkur:{" "}
+                <span className="font-medium text-neutral-700">
+                  {post.category}
+                </span>
+              </p>
+            )}
+
+            {/* KAUPA HNAPPUR */}
+            {post.buyUrl && (
+              <div className="pt-2">
+                <a
+                  href={post.buyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block"
+                >
+                  <Button className="w-full bg-black hover:bg-neutral-900 text-white text-sm py-2">
+                    Smelltu hér til að kaupa tilboðið
+                  </Button>
+                </a>
+                <p className="mt-1 text-[11px] text-neutral-500 text-center">
+                  Þú ferð á síðu verslunar til að ljúka kaupunum.
+                </p>
+              </div>
+            )}
           </div>
-
-          {post.description && (
-            <p className="text-sm leading-relaxed">{post.description}</p>
-          )}
-
-          {/* Tími og skoðanir */}
-          <div className="text-xs text-muted-foreground flex items-center justify-between pt-2 border-t">
-            <span>{timeRemaining}</span>
-            <span>{post.viewCount ?? 0} skoðanir</span>
-          </div>
-
-          {/* Kaupa */}
-          {post.buyUrl && (
-            <a href={post.buyUrl} target="_blank" rel="noopener noreferrer">
-              <Button className="w-full text-sm mt-2">Kaupa vöruna</Button>
-            </a>
-          )}
         </Card>
       </main>
     </div>

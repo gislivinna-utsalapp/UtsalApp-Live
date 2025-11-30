@@ -1,202 +1,215 @@
 // client/src/pages/CategoriesPage.tsx
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+
+import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
+import { SalePostCard } from "@/components/SalePostCard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatPrice, getTimeRemaining, calculateDiscount } from "@/lib/utils";
 
-async function fetchAllActivePosts(): Promise<SalePostWithDetails[]> {
-  const res = await fetch("/api/v1/posts?activeOnly=true");
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(text || "Tókst ekki að sækja útsölur.");
-  }
-  return (await res.json()) as SalePostWithDetails[];
+async function fetchPosts(): Promise<SalePostWithDetails[]> {
+  return apiFetch<SalePostWithDetails[]>("/api/v1/posts");
 }
 
-// Einföld flokkun: notum bara category sem kemur frá server
-function getCategoryKey(post: SalePostWithDetails): string {
-  const anyPost = post as any;
-  if (anyPost.category && typeof anyPost.category === "string") {
-    return anyPost.category;
-  }
-  return "annad";
-}
-
-const CATEGORY_CONFIG: { id: string; label: string }[] = [
-  { id: "all", label: "Allar útsölur" },
-  { id: "fatnadur", label: "Fatnaður" },
-  { id: "heimili", label: "Heimili" },
-  { id: "rafmagn", label: "Raftæki" },
-  { id: "heilsa", label: "Heilsa" },
-  { id: "veitingar", label: "Veitingar" },
-  { id: "snyrtivorur", label: "Snyrtivörur" },
-  { id: "annad", label: "Annað" },
+// Grunnflokkar – samræmdir við CreatePost.tsx
+const BASE_CATEGORIES = [
+  "Fatnaður - Konur",
+  "Fatnaður - Karlar",
+  "Fatnaður - Börn",
+  "Skór",
+  "Íþróttavörur",
+  "Heimili & húsgögn",
+  "Raftæki",
+  "Snyrtivörur",
+  "Leikföng & börn",
+  "Matur & veitingar",
+  "Happy Hour",
+  "Annað",
 ];
 
-export default function CategoriesPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+// Normalizer til að mappa gömul og vitlaus heiti yfir í ný, rétt heiti
+function normalizeCategory(raw: string | null | undefined): string {
+  const c = (raw || "").trim();
+  if (!c) return "";
 
+  const lower = c.toLowerCase();
+
+  // Allt sem byrjar á "rafmagn" => Raftæki
+  if (lower.startsWith("rafmagn")) {
+    return "Raftæki";
+  }
+
+  // "veitingar" => Matur & veitingar
+  if (lower === "veitingar") {
+    return "Matur & veitingar";
+  }
+
+  // Möguleg afbrigði af mat/veitingum sem gætu hafa slæðst inn
+  if (lower === "matur og veitingar") {
+    return "Matur & veitingar";
+  }
+
+  // Vitlaust skrifaðar snyrtivörur => Snyrtivörur
+  if (lower === "snyrtivorur") {
+    return "Snyrtivörur";
+  }
+
+  // Vitlaust skrifað "annad" => Annað
+  if (lower === "annad") {
+    return "Annað";
+  }
+
+  // "heimili" => Heimili & húsgögn
+  if (lower === "heimili") {
+    return "Heimili & húsgögn";
+  }
+
+  // Ef þetta er eitt af okkar kanónísku heitum, skilum því beint
+  if (BASE_CATEGORIES.includes(c)) {
+    return c;
+  }
+
+  // Default: tryggjum að strengurinn byrji á stórum staf
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
+export default function CategoriesPage() {
   const {
-    data: posts,
+    data: posts = [],
     isLoading,
-    isError,
     error,
-  } = useQuery<SalePostWithDetails[]>({
-    queryKey: ["all-active-posts"],
-    queryFn: fetchAllActivePosts,
+  } = useQuery({
+    queryKey: ["posts", "categories"],
+    queryFn: fetchPosts,
   });
 
-  const filteredPosts = useMemo(() => {
-    if (!posts) return [];
-    if (selectedCategory === "all") return posts;
+  // Normaliserum flokka fyrir öll tilboð
+  const normalizedPosts = posts.map((p) => ({
+    ...p,
+    _normCategory: normalizeCategory(p.category),
+  }));
 
-    return posts.filter((p) => getCategoryKey(p) === selectedCategory);
-  }, [posts, selectedCategory]);
+  // Flokkar byggðir bæði á grunnlista + raunverulegum gögnum
+  const categories = Array.from(
+    new Set([
+      ...BASE_CATEGORIES,
+      ...normalizedPosts
+        .map((p) => p._normCategory)
+        .filter((c) => c && c.length > 0),
+    ]),
+  ).sort();
+
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const visiblePosts =
+    selectedCategory === null
+      ? normalizedPosts
+      : normalizedPosts.filter((p) => p._normCategory === selectedCategory);
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Haus + flokkar */}
-      <header className="px-4 pt-4 pb-3 border-b border-border">
-        <h1 className="text-2xl font-bold">Flokkar</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Skoðaðu útsölur eftir flokkum – fatnaður, heimili, raftæki, heilsa,
-          veitingar, snyrtivörur og annað.
-        </p>
-
-        <div className="mt-3 flex gap-2 overflow-x-auto text-sm">
-          {CATEGORY_CONFIG.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1 rounded-full border whitespace-nowrap ${
-                selectedCategory === cat.id
-                  ? "bg-pink-600 text-white border-pink-600"
-                  : "bg-background text-foreground border-border"
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+    <div className="max-w-4xl mx-auto px-4 pb-24 pt-4 space-y-4">
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-white">Flokkar</h1>
+          <p className="text-xs text-neutral-400">
+            Veldu flokk til að sjá útsölutilboð í þeim flokki.
+          </p>
         </div>
       </header>
 
-      {/* Efni */}
-      <main className="p-4 space-y-4 max-w-4xl mx-auto">
-        {/* Villa */}
-        {isError && (
-          <Card className="p-4 text-sm text-destructive">
-            Villa við að sækja útsölur: {(error as Error)?.message}
-          </Card>
-        )}
+      {isLoading && (
+        <p className="text-sm text-neutral-400">Sæki tilboð og flokka…</p>
+      )}
 
-        {/* Loading */}
-        {isLoading && !isError && (
-          <p className="text-sm text-muted-foreground">Sæki útsölur...</p>
-        )}
+      {error && !isLoading && (
+        <p className="text-sm text-red-400">
+          Tókst ekki að sækja tilboð til að byggja flokka.
+        </p>
+      )}
 
-        {/* Engar niðurstöður í þessum flokki */}
-        {!isLoading &&
-          !isError &&
-          posts &&
-          posts.length > 0 &&
-          filteredPosts.length === 0 && (
-            <Card className="p-6 text-center space-y-2">
-              <p className="font-medium">
-                Engar útsölur fundust í þessum flokki.
+      {!isLoading && !error && (
+        <>
+          {/* Flokkar */}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-white">Flokkar</h2>
+
+            {categories.length === 0 && (
+              <p className="text-xs text-neutral-500">
+                Engir flokkar fundust ennþá.
               </p>
-              <p className="text-sm text-muted-foreground">
-                Prófaðu annan flokk eða veldu „Allar útsölur“.
-              </p>
-            </Card>
-          )}
+            )}
 
-        {/* Listi af útsölum í völdum flokki – Boozt look, 2 hlið við hlið */}
-        {!isLoading && !isError && filteredPosts.length > 0 && (
-          <div className="grid grid-cols-2 gap-3">
-            {filteredPosts.map((post) => {
-              const mainImage = post.images?.[0];
-              const discount = calculateDiscount(
-                post.priceOriginal,
-                post.priceSale,
-              );
-              const timeRemaining = getTimeRemaining(post.endsAt);
-              const detailHref = `/post/${post.id}`;
-
-              return (
-                <Card
-                  key={post.id}
-                  className="p-2 space-y-1 rounded-xl border border-border bg-background hover:shadow-md transition-shadow"
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={
+                    selectedCategory === null
+                      ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
+                      : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                  }
+                  onClick={() => setSelectedCategory(null)}
                 >
-                  <a
-                    href={detailHref}
-                    className="block rounded-xl overflow-hidden"
+                  Allt
+                </Button>
+
+                {categories.map((cat) => (
+                  <Button
+                    key={cat}
+                    size="sm"
+                    variant="outline"
+                    className={
+                      selectedCategory === cat
+                        ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
+                        : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                    }
+                    onClick={() =>
+                      setSelectedCategory(selectedCategory === cat ? null : cat)
+                    }
                   >
-                    {/* Mynd – sama style og í Search Boozt-look */}
-                    <div className="relative w-full aspect-[3/4] overflow-hidden rounded-lg bg-muted">
-                      {mainImage ? (
-                        <img
-                          src={mainImage.url}
-                          alt={mainImage.alt ?? post.title}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
-                          Engin mynd
-                        </div>
-                      )}
+                    {cat}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </section>
 
-                      {discount > 0 && (
-                        <div className="absolute top-1.5 right-1.5 bg-pink-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
-                          -{discount}%
-                        </div>
-                      )}
-                    </div>
+          {/* Tilboð í völdum flokki */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">
+                {selectedCategory
+                  ? `Tilboð í flokki: ${selectedCategory}`
+                  : "Öll tilboð"}
+              </h2>
+              <p className="text-[11px] text-neutral-400">
+                {visiblePosts.length} tilboð
+              </p>
+            </div>
 
-                    <div className="mt-1.5 space-y-1">
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {post.store?.name ?? "Ótilgreind verslun"}
-                      </div>
-                      <div className="font-semibold text-xs line-clamp-2">
-                        {post.title}
-                      </div>
-                      {post.description && (
-                        <div className="text-[11px] text-muted-foreground line-clamp-2">
-                          {post.description}
-                        </div>
-                      )}
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-sm font-bold text-pink-600">
-                          {formatPrice(post.priceSale ?? post.price)}
-                        </span>
-                        {post.priceOriginal != null && (
-                          <span className="text-[10px] text-muted-foreground line-through">
-                            {formatPrice(post.priceOriginal)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
-                        <span className="truncate max-w-[70%]">
-                          {timeRemaining}
-                        </span>
-                        <span>{post.viewCount ?? 0} skoðanir</span>
-                      </div>
-                    </div>
-                  </a>
+            {visiblePosts.length === 0 && (
+              <Card className="p-4 bg-white text-black border border-neutral-200 rounded-2xl">
+                <p className="text-xs text-neutral-700">
+                  Engin tilboð fundust í þessum flokki.
+                </p>
+              </Card>
+            )}
 
-                  <a href={detailHref}>
-                    <Button className="w-full mt-1 text-[11px] h-7">
-                      Skoða tilboð
-                    </Button>
-                  </a>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </main>
+            {visiblePosts.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                {visiblePosts.map((post) => (
+                  <Link key={post.id} to={`/post/${post.id}`}>
+                    <SalePostCard post={post} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

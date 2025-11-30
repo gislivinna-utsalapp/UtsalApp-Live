@@ -97,6 +97,90 @@
       "role": "store",
       "storeId": "b3544435-785c-4b64-8d01-8226f80fd4d6",
       "id": "b40bd2b6-4946-4301-94eb-d9bb2e9b12ed"
+    },
+    {
+      "email": "lol@lol.is",
+      "passwordHash": "$2b$10$9RhMZlw/rpnqsyL8DpAm7uAZ8IxQFwRILqLfyqEewkDLBj96225mG",
+      "role": "store",
+      "storeId": "486558a5-71e6-4263-9fa7-f03e590d077e",
+      "id": "5e4cfd49-9f35-4830-ab75-64f50df5641d"
+    },
+    {
+      "email": "lo@lo.is",
+      "passwordHash": "$2b$10$kguVWfIwpI4WmyhLYZ51Xuqa/lI/ikwQxlyWj6rmzW9AB4oZhS0C6",
+      "role": "store",
+      "storeId": "72dd703f-4044-422e-9ff0-d1cec1c83f34",
+      "id": "0c2271c6-5cee-40d4-9476-b82eabb927fd"
+    },
+    {
+      "email": "gull@gull.is",
+      "passwordHash": "$2b$10$Bh9lMfyNKY81TRuoVkG/f.g0Um3gejeOpaz3b.9cET9gYjWy2J.mS",
+      "role": "store",
+      "storeId": "d886c72a-e464-41f0-af63-22f5701deac5",
+      "id": "92b7c855-bcf7-4f4f-94dd-e141ebfa440e"
+    },
+    {
+      "email": "rugl@rugl.is",
+      "passwordHash": "$2b$10$YQh912nAQiLPl9OLUqAowujWCfdv8Q0PR8iQ5p4Eei0Ol5nJyvNlC",
+      "role": "store",
+      "storeId": "8f121848-1287-43e7-91f1-d5417cef7081",
+      "id": "f1e35611-d0b7-4da4-ac58-01dfc6086dec"
+    },
+    {
+      "email": "gr@gr.is",
+      "passwordHash": "$2b$10$IfDgbgoiyz4JvRCU.hZVKec8pc3UC9TS8C3KvP1Fcem0rpzcHfY6G",
+      "role": "store",
+      "storeId": "d8879c9e-0d6e-4f0c-9755-c37d07da63f6",
+      "id": "056e96ad-985f-4e9d-b169-58b9782cf76d"
+    },
+    {
+      "email": "shit@shit.is",
+      "passwordHash": "$2b$10$AoPuds4qL5IUn0O1cN3tD.I5jtiaA7tJs2w5yoJYVkkNslxtxr3Kq",
+      "role": "store",
+      "storeId": "ff1fc4ec-69aa-44b1-a60d-5b304b06a878",
+      "id": "8586e07b-bd64-4f50-9ffe-f31012637470"
+    },
+    {
+      "email": "ver@ver.is",
+      "passwordHash": "$2b$10$Wdw228dOHMaA9YF1xK4//.EwKovSzQUcegHalToWPokZ/Ggsa5gtm",
+      "role": "store",
+      "storeId": "c89982a2-5680-49c6-be32-67fb2605bc5b",
+      "id": "f1fd4d9a-32a1-4969-9732-07c1092b39d4"
+    },
+    {
+      "email": "da@da.is",
+      "passwordHash": "$2b$10$tVXk7vgluEXQqqMFo40be.DjBEqKXaoEjxjdV0Eg8UgAZXV4MpFD2",
+      "role": "store",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "id": "4cd9fdf0-af1f-4101-b483-553215356447"
+    },
+    {
+      "email": "sk@sk.is",
+      "passwordHash": "$2b$10$2fi1B7S7Wk83weuFFBGh6OJGmWpZne.0d24Az7c8zJT9KRxYKK5um",
+      "role": "store",
+      "storeId": "ca7fcdfe-c956-45c3-bc33-f4dd134473ac",
+      "id": "3b26bb9c-c751-45dc-8cf4-abdfdf90e2ec"
+    },
+    {
+      "email": "sigra@sigra.is",
+      "passwordHash": "$2b$10$YnaxgmJ86fWnWsxkDoHxS.y8Jvj20HRYaiXIAb5nTcM6VnWTx2lDy",
+      "role": "store",
+      "storeId": "9a0f97aa-2889-4501-98e6-870589c71aea",
+      "id": "e19e79ac-46e0-459f-8111-2c0f7909b222"
+    },
+    {
+      "email": "gigg@gigg.is",
+      "passwordHash": "$2b$10$qB1.V2uGJQblzROHet4CuO4hlrHNf9vwFH8KPrrMDUMqDjVLBrKum",
+      "role": "store",
+      "storeId": "e7919c73-82de-4210-a417-d76e27e7c082",
+      "id": "d780754f-7dfc-4626-bab1-7ba8329311c3"
+    },
+    {
+      "email": "horn@horn.is",
+      "passwordHash": "$2b$10$9q/oIKAS9xPYUpcVZE3Qfe1yeHswARp2iscsfmxxI99Ae.n15vztm",
+      "role": "store",
+      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
+      "id": "6550dbd3-f0a6-41e1-a1db-e176bf0944a0"
     }
   ],
   "stores": [
@@ -107,7 +191,7 @@
       "ownerEmail": "b@b.is",
       "id": "eed1989a-02bd-465f-ab65-eea215daeaaa",
       "trialEndsAt": "2025-12-02T12:55:45.524Z",
-      "plan": "premium",
+      "plan": "pro",
       "billingStatus": "active"
     },
     {
@@ -243,68 +327,167 @@
       "trialEndsAt": "2025-12-03T11:55:31.600Z",
       "billingStatus": "trial",
       "id": "b3544435-785c-4b64-8d01-8226f80fd4d6"
+    },
+    {
+      "name": "Lol",
+      "address": "Kringlan",
+      "phone": "5587569",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "lol@lol.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T18:20:13.404Z",
+      "billingStatus": "trial",
+      "id": "486558a5-71e6-4263-9fa7-f03e590d077e"
+    },
+    {
+      "name": "Lol",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "lo@lo.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T18:23:33.578Z",
+      "billingStatus": "trial",
+      "id": "72dd703f-4044-422e-9ff0-d1cec1c83f34"
+    },
+    {
+      "name": "gull",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "gull@gull.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T18:50:08.667Z",
+      "billingStatus": "trial",
+      "id": "d886c72a-e464-41f0-af63-22f5701deac5"
+    },
+    {
+      "name": "rugl",
+      "address": "Kringlan",
+      "phone": "5454545",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "rugl@rugl.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T18:56:22.565Z",
+      "billingStatus": "trial",
+      "id": "8f121848-1287-43e7-91f1-d5417cef7081"
+    },
+    {
+      "name": "Grjóni",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "gr@gr.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T19:09:38.932Z",
+      "billingStatus": "trial",
+      "id": "d8879c9e-0d6e-4f0c-9755-c37d07da63f6"
+    },
+    {
+      "name": "shit",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "shit@shit.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T19:26:33.499Z",
+      "billingStatus": "trial",
+      "id": "ff1fc4ec-69aa-44b1-a60d-5b304b06a878"
+    },
+    {
+      "name": "verslun",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "https://www.visir.is/",
+      "logoUrl": "",
+      "ownerEmail": "ver@ver.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T20:56:39.594Z",
+      "billingStatus": "trial",
+      "id": "c89982a2-5680-49c6-be32-67fb2605bc5b"
+    },
+    {
+      "name": "Dæmi",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "https://www.visir.is/",
+      "logoUrl": "",
+      "ownerEmail": "da@da.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T21:02:02.994Z",
+      "billingStatus": "trial",
+      "id": "9352b076-472f-4354-9f54-2dac2c95a85d"
+    },
+    {
+      "name": "Skrá",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "https://www.kopavogur.is/",
+      "logoUrl": "",
+      "ownerEmail": "sk@sk.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T21:07:20.875Z",
+      "billingStatus": "trial",
+      "id": "ca7fcdfe-c956-45c3-bc33-f4dd134473ac"
+    },
+    {
+      "name": "Sigra",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "https://www.kopavogur.is/",
+      "logoUrl": "",
+      "ownerEmail": "sigra@sigra.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T21:15:15.559Z",
+      "billingStatus": "trial",
+      "id": "9a0f97aa-2889-4501-98e6-870589c71aea"
+    },
+    {
+      "name": "Giggedí",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "https://www.kopavogur.is/",
+      "logoUrl": "",
+      "ownerEmail": "gigg@gigg.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-06T21:21:38.027Z",
+      "billingStatus": "trial",
+      "id": "e7919c73-82de-4210-a417-d76e27e7c082"
+    },
+    {
+      "name": "hornið",
+      "address": "Kringlan",
+      "phone": "54541515",
+      "website": "https://www.kopavogur.is/",
+      "logoUrl": "",
+      "ownerEmail": "horn@horn.is",
+      "plan": "premium",
+      "trialEndsAt": "2025-12-06T21:26:22.435Z",
+      "billingStatus": "trial",
+      "id": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174"
     }
   ],
   "posts": [
     {
-      "title": "Myglað rista brauð",
-      "description": "Ég á eftir að rista það. Set það i gang um leið og það er keypt",
-      "category": "veitingar",
-      "price": 6900,
-      "oldPrice": 9900,
-      "imageUrl": "/uploads/f59dac26-5aa9-4b35-bee1-cc0b8ca78332.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": null,
-      "startsAt": "2025-11-26",
-      "endsAt": "2025-12-03",
-      "createdAt": "2025-11-26T12:37:12.540Z",
-      "viewCount": 3,
-      "id": "81ab5440-d67f-488b-886a-48e3e9c9e01c"
-    },
-    {
-      "title": "Drasl",
-      "description": "Keyptu þetta bara draslið þitt",
-      "category": "heilsa",
-      "price": 5800,
-      "oldPrice": 9000,
-      "imageUrl": "/uploads/f637bcbe-9340-4f9f-8549-93dbd5eb84ba.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://www.sorpa.is/",
-      "startsAt": "2025-11-26",
-      "endsAt": "2025-12-02",
-      "createdAt": "2025-11-25T14:43:29.722Z",
-      "id": "02037da5-791b-413c-adad-19f40d292f1f",
-      "viewCount": 2
-    },
-    {
-      "title": "prufa",
-      "description": "Prufa",
-      "category": "rafmagn",
-      "price": 1500,
-      "oldPrice": 2000,
-      "imageUrl": "/uploads/8c12da22-6fa6-4e60-8439-8cecfc2f4e9d.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://fasteignir.visir.is/",
-      "startsAt": "2025-11-25",
-      "endsAt": "2025-12-02",
-      "createdAt": "2025-11-25T14:38:22.716Z",
-      "id": "3566a28d-7c23-4f66-97fe-b9e06326001d",
-      "viewCount": 3
-    },
-    {
-      "title": "Fiskur",
-      "description": "1000 kall ef þú borðar hann",
-      "category": "veitingar",
-      "price": 5000,
-      "oldPrice": 6000,
-      "imageUrl": "/uploads/6b7d6677-2b1e-4b38-9559-99a64fd0b201.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://hafid.is/",
-      "startsAt": "2025-11-25",
-      "endsAt": "2025-12-02",
-      "createdAt": "2025-11-25T14:18:24.846Z",
-      "id": "db2d7958-eac1-4a7e-bb9f-da256a405b41",
-      "viewCount": 2
+      "title": "Hús aftur",
+      "description": "Hús",
+      "category": "Skór",
+      "price": 12356,
+      "oldPrice": 14700,
+      "imageUrl": "/uploads/bfa2bc79-827a-40ef-acbf-42bb9f39b343.jpg",
+      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
+      "buyUrl": "https://www.kopavogur.is/",
+      "startsAt": "2025-11-30",
+      "endsAt": "2025-12-07",
+      "createdAt": "2025-11-30T16:33:36.235Z",
+      "viewCount": 2,
+      "id": "f74e32a8-9efb-4244-9ce4-2f363af1439b"
     },
     {
       "title": "Hálfdrukkinn bjór",
@@ -319,35 +502,7 @@
       "endsAt": "2025-12-02",
       "createdAt": "2025-11-25T14:00:35.940Z",
       "id": "9cd347d5-4b48-4a86-8459-b5646034904e",
-      "viewCount": 4
-    },
-    {
-      "title": "Iphone",
-      "description": "Kaupa kaupa kaupa",
-      "category": "annad",
-      "price": 189900,
-      "oldPrice": 169900,
-      "imageUrl": "/uploads/2612ac89-facb-4645-a744-ffd59552bf81.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://elko.is/",
-      "startsAt": "2025-11-25",
-      "endsAt": "2025-12-23",
-      "createdAt": "2025-11-25T13:56:16.958Z",
-      "id": "3ba22de2-85fd-4cf1-a54f-eb8f7f0d4552"
-    },
-    {
-      "title": "Voffi a afslætti",
-      "description": "Kúkar og pissar inni. Ælir alltaf eftir mat og geltir endalaust. Gjörsamlega óþolandi voffi",
-      "category": "heimili",
-      "price": 296000,
-      "oldPrice": 300000,
-      "imageUrl": "/uploads/46e0d16c-ba70-4f18-9388-3dee366ab02b.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://www.gaeludyr.is/",
-      "startsAt": "2025-11-26",
-      "endsAt": "2025-12-30",
-      "createdAt": "2025-11-25T13:00:36.081Z",
-      "id": "61ed73bc-1f61-480b-91bd-6b273cd2f941"
+      "viewCount": 13
     },
     {
       "title": "Svartur fössari",
@@ -362,7 +517,7 @@
       "endsAt": "2025-12-02",
       "createdAt": "2025-11-25T12:33:06.111Z",
       "id": "b72a075f-2771-47ed-bea3-e0d2babc7851",
-      "viewCount": 2
+      "viewCount": 4
     },
     {
       "title": "Hjól",
@@ -376,7 +531,8 @@
       "startsAt": "2025-11-26",
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-25T12:05:06.395Z",
-      "id": "405a9ce0-4f89-422e-95ad-18292d2e121f"
+      "id": "405a9ce0-4f89-422e-95ad-18292d2e121f",
+      "viewCount": 2
     },
     {
       "title": "Hús",
@@ -391,51 +547,37 @@
       "endsAt": "2025-12-02",
       "createdAt": "2025-11-25T11:41:34.056Z",
       "id": "6dc1f081-fe11-4153-a157-77211dde90ba",
-      "viewCount": 2
+      "viewCount": 8
     },
     {
-      "title": "30% af gjafabréfum",
-      "description": "Gjafabréf í bröns á 30% afslætti",
-      "category": "veitingar",
-      "price": 70000,
-      "oldPrice": 12000,
-      "imageUrl": "/uploads/879f9d76-de5f-4664-8105-8777887f10f0.jpg",
+      "title": "Happy Hour á English pub",
+      "description": "Happy hour a english fra 16-19 alla daga",
+      "category": "Happy Hour",
+      "price": 1000,
+      "oldPrice": 1600,
+      "imageUrl": "/uploads/9b4c9dda-a2ff-446d-b405-173032ff8002.jpg",
       "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
       "buyUrl": null,
-      "startsAt": "2025-11-25",
-      "endsAt": "2025-12-01",
-      "createdAt": "2025-11-25T09:35:11.509Z",
-      "id": "ca0ecad6-a94d-4749-b0f5-1fbe0e776841"
+      "startsAt": "2025-11-30",
+      "endsAt": "2025-12-07",
+      "createdAt": "2025-11-30T18:45:48.896Z",
+      "viewCount": 4,
+      "id": "12016fd7-d45e-4dc6-a2ec-fa37c963a1e9"
     },
     {
-      "title": "Kaffibolli",
-      "description": "Ég er bara búinn að taka 3 sopa af honum",
-      "category": "fatnadur",
-      "price": 89000,
-      "oldPrice": 90000,
-      "imageUrl": "/uploads/f4b698cc-54a0-4171-bcd8-82e82895235a.jpg",
+      "title": "Myglað rista brauð",
+      "description": "Ég á eftir að rista það. Set það i gang um leið og það er keypt",
+      "category": "veitingar",
+      "price": 6900,
+      "oldPrice": 9900,
+      "imageUrl": "/uploads/f59dac26-5aa9-4b35-bee1-cc0b8ca78332.jpg",
       "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://www.teogkaffi.is/",
-      "startsAt": "2025-11-24",
-      "endsAt": "2025-11-30",
-      "createdAt": "2025-11-24T15:35:33.485Z",
-      "id": "c3144f67-bd88-428d-bb8e-dee9c9f6352e",
-      "viewCount": 1
-    },
-    {
-      "title": "Vinur minn",
-      "description": "Hann er alveg ágætur en hringir aldrei í mann",
-      "category": "fatnadur",
-      "price": 50,
-      "oldPrice": 100,
-      "imageUrl": "/uploads/14fde3c1-f247-49dd-8f62-9dfec0e045cc.jpg",
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": "https://www.facebook.com/share/16CvKgnASW/",
-      "startsAt": "2025-11-24",
-      "endsAt": "2025-11-30",
-      "createdAt": "2025-11-24T14:38:35.530Z",
-      "id": "ce2e3ecd-1836-483f-9a3c-8b9e4d717b1a",
-      "viewCount": 1
+      "buyUrl": null,
+      "startsAt": "2025-11-26",
+      "endsAt": "2025-12-03",
+      "createdAt": "2025-11-26T12:37:12.540Z",
+      "viewCount": 14,
+      "id": "81ab5440-d67f-488b-886a-48e3e9c9e01c"
     },
     {
       "title": "Kópavogsbær fæst nú á góðu verði",
@@ -449,7 +591,7 @@
       "startsAt": "2025-11-26",
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-26T12:05:32.179Z",
-      "viewCount": 0,
+      "viewCount": 4,
       "id": "ef4b9580-5471-4d21-ade7-3f03cfc12072"
     },
     {
@@ -468,6 +610,51 @@
       "viewCount": 3
     },
     {
+      "title": "Drasl",
+      "description": "Keyptu þetta bara draslið þitt",
+      "category": "heilsa",
+      "price": 5800,
+      "oldPrice": 9000,
+      "imageUrl": "/uploads/f637bcbe-9340-4f9f-8549-93dbd5eb84ba.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://www.sorpa.is/",
+      "startsAt": "2025-11-26",
+      "endsAt": "2025-12-02",
+      "createdAt": "2025-11-25T14:43:29.722Z",
+      "id": "02037da5-791b-413c-adad-19f40d292f1f",
+      "viewCount": 13
+    },
+    {
+      "title": "prufa",
+      "description": "Prufa",
+      "category": "rafmagn",
+      "price": 1500,
+      "oldPrice": 2000,
+      "imageUrl": "/uploads/8c12da22-6fa6-4e60-8439-8cecfc2f4e9d.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://fasteignir.visir.is/",
+      "startsAt": "2025-11-25",
+      "endsAt": "2025-12-02",
+      "createdAt": "2025-11-25T14:38:22.716Z",
+      "id": "3566a28d-7c23-4f66-97fe-b9e06326001d",
+      "viewCount": 4
+    },
+    {
+      "title": "Fiskur",
+      "description": "1000 kall ef þú borðar hann",
+      "category": "veitingar",
+      "price": 5000,
+      "oldPrice": 6000,
+      "imageUrl": "/uploads/6b7d6677-2b1e-4b38-9559-99a64fd0b201.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://hafid.is/",
+      "startsAt": "2025-11-25",
+      "endsAt": "2025-12-02",
+      "createdAt": "2025-11-25T14:18:24.846Z",
+      "id": "db2d7958-eac1-4a7e-bb9f-da256a405b41",
+      "viewCount": 8
+    },
+    {
       "title": "Hálf pulsa",
       "description": "Ca 9 daga gomul en lyktar ekkert illa",
       "category": "veitingar",
@@ -480,7 +667,112 @@
       "endsAt": "2025-12-02",
       "createdAt": "2025-11-25T14:09:08.040Z",
       "id": "3da8fc74-65a0-4e1e-817a-218086907927",
+      "viewCount": 2
+    },
+    {
+      "title": "Iphone",
+      "description": "Kaupa kaupa kaupa",
+      "category": "annad",
+      "price": 189900,
+      "oldPrice": 169900,
+      "imageUrl": "/uploads/2612ac89-facb-4645-a744-ffd59552bf81.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://elko.is/",
+      "startsAt": "2025-11-25",
+      "endsAt": "2025-12-23",
+      "createdAt": "2025-11-25T13:56:16.958Z",
+      "id": "3ba22de2-85fd-4cf1-a54f-eb8f7f0d4552",
+      "viewCount": 4
+    },
+    {
+      "title": "Voffi a afslætti",
+      "description": "Kúkar og pissar inni. Ælir alltaf eftir mat og geltir endalaust. Gjörsamlega óþolandi voffi",
+      "category": "heimili",
+      "price": 296000,
+      "oldPrice": 300000,
+      "imageUrl": "/uploads/46e0d16c-ba70-4f18-9388-3dee366ab02b.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://www.gaeludyr.is/",
+      "startsAt": "2025-11-26",
+      "endsAt": "2025-12-30",
+      "createdAt": "2025-11-25T13:00:36.081Z",
+      "id": "61ed73bc-1f61-480b-91bd-6b273cd2f941",
+      "viewCount": 7
+    },
+    {
+      "title": "30% af gjafabréfum",
+      "description": "Gjafabréf í bröns á 30% afslætti",
+      "category": "veitingar",
+      "price": 70000,
+      "oldPrice": 12000,
+      "imageUrl": "/uploads/879f9d76-de5f-4664-8105-8777887f10f0.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": null,
+      "startsAt": "2025-11-25",
+      "endsAt": "2025-12-01",
+      "createdAt": "2025-11-25T09:35:11.509Z",
+      "id": "ca0ecad6-a94d-4749-b0f5-1fbe0e776841",
       "viewCount": 1
+    },
+    {
+      "title": "Kaffibolli",
+      "description": "Ég er bara búinn að taka 3 sopa af honum",
+      "category": "fatnadur",
+      "price": 89000,
+      "oldPrice": 90000,
+      "imageUrl": "/uploads/f4b698cc-54a0-4171-bcd8-82e82895235a.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://www.teogkaffi.is/",
+      "startsAt": "2025-11-24",
+      "endsAt": "2025-11-30",
+      "createdAt": "2025-11-24T15:35:33.485Z",
+      "id": "c3144f67-bd88-428d-bb8e-dee9c9f6352e",
+      "viewCount": 3
+    },
+    {
+      "title": "Vinur minn",
+      "description": "Hann er alveg ágætur en hringir aldrei í mann",
+      "category": "fatnadur",
+      "price": 50,
+      "oldPrice": 100,
+      "imageUrl": "/uploads/14fde3c1-f247-49dd-8f62-9dfec0e045cc.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": "https://www.facebook.com/share/16CvKgnASW/",
+      "startsAt": "2025-11-24",
+      "endsAt": "2025-11-30",
+      "createdAt": "2025-11-24T14:38:35.530Z",
+      "id": "ce2e3ecd-1836-483f-9a3c-8b9e4d717b1a",
+      "viewCount": 7
+    },
+    {
+      "title": "Kópavogur",
+      "description": "Kópavogur á góðu verði",
+      "category": "Íþróttavörur",
+      "price": 24000,
+      "oldPrice": 60000,
+      "imageUrl": "/uploads/921ded5f-a35a-49c6-aeaf-8c26e3ccb026.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://www.kopavogur.is/",
+      "startsAt": "2025-11-29",
+      "endsAt": "2025-12-06",
+      "createdAt": "2025-11-29T21:05:44.687Z",
+      "viewCount": 3,
+      "id": "5bc112e6-1ea0-4c72-b7a4-58ab21882cf9"
+    },
+    {
+      "title": "Hús",
+      "description": "Jebbs",
+      "category": "Snyrtivörur",
+      "price": 12600,
+      "oldPrice": 14000,
+      "imageUrl": "/uploads/94034df6-c653-4d0f-b600-a44a209903b0.jpg",
+      "storeId": "486558a5-71e6-4263-9fa7-f03e590d077e",
+      "buyUrl": "https://www.visir.is/",
+      "startsAt": "2025-11-29",
+      "endsAt": "2025-12-06",
+      "createdAt": "2025-11-29T20:32:35.602Z",
+      "viewCount": 9,
+      "id": "c8d29251-4c22-4da7-bb52-fd5c46b011a6"
     },
     {
       "title": "Hús",
@@ -494,7 +786,8 @@
       "startsAt": "2025-11-24",
       "endsAt": "2025-12-01",
       "createdAt": "2025-11-24T14:49:13.322Z",
-      "id": "10dcdafd-1197-4841-a968-ca27d7b43652"
+      "id": "10dcdafd-1197-4841-a968-ca27d7b43652",
+      "viewCount": 1
     }
   ]
 }

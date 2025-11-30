@@ -20,7 +20,7 @@ function BottomNav() {
   const tab = location.pathname;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#FF7300] text-white z-20 shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[#FF7A1A] text-white z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.6)]">
       <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
         <Link
           to="/"
@@ -65,8 +65,8 @@ function BottomNav() {
 
 export default function App() {
   return (
-    <div className="min-h-screen pb-12 bg-gray-50">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen pb-12 bg-black text-white">
+      <div className="max-w-4xl mx-auto px-4 pb-16 pt-4">
         <Routes>
           {/* Opnar síður */}
           <Route path="/" element={<Home />} />

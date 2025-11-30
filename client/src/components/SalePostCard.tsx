@@ -42,9 +42,9 @@ export function SalePostCard({ post }: Props) {
   return (
     <Link
       to={`/post/${post.id}`}
-      className="block rounded-[32px] overflow-hidden shadow-xl bg-white/95 border border-orange-900/40 hover:scale-[1.01] hover:shadow-2xl transition-transform duration-150"
+      className="block rounded-2xl overflow-hidden shadow-md bg-white/95 border border-orange-900/30 hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
     >
-      <div className="relative h-48 w-full overflow-hidden bg-neutral-900">
+      <div className="relative h-36 w-full overflow-hidden bg-neutral-900">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -53,48 +53,48 @@ export function SalePostCard({ post }: Props) {
             loading="lazy"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-sm text-neutral-400">
+          <div className="h-full w-full flex items-center justify-center text-xs text-neutral-400">
             Engin mynd skráð
           </div>
         )}
 
         {discountPercent !== null && (
-          <div className="absolute top-3 right-3 bg-[#FF7A00] text-white text-xs font-bold px-3 py-1 rounded-full shadow-md">
+          <div className="absolute top-2 right-2 bg-[#FF7A00] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md">
             -{discountPercent}%
           </div>
         )}
       </div>
 
-      <div className="p-4 space-y-1">
+      <div className="p-3 space-y-1">
         {post.store && (
-          <p className="text-xs uppercase tracking-wide text-neutral-500">
+          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
             {post.store.name}
           </p>
         )}
-        <h3 className="font-semibold text-base text-neutral-900 line-clamp-1">
+        <h3 className="font-semibold text-sm text-neutral-900 line-clamp-1">
           {post.title}
         </h3>
         {post.description && (
-          <p className="text-sm text-neutral-600 line-clamp-2">
+          <p className="text-xs text-neutral-600 line-clamp-2">
             {post.description}
           </p>
         )}
 
-        <div className="pt-2 flex items-baseline gap-2">
+        <div className="pt-1.5 flex items-baseline gap-1.5">
           {post.priceSale != null && (
-            <span className="text-base font-bold text-[#FF7A00]">
+            <span className="text-sm font-bold text-[#FF7A00]">
               ISK {post.priceSale.toLocaleString("is-IS")}
             </span>
           )}
           {post.priceOriginal != null && (
-            <span className="text-xs line-through text-neutral-400">
+            <span className="text-[11px] line-through text-neutral-400">
               ISK {post.priceOriginal.toLocaleString("is-IS")}
             </span>
           )}
         </div>
 
         {typeof post.viewCount === "number" && (
-          <p className="mt-1 text-[11px] text-neutral-500">
+          <p className="mt-0.5 text-[10px] text-neutral-500">
             {post.viewCount} skoðanir
           </p>
         )}

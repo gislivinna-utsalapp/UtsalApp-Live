@@ -36,6 +36,9 @@ type CreatePostPayload = {
   images: { url: string }[];
 };
 
+// Notum sama API_BASE_URL og annars staðar í appinu
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
 // Hjálparfall til að hlaða upp mynd með token
 async function uploadImage(file: File): Promise<string> {
   const token =
@@ -48,7 +51,12 @@ async function uploadImage(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("image", file);
 
-  const res = await fetch("/api/v1/uploads", {
+  // Notum backend-URL í stað relative slóðar svo þetta virki á Netlify + Replit
+  const url = API_BASE_URL
+    ? `${API_BASE_URL}/api/v1/uploads`
+    : "/api/v1/uploads";
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,

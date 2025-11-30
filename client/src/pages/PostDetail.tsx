@@ -3,10 +3,32 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { SalePostWithDetails } from "@shared/schema";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { formatPrice, calculateDiscount, getTimeRemaining } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+
+// SAMA myndarökfræði og í SalePostCard
+function buildImageUrl(rawUrl?: string | null): string | null {
+  if (!rawUrl) return null;
+
+  // Ef slóðin er nú þegar absolute (http/https) -> notum hana beint
+  if (/^https?:\/\//i.test(rawUrl)) {
+    return rawUrl;
+  }
+
+  // Í production (Netlify) þurfum við að preppa slóðina með API_BASE_URL
+  if (API_BASE_URL) {
+    const base = API_BASE_URL.endsWith("/")
+      ? API_BASE_URL.slice(0, -1)
+      : API_BASE_URL;
+    const path = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
+    return `${base}${path}`;
+  }
+
+  // Í dev (Replit) dugar relative slóð því frontend + backend eru á sama host
+  return rawUrl;
+}
 
 async function fetchPost(id: string): Promise<SalePostWithDetails> {
   return apiFetch<SalePostWithDetails>(`/api/v1/posts/${id}`);
@@ -107,8 +129,10 @@ export default function PostDetail() {
     }
   }
 
-  const mainImage =
-    post.images && post.images.length > 0 ? post.images[0].url : null;
+  // NÚNA notum við buildImageUrl → sama og forsíðan
+  const mainImage = buildImageUrl(
+    post.images && post.images.length > 0 ? post.images[0].url : null,
+  );
 
   return (
     <div className="max-w-3xl mx-auto pb-24">

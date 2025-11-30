@@ -47,6 +47,9 @@ type StorePost = {
 
 type PlanId = "basic" | "pro" | "premium";
 
+// Notum sama base URL og annars staðar í appinu
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
 // Reiknum texta fyrir prufuviku út frá trialEndsAt
 function getTrialLabel(trialEndsAt?: string | null) {
   if (!trialEndsAt) return null;
@@ -617,7 +620,28 @@ export default function Profile() {
         {!loadingPosts && !postsError && storePosts.length > 0 && (
           <div className="space-y-3">
             {storePosts.map((post) => {
-              const firstImageUrl = post.images?.[0]?.url ?? "";
+              // --- MYNDABREYTING: byggjum rétta slóð ---
+              const rawImageUrl = post.images?.[0]?.url ?? "";
+              let firstImageUrl = "";
+
+              if (rawImageUrl) {
+                if (
+                  rawImageUrl.startsWith("http://") ||
+                  rawImageUrl.startsWith("https://") ||
+                  rawImageUrl.startsWith("data:")
+                ) {
+                  // Full slóð eða data-URL
+                  firstImageUrl = rawImageUrl;
+                } else if (API_BASE_URL) {
+                  // Relative slóð (t.d. /uploads/xxx) → hengjum API_BASE_URL fyrir framan
+                  firstImageUrl = `${API_BASE_URL}${rawImageUrl}`;
+                } else {
+                  // Dev-tilvik þar sem API_BASE_URL er tómt – höldum gamla hegðun
+                  firstImageUrl = rawImageUrl;
+                }
+              }
+              // --- MYNDABREYTING ENDAR HÉR ---
+
               const isDeleting = deletingPostId === post.id;
               const timeRemainingLabel = getPostTimeRemainingLabel(post.endsAt);
 

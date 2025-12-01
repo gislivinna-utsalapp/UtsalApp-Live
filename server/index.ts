@@ -16,8 +16,8 @@ function main() {
   // Búum til HTTP server ofan á app
   const server = createServer(app);
 
-  // Ræsum serverinn
-  server.listen(PORT, () => {
+  // Ræsum serverinn – MIKILVÆGT: hlusta á 0.0.0.0 fyrir Replit deploy
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`[express] serving on port ${PORT}`);
   });
 }

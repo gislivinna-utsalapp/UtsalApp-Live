@@ -11,7 +11,7 @@ packages = ["ps"]
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["bash", "-lc", "npm start"]
+run = ["sh", "-c", "npm start"]
 
 [[ports]]
 localPort = 5000

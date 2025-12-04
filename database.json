@@ -469,7 +469,7 @@
       "website": "https://www.kopavogur.is/",
       "logoUrl": "",
       "ownerEmail": "horn@horn.is",
-      "plan": "basic",
+      "plan": "premium",
       "trialEndsAt": "2025-12-06T21:26:22.435Z",
       "billingStatus": "trial",
       "id": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174"
@@ -567,19 +567,19 @@
       "id": "4eac90dd-3432-49be-873b-c9cdaef69396"
     },
     {
-      "title": "Kálhausar til sölu",
-      "description": "Ekkert svo úldnir",
+      "title": "Jólakaffi",
+      "description": "Þessi kaffibolli sko! 🤤",
       "category": "Matur & veitingar",
-      "price": 0,
-      "oldPrice": 0,
-      "imageUrl": "/uploads/6b50f410-f73f-4c24-ae56-d197a3118a4d.jpg",
-      "storeId": "fd1f235a-7ba8-4279-bbe6-55f918186987",
-      "buyUrl": "https://www.facebook.com/share/1Z3KPmDXsh/",
+      "price": 1900,
+      "oldPrice": 19900,
+      "imageUrl": "/uploads/77746785-3318-46f0-8233-3efbcfa90f6d.jpg",
+      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
+      "buyUrl": "https://www.google.com/search?ie=UTF-8&client=ms-android-samsung-rvo1&source=android-browser&q=kaffi",
       "startsAt": "2025-12-04",
-      "endsAt": "2025-12-25",
-      "createdAt": "2025-12-04T14:15:36.505Z",
-      "viewCount": 14,
-      "id": "ed9c51d1-7980-464e-ab8a-9ffc7eeca469"
+      "endsAt": "2025-12-06",
+      "createdAt": "2025-12-04T17:58:48.974Z",
+      "viewCount": 1,
+      "id": "37f72f8b-b01b-4a30-ad9d-bf3bee0faae8"
     }
   ]
 }

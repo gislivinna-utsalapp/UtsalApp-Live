@@ -31,7 +31,7 @@ export function SalePostCard({ post }: Props) {
   const firstImage = post.images?.[0];
   const imageUrl = buildImageUrl(firstImage?.url ?? null);
 
-  // NÝTT: tryggjum að afsláttur sé tala (number) og ekki horfi þegar hann er 0 / strengur
+  // Afsláttur í %
   const rawDiscount =
     post.priceOriginal != null && post.priceSale != null
       ? calculateDiscount(post.priceOriginal, post.priceSale)
@@ -39,11 +39,16 @@ export function SalePostCard({ post }: Props) {
 
   const discount = typeof rawDiscount === "number" ? rawDiscount : null;
 
+  // Lýsing (tekin ef hún er til – annars tómur strengur)
+  const rawDescription = (post as any).description ?? (post as any).body ?? "";
+  const description =
+    typeof rawDescription === "string" ? rawDescription.trim() : "";
+
   return (
     <Link to={`/post/${post.id}`} className="block h-full">
       <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm">
-        {/* Myndabox – Boozt-style: stöðugt hlutfall + object-cover */}
-        <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
+        {/* Myndabox – kassalagað (4/3) */}
+        <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -67,12 +72,21 @@ export function SalePostCard({ post }: Props) {
 
         {/* Texti + verð fyrir neðan */}
         <div className="flex flex-1 flex-col gap-1 p-2">
+          {/* Titill */}
           <p className="text-xs font-semibold text-gray-900 line-clamp-2">
             {post.title}
           </p>
 
+          {/* Lýsing – við hliðina/undir upplýsingunum, sýnum eins mikið og kemst í 3 línur */}
+          {description && (
+            <p className="text-[11px] leading-tight text-gray-700 line-clamp-3">
+              {description}
+            </p>
+          )}
+
+          {/* Verðupplýsingar */}
           {(post.priceSale ?? post.priceOriginal) && (
-            <div className="flex items-baseline gap-1">
+            <div className="mt-1 flex items-baseline gap-1">
               {post.priceSale && (
                 <span className="text-sm font-bold text-[#fc7102]">
                   {formatPrice(post.priceSale)}

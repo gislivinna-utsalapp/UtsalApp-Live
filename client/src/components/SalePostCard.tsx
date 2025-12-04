@@ -31,11 +31,13 @@ export function SalePostCard({ post }: Props) {
   const firstImage = post.images?.[0];
   const imageUrl = buildImageUrl(firstImage?.url ?? null);
 
-  // NÝTT: reiknum afsláttarprósentu fyrir kortið
-  const discount =
-    post.priceOriginal && post.priceSale
+  // NÝTT: tryggjum að afsláttur sé tala (number) og ekki horfi þegar hann er 0 / strengur
+  const rawDiscount =
+    post.priceOriginal != null && post.priceSale != null
       ? calculateDiscount(post.priceOriginal, post.priceSale)
       : null;
+
+  const discount = typeof rawDiscount === "number" ? rawDiscount : null;
 
   return (
     <Link to={`/post/${post.id}`} className="block h-full">
@@ -55,8 +57,8 @@ export function SalePostCard({ post }: Props) {
             </div>
           )}
 
-          {/* NÝTT: Afsláttur í % ofan á myndina */}
-          {discount && (
+          {/* Afsláttur í % ofan á myndina */}
+          {discount !== null && discount > 0 && (
             <div className="absolute top-1.5 left-1.5 rounded-full bg-black/80 text-white text-[11px] font-bold px-2 py-1">
               -{discount}%
             </div>

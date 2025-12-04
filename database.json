@@ -315,7 +315,8 @@
       "trialEndsAt": "2025-12-03T10:35:26.730Z",
       "id": "ab6ff6a8-ad1b-4057-91bd-401e07547bbe",
       "plan": "pro",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "isBanned": true
     },
     {
       "name": "Dimmuval",
@@ -488,7 +489,7 @@
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
-      "viewCount": 26
+      "viewCount": 27
     },
     {
       "title": "Hálf pulsa",
@@ -517,23 +518,8 @@
       "startsAt": "2025-12-03",
       "endsAt": "2026-01-06",
       "createdAt": "2025-12-03T10:22:02.428Z",
-      "viewCount": 18,
+      "viewCount": 19,
       "id": "4ea49e2c-8557-406d-aa7b-a5de985ef70e"
-    },
-    {
-      "title": "Hús á afslætti",
-      "description": "Draugahús",
-      "category": "Heimili & húsgögn",
-      "price": 269,
-      "oldPrice": 1990,
-      "imageUrl": "/uploads/6230b946-2970-4089-8dcf-eb90bba35683.jpg",
-      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
-      "buyUrl": "https://fasteignir.visir.is/property/928421",
-      "startsAt": "2025-12-02",
-      "endsAt": "2025-12-09",
-      "createdAt": "2025-12-02T21:31:48.630Z",
-      "viewCount": 8,
-      "id": "284c5711-50de-4a22-a126-afd1acd437cb"
     },
     {
       "title": "Jól í kópavogi",
@@ -547,7 +533,7 @@
       "startsAt": "2025-11-29",
       "endsAt": "2025-12-06",
       "createdAt": "2025-11-29T21:05:44.687Z",
-      "viewCount": 22,
+      "viewCount": 25,
       "id": "5bc112e6-1ea0-4c72-b7a4-58ab21882cf9"
     },
     {
@@ -562,23 +548,8 @@
       "startsAt": "2025-12-03",
       "endsAt": "2027-01-01",
       "createdAt": "2025-12-03T13:43:27.496Z",
-      "viewCount": 30,
+      "viewCount": 31,
       "id": "785cba99-e632-47b9-9e8c-10a6733d5e19"
-    },
-    {
-      "title": "Föt",
-      "description": "Fatnaður",
-      "category": "Fatnaður - Karlar",
-      "price": 990,
-      "oldPrice": 1900,
-      "imageUrl": "/uploads/c631df80-33db-4b3a-a6c9-b679c7e4fa3f.jpg",
-      "storeId": "fd1f235a-7ba8-4279-bbe6-55f918186987",
-      "buyUrl": null,
-      "startsAt": "2025-12-03",
-      "endsAt": "2025-12-17",
-      "createdAt": "2025-12-03T20:10:04.006Z",
-      "viewCount": 13,
-      "id": "a854346b-a22a-4767-aba2-3dc15c20acfe"
     },
     {
       "title": "Happy hour",
@@ -592,8 +563,23 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-03T23:29:59.085Z",
-      "viewCount": 5,
+      "viewCount": 7,
       "id": "4eac90dd-3432-49be-873b-c9cdaef69396"
+    },
+    {
+      "title": "Kálhausar til sölu",
+      "description": "Ekkert svo úldnir",
+      "category": "Matur & veitingar",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/6b50f410-f73f-4c24-ae56-d197a3118a4d.jpg",
+      "storeId": "fd1f235a-7ba8-4279-bbe6-55f918186987",
+      "buyUrl": "https://www.facebook.com/share/1Z3KPmDXsh/",
+      "startsAt": "2025-12-04",
+      "endsAt": "2025-12-25",
+      "createdAt": "2025-12-04T14:15:36.505Z",
+      "viewCount": 14,
+      "id": "ed9c51d1-7980-464e-ab8a-9ffc7eeca469"
     }
   ]
 }

@@ -151,7 +151,7 @@ export default function PostDetail() {
       <main className="px-4 py-4 space-y-4">
         <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
           {mainImage && (
-            <div className="aspect-[4/3] w-full bg-neutral-100 overflow-hidden">
+            <div className="aspect-[3/4] w-full bg-neutral-100 overflow-hidden">
               <img
                 src={mainImage}
                 alt={post.title}

@@ -15,12 +15,15 @@ type StoreInfo = {
   id: string;
   name: string;
   planType?: "basic" | "pro" | "premium";
+  plan?: "basic" | "pro" | "premium";
   trialEndsAt?: string | null;
   billingActive?: boolean;
   billingStatus?: string;
   address?: string;
   phone?: string;
   website?: string;
+  createdAt?: string | null;
+  isBanned?: boolean;
 };
 
 type User = {

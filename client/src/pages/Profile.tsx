@@ -161,6 +161,9 @@ export default function Profile() {
 
   const store: StoreInfo | null = authUser?.store ?? null;
 
+  // NÝTT: er notandinn admin út frá role?
+  const isAdmin = authUser?.user?.role === "admin";
+
   // Billing + pakki koma frá backend í stað localStorage
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
@@ -396,7 +399,8 @@ export default function Profile() {
         <div>
           <h1 className="text-lg font-semibold">Prófíll verslunar</h1>
           <p className="text-xs text-muted-foreground">
-            Innskráður sem {authUser.user.email} (verslun)
+            Innskráður sem {authUser.user.email} (verslun
+            {isAdmin ? " – ADMIN" : ""})
           </p>
         </div>
         <Button

@@ -1,7 +1,6 @@
 // client/src/pages/CategoriesPage.tsx
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
@@ -29,53 +28,14 @@ const BASE_CATEGORIES = [
   "Annað",
 ];
 
-// Normalizer til að mappa gömul og vitlaus heiti yfir í ný, rétt heiti
-function normalizeCategory(raw: string | null | undefined): string {
-  const c = (raw || "").trim();
-  if (!c) return "";
-
-  const lower = c.toLowerCase();
-
-  // Allt sem byrjar á "rafmagn" => Raftæki
-  if (lower.startsWith("rafmagn")) {
-    return "Raftæki";
-  }
-
-  // "veitingar" => Matur & veitingar
-  if (lower === "veitingar") {
-    return "Matur & veitingar";
-  }
-
-  // Möguleg afbrigði af mat/veitingum sem gætu hafa slæðst inn
-  if (lower === "matur og veitingar") {
-    return "Matur & veitingar";
-  }
-
-  // Vitlaust skrifaðar snyrtivörur => Snyrtivörur
-  if (lower === "snyrtivorur") {
-    return "Snyrtivörur";
-  }
-
-  // Vitlaust skrifað "annad" => Annað
-  if (lower === "annad") {
-    return "Annað";
-  }
-
-  // "heimili" => Heimili & húsgögn
-  if (lower === "heimili") {
-    return "Heimili & húsgögn";
-  }
-
-  // Ef þetta er eitt af okkar kanónísku heitum, skilum því beint
-  if (BASE_CATEGORIES.includes(c)) {
-    return c;
-  }
-
-  // Default: tryggjum að strengurinn byrji á stórum staf
-  return c.charAt(0).toUpperCase() + c.slice(1);
+function normalizeCategory(value?: string | null): string | null {
+  if (!value) return null;
+  return value.trim().toLowerCase();
 }
 
 export default function CategoriesPage() {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   const {
     data: posts = [],
     isLoading,
@@ -85,130 +45,73 @@ export default function CategoriesPage() {
     queryFn: fetchPosts,
   });
 
-  // Normaliserum flokka fyrir öll tilboð
-  const normalizedPosts = posts.map((p) => ({
-    ...p,
-    _normCategory: normalizeCategory(p.category),
-  }));
+  const filteredPosts = useMemo(() => {
+    if (!selectedCategory) return posts;
 
-  // Flokkar byggðir bæði á grunnlista + raunverulegum gögnum
-  const categories = Array.from(
-    new Set([
-      ...BASE_CATEGORIES,
-      ...normalizedPosts
-        .map((p) => p._normCategory)
-        .filter((c) => c && c.length > 0),
-    ]),
-  ).sort();
-
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-
-  const visiblePosts =
-    selectedCategory === null
-      ? normalizedPosts
-      : normalizedPosts.filter((p) => p._normCategory === selectedCategory);
+    const target = normalizeCategory(selectedCategory);
+    return posts.filter((post) => {
+      const cat = normalizeCategory(post.category ?? null);
+      return cat === target;
+    });
+  }, [posts, selectedCategory]);
 
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-white">Flokkar</h1>
-          <p className="text-xs text-neutral-400">
-            Veldu flokk til að sjá útsölutilboð í þeim flokki.
-          </p>
-        </div>
+      <header className="space-y-2">
+        <h1 className="text-xl font-semibold text-white">Flokkar</h1>
+        <p className="text-sm text-gray-300">
+          Veldu flokk til að sjá tilboðin sem passa.
+        </p>
       </header>
 
+      {/* Flokkar */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        <Button
+          variant={selectedCategory === null ? "default" : "outline"}
+          size="sm"
+          onClick={() => setSelectedCategory(null)}
+        >
+          Allt
+        </Button>
+
+        {BASE_CATEGORIES.map((cat) => (
+          <Button
+            key={cat}
+            variant={selectedCategory === cat ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedCategory(cat)}
+          >
+            {cat}
+          </Button>
+        ))}
+      </div>
+
       {isLoading && (
-        <p className="text-sm text-neutral-400">Sæki tilboð og flokka…</p>
+        <Card className="p-4">
+          <p>Er að hlaða tilboðum...</p>
+        </Card>
       )}
 
-      {error && !isLoading && (
-        <p className="text-sm text-red-400">
-          Tókst ekki að sækja tilboð til að byggja flokka.
-        </p>
+      {error && (
+        <Card className="p-4">
+          <p>Villa kom upp við að sækja tilboð.</p>
+        </Card>
       )}
 
-      {!isLoading && !error && (
-        <>
-          {/* Flokkar */}
-          <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-white">Flokkar</h2>
+      {!isLoading && !error && filteredPosts.length === 0 && (
+        <Card className="p-4">
+          <p>Engin tilboð í þessum flokki eins og er.</p>
+        </Card>
+      )}
 
-            {categories.length === 0 && (
-              <p className="text-xs text-neutral-500">
-                Engir flokkar fundust ennþá.
-              </p>
-            )}
-
-            {categories.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={
-                    selectedCategory === null
-                      ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
-                      : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                  }
-                  onClick={() => setSelectedCategory(null)}
-                >
-                  Allt
-                </Button>
-
-                {categories.map((cat) => (
-                  <Button
-                    key={cat}
-                    size="sm"
-                    variant="outline"
-                    className={
-                      selectedCategory === cat
-                        ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
-                        : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                    }
-                    onClick={() =>
-                      setSelectedCategory(selectedCategory === cat ? null : cat)
-                    }
-                  >
-                    {cat}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </section>
-
-          {/* Tilboð í völdum flokki */}
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">
-                {selectedCategory
-                  ? `Tilboð í flokki: ${selectedCategory}`
-                  : "Öll tilboð"}
-              </h2>
-              <p className="text-[11px] text-neutral-400">
-                {visiblePosts.length} tilboð
-              </p>
-            </div>
-
-            {visiblePosts.length === 0 && (
-              <Card className="p-4 bg-white text-black border border-neutral-200 rounded-2xl">
-                <p className="text-xs text-neutral-700">
-                  Engin tilboð fundust í þessum flokki.
-                </p>
-              </Card>
-            )}
-
-            {visiblePosts.length > 0 && (
-              <div className="grid grid-cols-2 gap-3">
-                {visiblePosts.map((post) => (
-                  <Link key={post.id} to={`/post/${post.id}`}>
-                    <SalePostCard post={post} />
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
+      {!isLoading && !error && filteredPosts.length > 0 && (
+        <section>
+          <div className="grid grid-cols-2 gap-3">
+            {filteredPosts.map((post) => (
+              <SalePostCard key={post.id} post={post} />
+            ))}
+          </div>
+        </section>
       )}
     </main>
   );

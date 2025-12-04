@@ -103,6 +103,22 @@ export class DbStorage {
     return this.db.users.find((u) => u.id === id);
   }
 
+  async updateUser(
+    userId: string,
+    updates: Partial<User> & Record<string, any>,
+  ): Promise<User | null> {
+    const index = this.db.users.findIndex((u) => u.id === userId);
+    if (index === -1) return null;
+
+    const existing: any = this.db.users[index];
+    const updated: any = { ...existing, ...updates };
+
+    this.db.users[index] = updated;
+    saveDatabase(this.db);
+
+    return updated as User;
+  }
+
   // STORES
   async createStore(
     store: Omit<Store, "id"> & Record<string, any>,

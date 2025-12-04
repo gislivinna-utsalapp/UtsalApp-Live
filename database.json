@@ -292,7 +292,8 @@
       "trialEndsAt": "2025-12-02T14:08:20.580Z",
       "id": "da74b728-eea0-4ad4-bdf6-0a8f8024306b",
       "plan": "pro",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "isBanned": true
     },
     {
       "name": "Grínbúðin",
@@ -347,7 +348,7 @@
       "website": "",
       "logoUrl": "",
       "ownerEmail": "lo@lo.is",
-      "plan": "basic",
+      "plan": "pro",
       "trialEndsAt": "2025-12-06T18:23:33.578Z",
       "billingStatus": "trial",
       "id": "72dd703f-4044-422e-9ff0-d1cec1c83f34"
@@ -419,7 +420,7 @@
       "website": "https://www.visir.is/",
       "logoUrl": "",
       "ownerEmail": "da@da.is",
-      "plan": "basic",
+      "plan": "premium",
       "trialEndsAt": "2025-12-06T21:02:02.994Z",
       "billingStatus": "trial",
       "id": "9352b076-472f-4354-9f54-2dac2c95a85d"
@@ -467,28 +468,13 @@
       "website": "https://www.kopavogur.is/",
       "logoUrl": "",
       "ownerEmail": "horn@horn.is",
-      "plan": "premium",
+      "plan": "basic",
       "trialEndsAt": "2025-12-06T21:26:22.435Z",
       "billingStatus": "trial",
       "id": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174"
     }
   ],
   "posts": [
-    {
-      "title": "Happy hour á english pub",
-      "description": "Já",
-      "category": "Happy Hour",
-      "price": 1000,
-      "oldPrice": 1400,
-      "imageUrl": "/uploads/cef73730-3f1f-495a-86a2-89a2ae632a5c.jpg",
-      "storeId": "fd1f235a-7ba8-4279-bbe6-55f918186987",
-      "buyUrl": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2025-12-01T11:34:58.994Z",
-      "viewCount": 2,
-      "id": "ed4301cb-eaab-4515-9ee1-539868171f55"
-    },
     {
       "title": "Hlemmur til sölu",
       "description": "Kauptu þér hlemm og þú getur tekið strætó að eilífu",
@@ -502,7 +488,7 @@
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
-      "viewCount": 7
+      "viewCount": 26
     },
     {
       "title": "Hálf pulsa",
@@ -517,22 +503,97 @@
       "endsAt": "2025-12-02",
       "createdAt": "2025-11-25T14:09:08.040Z",
       "id": "3da8fc74-65a0-4e1e-817a-218086907927",
-      "viewCount": 5
+      "viewCount": 15
     },
     {
-      "title": "Kópavogur",
-      "description": "Kópavogur á góðu verði",
-      "category": "Íþróttavörur",
+      "title": "Hafnfirsk jól",
+      "description": "Jól í Hafnarfirði svíkja engan",
+      "category": "Annað",
+      "price": 3333,
+      "oldPrice": 99999,
+      "imageUrl": "/uploads/e3c727c4-3e8c-43e2-8eff-25f411e58d9f.jpg",
+      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
+      "buyUrl": "https://hafnarfjordur.is/stadur/jolathorpid/",
+      "startsAt": "2025-12-03",
+      "endsAt": "2026-01-06",
+      "createdAt": "2025-12-03T10:22:02.428Z",
+      "viewCount": 18,
+      "id": "4ea49e2c-8557-406d-aa7b-a5de985ef70e"
+    },
+    {
+      "title": "Hús á afslætti",
+      "description": "Draugahús",
+      "category": "Heimili & húsgögn",
+      "price": 269,
+      "oldPrice": 1990,
+      "imageUrl": "/uploads/6230b946-2970-4089-8dcf-eb90bba35683.jpg",
+      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
+      "buyUrl": "https://fasteignir.visir.is/property/928421",
+      "startsAt": "2025-12-02",
+      "endsAt": "2025-12-09",
+      "createdAt": "2025-12-02T21:31:48.630Z",
+      "viewCount": 8,
+      "id": "284c5711-50de-4a22-a126-afd1acd437cb"
+    },
+    {
+      "title": "Jól í kópavogi",
+      "description": "Jólin í kópavogi 🌲🎅",
+      "category": "Annað",
       "price": 24000,
       "oldPrice": 60000,
-      "imageUrl": "/uploads/921ded5f-a35a-49c6-aeaf-8c26e3ccb026.jpg",
+      "imageUrl": "/uploads/1ca858dd-7882-4816-adad-1c0b1df81aab.jpg",
       "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
-      "buyUrl": "https://www.kopavogur.is/",
+      "buyUrl": "https://menning.kopavogur.is/event_umbrella/jol/",
       "startsAt": "2025-11-29",
       "endsAt": "2025-12-06",
       "createdAt": "2025-11-29T21:05:44.687Z",
-      "viewCount": 5,
+      "viewCount": 22,
       "id": "5bc112e6-1ea0-4c72-b7a4-58ab21882cf9"
+    },
+    {
+      "title": "Black friday",
+      "description": "Endalausir afslættir út um allt.",
+      "category": "Annað",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/389fdf23-7eb7-4ae0-b893-6007e4bdb884.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://utsalapp-live.netlify.app/",
+      "startsAt": "2025-12-03",
+      "endsAt": "2027-01-01",
+      "createdAt": "2025-12-03T13:43:27.496Z",
+      "viewCount": 30,
+      "id": "785cba99-e632-47b9-9e8c-10a6733d5e19"
+    },
+    {
+      "title": "Föt",
+      "description": "Fatnaður",
+      "category": "Fatnaður - Karlar",
+      "price": 990,
+      "oldPrice": 1900,
+      "imageUrl": "/uploads/c631df80-33db-4b3a-a6c9-b679c7e4fa3f.jpg",
+      "storeId": "fd1f235a-7ba8-4279-bbe6-55f918186987",
+      "buyUrl": null,
+      "startsAt": "2025-12-03",
+      "endsAt": "2025-12-17",
+      "createdAt": "2025-12-03T20:10:04.006Z",
+      "viewCount": 13,
+      "id": "a854346b-a22a-4767-aba2-3dc15c20acfe"
+    },
+    {
+      "title": "Happy hour",
+      "description": "Happy hour út um allt 🍷🍸🍹🍻🥂",
+      "category": "Happy Hour",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/6e60134f-8e66-4abf-8b88-59e3ba8462c9.jpg",
+      "storeId": "72dd703f-4044-422e-9ff0-d1cec1c83f34",
+      "buyUrl": "https://526cb025-19f3-44f7-8f5d-6f058115b7de-00-1j9hm75tqhard.picard.replit.dev/#/categories",
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2025-12-03T23:29:59.085Z",
+      "viewCount": 5,
+      "id": "4eac90dd-3432-49be-873b-c9cdaef69396"
     }
   ]
 }

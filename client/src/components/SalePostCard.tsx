@@ -1,7 +1,7 @@
-// client/src/components/SalePostCard.tsx
 import { Link } from "react-router-dom";
 import type { SalePostWithDetails } from "@shared/schema";
 import { API_BASE_URL } from "@/lib/api";
+import { formatPrice, calculateDiscount } from "@/lib/utils";
 
 type Props = {
   post: SalePostWithDetails;
@@ -16,7 +16,6 @@ function buildImageUrl(rawUrl?: string | null): string | null {
     return rawUrl;
   }
 
-  // Ef við höfum API_BASE_URL (Netlify / production)
   if (API_BASE_URL) {
     const base = API_BASE_URL.endsWith("/")
       ? API_BASE_URL.slice(0, -1)
@@ -25,79 +24,67 @@ function buildImageUrl(rawUrl?: string | null): string | null {
     return `${base}${path}`;
   }
 
-  // Fallback: relative slóð (virkar í Replit dev þar sem frontend+backend eru á sama host)
   return rawUrl;
 }
 
 export function SalePostCard({ post }: Props) {
-  const imageUrl = buildImageUrl(post.images?.[0]?.url ?? null);
+  const firstImage = post.images?.[0];
+  const imageUrl = buildImageUrl(firstImage?.url ?? null);
 
-  const discountPercent =
+  // NÝTT: reiknum afsláttarprósentu fyrir kortið
+  const discount =
     post.priceOriginal && post.priceSale
-      ? Math.round(
-          ((post.priceOriginal - post.priceSale) / post.priceOriginal) * 100,
-        )
+      ? calculateDiscount(post.priceOriginal, post.priceSale)
       : null;
 
   return (
-    <Link
-      to={`/post/${post.id}`}
-      className="block rounded-2xl overflow-hidden shadow-md bg-white/95 border border-orange-900/30 hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
-    >
-      <div className="relative h-36 w-full overflow-hidden bg-neutral-900">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={post.images?.[0]?.alt || post.title}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-xs text-neutral-400">
-            Engin mynd skráð
-          </div>
-        )}
-
-        {discountPercent !== null && (
-          <div className="absolute top-2 right-2 bg-[#FF7A00] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md">
-            -{discountPercent}%
-          </div>
-        )}
-      </div>
-
-      <div className="p-3 space-y-1">
-        {post.store && (
-          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
-            {post.store.name}
-          </p>
-        )}
-        <h3 className="font-semibold text-sm text-neutral-900 line-clamp-1">
-          {post.title}
-        </h3>
-        {post.description && (
-          <p className="text-xs text-neutral-600 line-clamp-2">
-            {post.description}
-          </p>
-        )}
-
-        <div className="pt-1.5 flex items-baseline gap-1.5">
-          {post.priceSale != null && (
-            <span className="text-sm font-bold text-[#FF7A00]">
-              ISK {post.priceSale.toLocaleString("is-IS")}
-            </span>
+    <Link to={`/post/${post.id}`} className="block h-full">
+      <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm">
+        {/* Myndabox – Boozt-style: stöðugt hlutfall + object-cover */}
+        <div className="relative w-full aspect-[3/4] bg-gray-100 overflow-hidden">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={firstImage?.alt || post.title}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+              Engin mynd skráð
+            </div>
           )}
-          {post.priceOriginal != null && (
-            <span className="text-[11px] line-through text-neutral-400">
-              ISK {post.priceOriginal.toLocaleString("is-IS")}
-            </span>
+
+          {/* NÝTT: Afsláttur í % ofan á myndina */}
+          {discount && (
+            <div className="absolute top-1.5 left-1.5 rounded-full bg-black/80 text-white text-[11px] font-bold px-2 py-1">
+              -{discount}%
+            </div>
           )}
         </div>
 
-        {typeof post.viewCount === "number" && (
-          <p className="mt-0.5 text-[10px] text-neutral-500">
-            {post.viewCount} skoðanir
+        {/* Texti + verð fyrir neðan */}
+        <div className="flex flex-1 flex-col gap-1 p-2">
+          <p className="text-xs font-semibold text-gray-900 line-clamp-2">
+            {post.title}
           </p>
-        )}
+
+          {(post.priceSale ?? post.priceOriginal) && (
+            <div className="flex items-baseline gap-1">
+              {post.priceSale && (
+                <span className="text-sm font-bold text-[#fc7102]">
+                  {formatPrice(post.priceSale)}
+                </span>
+              )}
+
+              {post.priceOriginal && (
+                <span className="text-[11px] text-gray-400 line-through">
+                  {formatPrice(post.priceOriginal)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </Link>
   );

@@ -87,6 +87,15 @@ var DbStorage = class {
   async findUserById(id) {
     return this.db.users.find((u) => u.id === id);
   }
+  async updateUser(userId, updates) {
+    const index = this.db.users.findIndex((u) => u.id === userId);
+    if (index === -1) return null;
+    const existing = this.db.users[index];
+    const updated = { ...existing, ...updates };
+    this.db.users[index] = updated;
+    saveDatabase(this.db);
+    return updated;
+  }
   // STORES
   async createStore(store) {
     const newStore = {
@@ -157,6 +166,7 @@ var storage = new DbStorage();
 
 // server/routes.ts
 var JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+var ADMIN_EMAIL = "b@b.is".toLowerCase();
 var UPLOAD_DIR = path2.join(process.cwd(), "uploads");
 if (!fs2.existsSync(UPLOAD_DIR)) {
   fs2.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -176,6 +186,9 @@ function auth(requiredRole) {
         header.substring(7),
         JWT_SECRET
       );
+      if (decoded?.email && decoded.email.toLowerCase() === ADMIN_EMAIL) {
+        decoded.role = "admin";
+      }
       req.user = decoded;
       if (requiredRole && decoded.role !== requiredRole) {
         return res.status(403).json({ message: "Ekki heimild" });
@@ -202,6 +215,11 @@ async function requireActiveOrTrialStore(req, res, next) {
     let store = await storage.getStoreById(req.user.storeId);
     if (!store) {
       return res.status(404).json({ message: "Verslun fannst ekki" });
+    }
+    if (store.isBanned) {
+      return res.status(403).json({
+        message: "\xDEessi verslun hefur veri\xF0 b\xF6nnu\xF0 af kerfisstj\xF3ra. Haf\xF0u samband vi\xF0 \xDAtsalApp ef \xFEetta er villa."
+      });
     }
     if (!store.trialEndsAt && store.billingStatus !== "expired") {
       const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
@@ -252,12 +270,15 @@ async function mapPostToFrontend(p) {
     store: store ? {
       id: store.id,
       name: store.name,
+      address: store.address ?? "",
+      phone: store.phone ?? "",
+      website: store.website ?? "",
       plan,
       planType: plan,
       // fyrir eldri client
       billingStatus,
-      createdAt: store.createdAt ?? null
-      // BÆTT VIÐ
+      createdAt: store.createdAt ?? null,
+      isBanned: store.isBanned ?? false
     } : null
   };
 }
@@ -304,7 +325,8 @@ function registerRoutes(app) {
           ownerEmail: email,
           plan: "basic",
           trialEndsAt,
-          billingStatus: "trial"
+          billingStatus: "trial",
+          isBanned: false
         });
         const user = await storage.createUser({
           email,
@@ -327,8 +349,8 @@ function registerRoutes(app) {
             trialEndsAt: store.trialEndsAt ?? null,
             billingStatus: store.billingStatus ?? "trial",
             billingActive,
-            createdAt: store.createdAt ?? null
-            // BÆTT VIÐ
+            createdAt: store.createdAt ?? null,
+            isBanned: store.isBanned ?? false
           }
         });
       } catch (err) {
@@ -367,7 +389,8 @@ function registerRoutes(app) {
         ownerEmail: email,
         plan: "basic",
         trialEndsAt,
-        billingStatus: "trial"
+        billingStatus: "trial",
+        isBanned: false
       });
       const user = await storage.createUser({
         email,
@@ -390,8 +413,8 @@ function registerRoutes(app) {
           trialEndsAt: store.trialEndsAt ?? null,
           billingStatus: store.billingStatus ?? "trial",
           billingActive,
-          createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
+          createdAt: store.createdAt ?? null,
+          isBanned: store.isBanned ?? false
         }
       });
     } catch (err) {
@@ -427,11 +450,13 @@ function registerRoutes(app) {
           store = updated;
         }
       }
+      const baseRole = user.role;
+      const effectiveRole = email === ADMIN_EMAIL ? "admin" : baseRole;
       const token = jwt.sign(
         {
           id: user.id,
           email,
-          role: user.role,
+          role: effectiveRole,
           storeId: user.storeId
         },
         JWT_SECRET,
@@ -453,12 +478,12 @@ function registerRoutes(app) {
           trialEndsAt: store.trialEndsAt ?? null,
           billingStatus,
           billingActive,
-          createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
+          createdAt: store.createdAt ?? null,
+          isBanned: store.isBanned ?? false
         };
       }
       return res.json({
-        user: { id: user.id, email, role: user.role },
+        user: { id: user.id, email, role: effectiveRole },
         store: storePayload,
         token
       });
@@ -502,8 +527,8 @@ function registerRoutes(app) {
             trialEndsAt: store.trialEndsAt ?? null,
             billingStatus,
             billingActive,
-            createdAt: store.createdAt ?? null
-            // BÆTT VIÐ
+            createdAt: store.createdAt ?? null,
+            isBanned: store.isBanned ?? false
           };
         }
         return res.json({
@@ -516,6 +541,45 @@ function registerRoutes(app) {
         });
       } catch (err) {
         console.error("auth/me error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
+  app.post(
+    "/api/v1/auth/change-password",
+    auth(),
+    async (req, res) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ message: "Ekki innskr\xE1\xF0ur" });
+        }
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+          return res.status(400).json({ message: "Vantar n\xFAverandi og n\xFDtt lykilor\xF0" });
+        }
+        if (newPassword.trim().length < 6) {
+          return res.status(400).json({
+            message: "N\xFDtt lykilor\xF0 \xFEarf a\xF0 vera a\xF0 minnsta kosti 6 stafir."
+          });
+        }
+        const user = await storage.findUserById(req.user.id);
+        if (!user) {
+          return res.status(404).json({ message: "Notandi fannst ekki" });
+        }
+        const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+        if (!ok) {
+          return res.status(400).json({ message: "Gamla lykilor\xF0i\xF0 stemmir ekki" });
+        }
+        const passwordHash = await bcrypt.hash(newPassword.trim(), 10);
+        const updated = await storage.updateUser(user.id, {
+          passwordHash
+        });
+        if (!updated) {
+          return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra lykilor\xF0" });
+        }
+        return res.json({ success: true });
+      } catch (err) {
+        console.error("change-password error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     }
@@ -549,11 +613,68 @@ function registerRoutes(app) {
           billingStatus,
           trialExpired: isTrialExpired(store),
           daysLeft,
-          createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
+          createdAt: store.createdAt ?? null,
+          isBanned: store.isBanned ?? false
         });
       } catch (err) {
         console.error("stores/me/billing error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
+  app.put(
+    "/api/v1/stores/me",
+    auth("store"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+        const { name, address, phone, website } = req.body;
+        const updates = {};
+        if (name !== void 0) {
+          const trimmed = name.trim();
+          if (!trimmed) {
+            return res.status(400).json({ message: "Nafn verslunar m\xE1 ekki vera t\xF3mt" });
+          }
+          updates.name = trimmed;
+        }
+        if (address !== void 0) {
+          updates.address = address ? address.trim() : null;
+        }
+        if (phone !== void 0) {
+          updates.phone = phone ? phone.trim() : null;
+        }
+        if (website !== void 0) {
+          updates.website = website ? website.trim() : null;
+        }
+        const updated = await storage.updateStore(store.id, updates);
+        if (!updated) {
+          return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra verslun" });
+        }
+        const plan = updated.plan ?? updated.planType ?? "basic";
+        const billingStatus = updated.billingStatus ?? (updated.billingActive ? "active" : "trial");
+        const billingActive = billingStatus === "active" || billingStatus === "trial";
+        return res.json({
+          id: updated.id,
+          name: updated.name,
+          address: updated.address ?? "",
+          phone: updated.phone ?? "",
+          website: updated.website ?? "",
+          plan,
+          planType: plan,
+          trialEndsAt: updated.trialEndsAt ?? null,
+          billingStatus,
+          billingActive,
+          createdAt: updated.createdAt ?? null,
+          isBanned: updated.isBanned ?? false
+        });
+      } catch (err) {
+        console.error("stores/me update error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     }
@@ -603,8 +724,8 @@ function registerRoutes(app) {
           trialEndsAt: updated.trialEndsAt ?? null,
           billingStatus,
           billingActive,
-          createdAt: updated.createdAt ?? null
-          // BÆTT VIÐ
+          createdAt: updated.createdAt ?? null,
+          isBanned: updated.isBanned ?? false
         });
       } catch (err) {
         console.error("activate-plan error:", err);
@@ -643,7 +764,12 @@ function registerRoutes(app) {
       for (const s of stores) {
         storesById[s.id] = s;
       }
-      const filtered = q ? posts.filter((p) => (p.title || "").toLowerCase().includes(q)) : posts;
+      const filteredByQuery = q ? posts.filter((p) => (p.title || "").toLowerCase().includes(q)) : posts;
+      const filtered = filteredByQuery.filter((p) => {
+        const store = p.storeId ? storesById[p.storeId] : null;
+        if (store && store.isBanned) return false;
+        return true;
+      });
       filtered.sort((a, b) => {
         const pa = getPlanRankForPost(a, storesById);
         const pb = getPlanRankForPost(b, storesById);
@@ -666,6 +792,10 @@ function registerRoutes(app) {
       const all = await storage.listPosts();
       const post = all.find((p) => p.id === req.params.id);
       if (!post) {
+        return res.status(404).json({ message: "Tilbo\xF0 fannst ekki" });
+      }
+      const storeForPost = post.storeId ? await storage.getStoreById(post.storeId) : null;
+      if (storeForPost && storeForPost.isBanned) {
         return res.status(404).json({ message: "Tilbo\xF0 fannst ekki" });
       }
       const ipHeader = req.headers["x-forwarded-for"] || "";
@@ -806,6 +936,74 @@ function registerRoutes(app) {
       }
     }
   );
+  app.delete(
+    "/api/v1/admin/posts/:id",
+    auth(),
+    async (req, res) => {
+      try {
+        if (!req.user || req.user.role !== "admin") {
+          return res.status(403).json({ message: "Ekki heimild" });
+        }
+        const postId = req.params.id;
+        const all = await storage.listPosts();
+        const target = all.find((p) => p.id === postId);
+        if (!target) {
+          return res.status(404).json({ message: "F\xE6rsla fannst ekki" });
+        }
+        const deleted = await storage.deletePost(postId);
+        res.json({ success: deleted });
+      } catch (err) {
+        console.error("admin delete post error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
+  app.delete(
+    "/api/v1/admin/stores/:id",
+    auth(),
+    async (req, res) => {
+      try {
+        if (!req.user || req.user.role !== "admin") {
+          return res.status(403).json({ message: "Ekki heimild" });
+        }
+        const storeId = req.params.id;
+        const deleted = await storage.deleteStore(storeId);
+        if (!deleted) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+        return res.json({ success: true });
+      } catch (err) {
+        console.error("admin delete store error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
+  app.post(
+    "/api/v1/admin/stores/:id/ban",
+    auth(),
+    async (req, res) => {
+      try {
+        if (!req.user || req.user.role !== "admin") {
+          return res.status(403).json({ message: "Ekki heimild" });
+        }
+        const storeId = req.params.id;
+        const { isBanned } = req.body;
+        const updated = await storage.updateStore(storeId, {
+          isBanned: !!isBanned
+        });
+        if (!updated) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+        return res.json({
+          id: updated.id,
+          isBanned: updated.isBanned ?? false
+        });
+      } catch (err) {
+        console.error("admin ban store error", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
   app.post(
     "/api/v1/uploads",
     auth("store"),
@@ -846,7 +1044,7 @@ function main() {
   const app = express2();
   registerRoutes(app);
   const server = createServer(app);
-  server.listen(PORT, () => {
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`[express] serving on port ${PORT}`);
   });
 }

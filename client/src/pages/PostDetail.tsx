@@ -168,10 +168,11 @@ export default function PostDetail() {
               </h2>
               {post.store && (
                 <p className="text-sm text-neutral-600">
-                  {post.store.name} ·{" "}
-                  {(post.store as any).location ||
-                    (post.store as any).address ||
-                    "Staðsetning vantar"}
+                  {post.store.name}
+                  {" · "}
+                  {post.store.address && post.store.address.trim().length > 0
+                    ? post.store.address
+                    : "Staðsetning vantar"}
                 </p>
               )}
             </div>

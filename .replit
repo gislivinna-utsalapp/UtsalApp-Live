@@ -6,7 +6,7 @@ run = "bash -lc 'npm start'"
 
 [nix]
 channel = "stable-24_05"
-packages = ["ps"]
+packages = ["ps", "killall", "psmisc"]
 
 [deployment]
 deploymentTarget = "autoscale"

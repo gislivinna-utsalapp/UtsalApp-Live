@@ -270,6 +270,7 @@ export function registerRoutes(app: Express): void {
           trialEndsAt,
           billingStatus: "trial",
           isBanned: false,
+          categories: [], // NÝTT – engir flokka valdir við skráningu
         } as any);
 
         const user = await storage.createUser({
@@ -297,6 +298,7 @@ export function registerRoutes(app: Express): void {
             billingActive,
             createdAt: (store as any).createdAt ?? null,
             isBanned: (store as any).isBanned ?? false,
+            categories: (store as any).categories ?? [],
           },
         });
       } catch (err) {
@@ -352,6 +354,7 @@ export function registerRoutes(app: Express): void {
         trialEndsAt,
         billingStatus: "trial",
         isBanned: false,
+        categories: [], // NÝTT
       } as any);
 
       const user = await storage.createUser({
@@ -379,6 +382,7 @@ export function registerRoutes(app: Express): void {
           billingActive,
           createdAt: (store as any).createdAt ?? null,
           isBanned: (store as any).isBanned ?? false,
+          categories: (store as any).categories ?? [],
         },
       });
     } catch (err) {
@@ -470,6 +474,7 @@ export function registerRoutes(app: Express): void {
           billingActive,
           createdAt: (store as any).createdAt ?? null,
           isBanned: (store as any).isBanned ?? false,
+          categories: (store as any).categories ?? [],
         };
       }
 
@@ -539,6 +544,7 @@ export function registerRoutes(app: Express): void {
             billingActive,
             createdAt: (store as any).createdAt ?? null,
             isBanned: (store as any).isBanned ?? false,
+            categories: (store as any).categories ?? [],
           };
         }
 
@@ -681,11 +687,12 @@ export function registerRoutes(app: Express): void {
           return res.status(404).json({ message: "Verslun fannst ekki" });
         }
 
-        const { name, address, phone, website } = req.body as {
+        const { name, address, phone, website, categories } = req.body as {
           name?: string;
           address?: string | null;
           phone?: string | null;
           website?: string | null;
+          categories?: string[];
         };
 
         const updates: any = {};
@@ -710,6 +717,21 @@ export function registerRoutes(app: Express): void {
 
         if (website !== undefined) {
           updates.website = website ? website.trim() : null;
+        }
+
+        // NÝTT: uppfæra flokka verslunar – tryggjum fylki og max 3
+        if (categories !== undefined) {
+          if (!Array.isArray(categories)) {
+            return res
+              .status(400)
+              .json({ message: "Flokkar þurfa að vera fylki af strengjum" });
+          }
+
+          const cleaned = categories
+            .map((c) => String(c).trim())
+            .filter(Boolean);
+
+          updates.categories = cleaned.slice(0, 3);
         }
 
         const updated = await storage.updateStore(store.id, updates);
@@ -740,6 +762,7 @@ export function registerRoutes(app: Express): void {
           billingActive,
           createdAt: (updated as any).createdAt ?? null,
           isBanned: (updated as any).isBanned ?? false,
+          categories: (updated as any).categories ?? [],
         });
       } catch (err) {
         console.error("stores/me update error", err);
@@ -820,6 +843,7 @@ export function registerRoutes(app: Express): void {
           billingActive,
           createdAt: (updated as any).createdAt ?? null,
           isBanned: (updated as any).isBanned ?? false,
+          categories: (updated as any).categories ?? [],
         });
       } catch (err) {
         console.error("activate-plan error:", err);

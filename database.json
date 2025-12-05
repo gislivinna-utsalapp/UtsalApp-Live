@@ -192,7 +192,8 @@
       "id": "eed1989a-02bd-465f-ab65-eea215daeaaa",
       "trialEndsAt": "2025-12-02T12:55:45.524Z",
       "plan": "pro",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Rugl.is",
@@ -202,7 +203,8 @@
       "id": "5abe3d79-0923-4330-a55e-d08573819646",
       "trialEndsAt": "2025-12-08T11:32:11.322Z",
       "plan": "basic",
-      "billingStatus": "trial"
+      "billingStatus": "trial",
+      "categories": []
     },
     {
       "name": "Verslunin",
@@ -212,7 +214,8 @@
       "trialEndsAt": "2025-12-02T09:47:24.970Z",
       "id": "a390d864-bdd6-43e6-92ca-f0706e30cc17",
       "plan": "basic",
-      "billingStatus": "trial"
+      "billingStatus": "trial",
+      "categories": []
     },
     {
       "name": "Poppúðin",
@@ -222,7 +225,8 @@
       "trialEndsAt": "2025-12-02T11:37:57.435Z",
       "id": "0ba31645-a1d0-4f2a-ba2b-4a54014a9f34",
       "plan": "premium",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Teverslunin",
@@ -232,7 +236,8 @@
       "trialEndsAt": "2025-12-02T12:14:09.562Z",
       "id": "283c073c-07e5-4e6a-b978-e459031f4b33",
       "plan": "basic",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Orkubúðin",
@@ -242,7 +247,8 @@
       "trialEndsAt": "2025-12-02T12:20:22.828Z",
       "id": "faeb4537-9e58-4531-a2b4-01a44b4dd923",
       "plan": "pro",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "ibúðin",
@@ -252,7 +258,8 @@
       "trialEndsAt": "2025-12-02T12:27:01.161Z",
       "id": "4b73771f-48d5-4909-b09b-23dcb314a214",
       "plan": "premium",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Ubuðin",
@@ -262,7 +269,8 @@
       "trialEndsAt": "2025-12-02T12:31:45.561Z",
       "id": "f2dd733b-d140-4e1d-8555-dbf9539119c0",
       "plan": "premium",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Dótabúðin",
@@ -272,7 +280,8 @@
       "trialEndsAt": "2025-12-02T13:48:40.741Z",
       "id": "b6580edc-7ff8-4d45-817f-ad1dc72ed69c",
       "plan": "premium",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Bjórbúðin",
@@ -282,7 +291,8 @@
       "trialEndsAt": "2025-12-02T13:58:37.119Z",
       "id": "fd1f235a-7ba8-4279-bbe6-55f918186987",
       "plan": "premium",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Gilbert",
@@ -293,7 +303,8 @@
       "id": "da74b728-eea0-4ad4-bdf6-0a8f8024306b",
       "plan": "pro",
       "billingStatus": "active",
-      "isBanned": true
+      "isBanned": true,
+      "categories": []
     },
     {
       "name": "Grínbúðin",
@@ -303,7 +314,8 @@
       "trialEndsAt": "2025-12-02T15:27:22.509Z",
       "id": "e460f5b9-be96-44e5-b081-6ae6bf8f03f3",
       "plan": "basic",
-      "billingStatus": "active"
+      "billingStatus": "active",
+      "categories": []
     },
     {
       "name": "Nýjabúðin",
@@ -316,7 +328,8 @@
       "id": "ab6ff6a8-ad1b-4057-91bd-401e07547bbe",
       "plan": "pro",
       "billingStatus": "active",
-      "isBanned": true
+      "isBanned": true,
+      "categories": []
     },
     {
       "name": "Dimmuval",
@@ -328,7 +341,8 @@
       "plan": "pro",
       "trialEndsAt": "2025-12-03T11:55:31.600Z",
       "billingStatus": "trial",
-      "id": "b3544435-785c-4b64-8d01-8226f80fd4d6"
+      "id": "b3544435-785c-4b64-8d01-8226f80fd4d6",
+      "categories": []
     },
     {
       "name": "Lol",
@@ -340,7 +354,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T18:20:13.404Z",
       "billingStatus": "trial",
-      "id": "486558a5-71e6-4263-9fa7-f03e590d077e"
+      "id": "486558a5-71e6-4263-9fa7-f03e590d077e",
+      "categories": []
     },
     {
       "name": "Lol",
@@ -352,7 +367,8 @@
       "plan": "pro",
       "trialEndsAt": "2025-12-06T18:23:33.578Z",
       "billingStatus": "trial",
-      "id": "72dd703f-4044-422e-9ff0-d1cec1c83f34"
+      "id": "72dd703f-4044-422e-9ff0-d1cec1c83f34",
+      "categories": []
     },
     {
       "name": "gull",
@@ -364,7 +380,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T18:50:08.667Z",
       "billingStatus": "trial",
-      "id": "d886c72a-e464-41f0-af63-22f5701deac5"
+      "id": "d886c72a-e464-41f0-af63-22f5701deac5",
+      "categories": []
     },
     {
       "name": "rugl",
@@ -376,7 +393,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T18:56:22.565Z",
       "billingStatus": "trial",
-      "id": "8f121848-1287-43e7-91f1-d5417cef7081"
+      "id": "8f121848-1287-43e7-91f1-d5417cef7081",
+      "categories": []
     },
     {
       "name": "Grjóni",
@@ -388,7 +406,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T19:09:38.932Z",
       "billingStatus": "trial",
-      "id": "d8879c9e-0d6e-4f0c-9755-c37d07da63f6"
+      "id": "d8879c9e-0d6e-4f0c-9755-c37d07da63f6",
+      "categories": []
     },
     {
       "name": "shit",
@@ -400,7 +419,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T19:26:33.499Z",
       "billingStatus": "trial",
-      "id": "ff1fc4ec-69aa-44b1-a60d-5b304b06a878"
+      "id": "ff1fc4ec-69aa-44b1-a60d-5b304b06a878",
+      "categories": []
     },
     {
       "name": "verslun",
@@ -412,7 +432,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T20:56:39.594Z",
       "billingStatus": "trial",
-      "id": "c89982a2-5680-49c6-be32-67fb2605bc5b"
+      "id": "c89982a2-5680-49c6-be32-67fb2605bc5b",
+      "categories": []
     },
     {
       "name": "Dæmi",
@@ -424,7 +445,8 @@
       "plan": "premium",
       "trialEndsAt": "2025-12-06T21:02:02.994Z",
       "billingStatus": "trial",
-      "id": "9352b076-472f-4354-9f54-2dac2c95a85d"
+      "id": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "categories": []
     },
     {
       "name": "Skrá",
@@ -436,7 +458,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T21:07:20.875Z",
       "billingStatus": "trial",
-      "id": "ca7fcdfe-c956-45c3-bc33-f4dd134473ac"
+      "id": "ca7fcdfe-c956-45c3-bc33-f4dd134473ac",
+      "categories": []
     },
     {
       "name": "Sigra",
@@ -448,7 +471,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T21:15:15.559Z",
       "billingStatus": "trial",
-      "id": "9a0f97aa-2889-4501-98e6-870589c71aea"
+      "id": "9a0f97aa-2889-4501-98e6-870589c71aea",
+      "categories": []
     },
     {
       "name": "Giggedí",
@@ -460,7 +484,8 @@
       "plan": "basic",
       "trialEndsAt": "2025-12-06T21:21:38.027Z",
       "billingStatus": "trial",
-      "id": "e7919c73-82de-4210-a417-d76e27e7c082"
+      "id": "e7919c73-82de-4210-a417-d76e27e7c082",
+      "categories": []
     },
     {
       "name": "hornið",
@@ -472,7 +497,12 @@
       "plan": "premium",
       "trialEndsAt": "2025-12-06T21:26:22.435Z",
       "billingStatus": "trial",
-      "id": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174"
+      "id": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
+      "categories": [
+        "Veitingar & Matur",
+        "Fatnaður & Lífstíll",
+        "Heimili & Húsgögn"
+      ]
     }
   ],
   "posts": [
@@ -518,26 +548,26 @@
       "startsAt": "2025-12-03",
       "endsAt": "2026-01-06",
       "createdAt": "2025-12-03T10:22:02.428Z",
-      "viewCount": 19,
+      "viewCount": 28,
       "id": "4ea49e2c-8557-406d-aa7b-a5de985ef70e"
     },
     {
       "title": "Jól í kópavogi",
       "description": "Jólin í kópavogi 🌲🎅",
       "category": "Annað",
-      "price": 24000,
-      "oldPrice": 60000,
+      "price": 3333,
+      "oldPrice": 999999,
       "imageUrl": "/uploads/1ca858dd-7882-4816-adad-1c0b1df81aab.jpg",
       "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
       "buyUrl": "https://menning.kopavogur.is/event_umbrella/jol/",
       "startsAt": "2025-11-29",
-      "endsAt": "2025-12-06",
+      "endsAt": "2026-01-06",
       "createdAt": "2025-11-29T21:05:44.687Z",
-      "viewCount": 25,
+      "viewCount": 36,
       "id": "5bc112e6-1ea0-4c72-b7a4-58ab21882cf9"
     },
     {
-      "title": "Black friday",
+      "title": "Black fridayyyyyyyyy",
       "description": "Endalausir afslættir út um allt.",
       "category": "Annað",
       "price": 0,
@@ -546,9 +576,9 @@
       "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
       "buyUrl": "https://utsalapp-live.netlify.app/",
       "startsAt": "2025-12-03",
-      "endsAt": "2027-01-01",
+      "endsAt": "2026-12-06",
       "createdAt": "2025-12-03T13:43:27.496Z",
-      "viewCount": 31,
+      "viewCount": 39,
       "id": "785cba99-e632-47b9-9e8c-10a6733d5e19"
     },
     {
@@ -563,23 +593,128 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-03T23:29:59.085Z",
-      "viewCount": 7,
+      "viewCount": 17,
       "id": "4eac90dd-3432-49be-873b-c9cdaef69396"
     },
     {
-      "title": "Jólakaffi",
-      "description": "Þessi kaffibolli sko! 🤤",
+      "title": "Kaffi lauglækur",
+      "description": "Velkomin á kaffi laugalæk",
       "category": "Matur & veitingar",
-      "price": 1900,
-      "oldPrice": 19900,
-      "imageUrl": "/uploads/77746785-3318-46f0-8233-3efbcfa90f6d.jpg",
-      "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
-      "buyUrl": "https://www.google.com/search?ie=UTF-8&client=ms-android-samsung-rvo1&source=android-browser&q=kaffi",
-      "startsAt": "2025-12-04",
-      "endsAt": "2025-12-06",
-      "createdAt": "2025-12-04T17:58:48.974Z",
-      "viewCount": 1,
-      "id": "37f72f8b-b01b-4a30-ad9d-bf3bee0faae8"
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/4b061685-1b3f-477e-b436-87d17791a8af.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://www.facebook.com/share/1AQS2HVaCF/",
+      "startsAt": "2025-12-05",
+      "endsAt": "2026-01-06",
+      "createdAt": "2025-12-05T09:33:18.045Z",
+      "viewCount": 2,
+      "id": "e41398da-f17a-498f-82ad-e130f0d03e0b"
+    },
+    {
+      "title": "Hamborgarabúlla Tómasar",
+      "description": "Bestu borgarar landsins segja margir. 🤤",
+      "category": "Matur & veitingar",
+      "price": 2990,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/c8d46beb-4373-424e-92ca-e2726413420a.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://tommis.is/is/?location=is&gad_source=1&gad_campaignid=19918579089&gclid=Cj0KCQiAosrJBhD0ARIsAHebCNrmp2rfET9bauJRXzqMEr7NCIo5Jo8teokMPJcb6HLr6JMFJ5X1_50aApEuEALw_wcB",
+      "startsAt": "2025-12-05",
+      "endsAt": "2026-01-06",
+      "createdAt": "2025-12-05T09:38:03.901Z",
+      "viewCount": 4,
+      "id": "66c9e824-ee50-4f33-9cef-cd058f9a983c"
+    },
+    {
+      "title": "Beautybox",
+      "description": "Falleg jólatilboð",
+      "category": "Snyrtivörur",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/80769ecf-d851-476c-8cab-bc59a011c8a1.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://beautybox.is/",
+      "startsAt": "2025-12-05",
+      "endsAt": "2026-01-06",
+      "createdAt": "2025-12-05T10:50:23.290Z",
+      "viewCount": 13,
+      "id": "324cc32b-879b-404f-8504-9ed4b67298ee"
+    },
+    {
+      "title": "Byko jólagjafir 🎁",
+      "description": "Jólagjafir? 🎁 Við höfum tekið saman bestu jólagjafahugmyndirnar! Þú finnur frábært úrval af skemmtilegum, fallegum og nytsamlegum gjöfum í BYKO. Allt frá leikföngum og heimilisvörum til verkfæra og vinnufatnaðar.  🎅⛄🎄",
+      "category": "Heimili & húsgögn",
+      "price": 14994,
+      "oldPrice": 24990,
+      "imageUrl": "/uploads/adb48bd3-725a-47ab-944e-8c1a782d9c8c.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://byko.is/jolagjafir",
+      "startsAt": "2025-12-05",
+      "endsAt": "2025-12-12",
+      "createdAt": "2025-12-05T11:04:22.921Z",
+      "viewCount": 4,
+      "id": "3ca4bc21-11ee-4d32-b47d-59d5e769a566"
+    },
+    {
+      "title": "Hellaferð - Ómetanleg upplifun",
+      "description": "Hellaferð í Vatnshelli fyrir tvo",
+      "category": "Annað",
+      "price": 7080,
+      "oldPrice": 11800,
+      "imageUrl": "/uploads/1570f7ed-c04b-4247-a833-19ed9bce3db9.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://www.hopkaup.is/reykjaviksummitguides_vatnshellar_2026",
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2025-12-05T11:14:40.013Z",
+      "viewCount": 2,
+      "id": "d83240ae-60ad-4169-90bb-9b414fe665fa"
+    },
+    {
+      "title": "Snilldarvörur - Jólagjafir fyrir alla",
+      "description": "Dagljósavekjari (Ný Útgáfa) (Forpöntun)",
+      "category": "Annað",
+      "price": 6890,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/1322469f-27b4-4c21-8b43-01591120286d.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://www.snilldar.is/products/dagljosavekjari-nyr",
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2025-12-05T11:33:34.093Z",
+      "viewCount": 2,
+      "id": "164b6bdd-11cc-4804-96d3-c43f6d887cf1"
+    },
+    {
+      "title": "Dillon - Live music",
+      "description": "Lifandi tónlist - Blúskvöld öll miðvikudagskvöld",
+      "category": "Annað",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/774c5e66-adea-4cf0-a968-971be1b0424d.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://dillon.is/",
+      "startsAt": "2025-12-01",
+      "endsAt": "2026-01-07",
+      "createdAt": "2025-12-05T14:06:28.609Z",
+      "viewCount": 12,
+      "id": "3163972e-c791-4d1f-82b9-6e091edc308b"
+    },
+    {
+      "title": "Bingó á Ölhúsinu grafarvogi",
+      "description": "Komdu og náðu þér í vinning",
+      "category": "Annað",
+      "price": 1500,
+      "oldPrice": 1500,
+      "imageUrl": "/uploads/8b2a096d-8b65-4b63-ba42-4cbf0dbd2e4a.jpg",
+      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
+      "buyUrl": "https://www.facebook.com/share/1F98aWxG1M/",
+      "startsAt": "2025-12-05",
+      "endsAt": "2025-12-05",
+      "createdAt": "2025-12-05T17:53:20.514Z",
+      "viewCount": 0,
+      "id": "841626d7-4430-45b9-9c05-610cf97c4551"
     }
   ]
 }

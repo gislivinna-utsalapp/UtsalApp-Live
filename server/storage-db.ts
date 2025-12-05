@@ -71,6 +71,12 @@ export class DbStorage {
         changed = true;
       }
 
+      // NÝTT: tryggjum að categories sé til sem fylki
+      if (s.categories === undefined) {
+        s.categories = [];
+        changed = true;
+      }
+
       // Hreinsa gamla reiti ef þeir eru til
       if (s.planType !== undefined) {
         delete s.planType;
@@ -132,6 +138,7 @@ export class DbStorage {
     if (newStore.plan === undefined) newStore.plan = "basic";
     if (newStore.trialEndsAt === undefined) newStore.trialEndsAt = null;
     if (newStore.billingStatus === undefined) newStore.billingStatus = "trial";
+    if (newStore.categories === undefined) newStore.categories = [];
 
     this.db.stores.push(newStore);
     saveDatabase(this.db);
@@ -161,6 +168,9 @@ export class DbStorage {
     if (updated.trialEndsAt === undefined) updated.trialEndsAt = null;
     if (updated.billingStatus === undefined) {
       updated.billingStatus = "trial";
+    }
+    if (updated.categories === undefined) {
+      updated.categories = existing.categories ?? [];
     }
 
     (this.db.stores as any[])[index] = updated;

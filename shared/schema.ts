@@ -1,4 +1,3 @@
-// shared/schema.ts
 import { z } from "zod";
 
 /*
@@ -29,6 +28,9 @@ export const storeSchema = z.object({
   website: z.string().nullable().optional(),
   logoUrl: z.string().nullable().optional(),
 
+  // NÝTT: flokkar verslunar – top-level, allt að 3 í UI (en schema leyfir fleiri)
+  categories: z.array(z.string()).optional(),
+
   ownerEmail: z.string().email(),
 
   plan: z.string().optional(), // "basic" | "pro" | "premium" o.s.frv.
@@ -50,7 +52,12 @@ export const salePostSchema = z.object({
   title: z.string(),
 
   description: z.string().nullable().optional(),
+
+  // Gamli reiturinn (fyrsti flokkurinn)
   category: z.string().nullable().optional(),
+
+  // NÝTT: listi af flokkum (hámark 3 í UI, en schema leyfir fleiri)
+  categories: z.array(z.string()).optional(),
 
   // Í DB ertu með price / oldPrice – geymum bæði sem valfrjálsar tölur
   price: z.number().nullable().optional(),
@@ -114,7 +121,12 @@ export const salePostWithDetailsSchema = z.object({
   title: z.string(),
 
   description: z.string().nullable().optional(),
+
+  // Fyrsti flokkurinn (fyrir eldri kóða)
   category: z.string().nullable().optional(),
+
+  // NÝTT: margir flokkar við eitt tilboð
+  categories: z.array(z.string()).optional(),
 
   priceOriginal: z.number().nullable().optional(),
   priceSale: z.number().nullable().optional(),

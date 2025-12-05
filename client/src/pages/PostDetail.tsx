@@ -150,6 +150,15 @@ export default function PostDetail() {
 
       <main className="px-4 py-4 space-y-4">
         <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
+          {/* NAFN FYRIRTÆKIS EFST Í AUKSLÝSINGABOXINU */}
+          {post.store && post.store.name && (
+            <div className="px-4 pt-4 pb-2 border-b border-neutral-100">
+              <p className="text-xs font-semibold text-neutral-700">
+                {post.store.name}
+              </p>
+            </div>
+          )}
+
           {mainImage && (
             <div className="aspect-[3/4] w-full bg-neutral-100 overflow-hidden">
               <img

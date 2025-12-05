@@ -61,6 +61,10 @@ var DbStorage = class {
         }
         changed = true;
       }
+      if (s.categories === void 0) {
+        s.categories = [];
+        changed = true;
+      }
       if (s.planType !== void 0) {
         delete s.planType;
         changed = true;
@@ -105,6 +109,7 @@ var DbStorage = class {
     if (newStore.plan === void 0) newStore.plan = "basic";
     if (newStore.trialEndsAt === void 0) newStore.trialEndsAt = null;
     if (newStore.billingStatus === void 0) newStore.billingStatus = "trial";
+    if (newStore.categories === void 0) newStore.categories = [];
     this.db.stores.push(newStore);
     saveDatabase(this.db);
     return newStore;
@@ -124,6 +129,9 @@ var DbStorage = class {
     if (updated.trialEndsAt === void 0) updated.trialEndsAt = null;
     if (updated.billingStatus === void 0) {
       updated.billingStatus = "trial";
+    }
+    if (updated.categories === void 0) {
+      updated.categories = existing.categories ?? [];
     }
     this.db.stores[index] = updated;
     saveDatabase(this.db);
@@ -326,7 +334,9 @@ function registerRoutes(app) {
           plan: "basic",
           trialEndsAt,
           billingStatus: "trial",
-          isBanned: false
+          isBanned: false,
+          categories: []
+          // NÝTT – engir flokka valdir við skráningu
         });
         const user = await storage.createUser({
           email,
@@ -350,7 +360,8 @@ function registerRoutes(app) {
             billingStatus: store.billingStatus ?? "trial",
             billingActive,
             createdAt: store.createdAt ?? null,
-            isBanned: store.isBanned ?? false
+            isBanned: store.isBanned ?? false,
+            categories: store.categories ?? []
           }
         });
       } catch (err) {
@@ -390,7 +401,9 @@ function registerRoutes(app) {
         plan: "basic",
         trialEndsAt,
         billingStatus: "trial",
-        isBanned: false
+        isBanned: false,
+        categories: []
+        // NÝTT
       });
       const user = await storage.createUser({
         email,
@@ -414,7 +427,8 @@ function registerRoutes(app) {
           billingStatus: store.billingStatus ?? "trial",
           billingActive,
           createdAt: store.createdAt ?? null,
-          isBanned: store.isBanned ?? false
+          isBanned: store.isBanned ?? false,
+          categories: store.categories ?? []
         }
       });
     } catch (err) {
@@ -479,7 +493,8 @@ function registerRoutes(app) {
           billingStatus,
           billingActive,
           createdAt: store.createdAt ?? null,
-          isBanned: store.isBanned ?? false
+          isBanned: store.isBanned ?? false,
+          categories: store.categories ?? []
         };
       }
       return res.json({
@@ -528,7 +543,8 @@ function registerRoutes(app) {
             billingStatus,
             billingActive,
             createdAt: store.createdAt ?? null,
-            isBanned: store.isBanned ?? false
+            isBanned: store.isBanned ?? false,
+            categories: store.categories ?? []
           };
         }
         return res.json({
@@ -634,7 +650,7 @@ function registerRoutes(app) {
         if (!store) {
           return res.status(404).json({ message: "Verslun fannst ekki" });
         }
-        const { name, address, phone, website } = req.body;
+        const { name, address, phone, website, categories } = req.body;
         const updates = {};
         if (name !== void 0) {
           const trimmed = name.trim();
@@ -651,6 +667,13 @@ function registerRoutes(app) {
         }
         if (website !== void 0) {
           updates.website = website ? website.trim() : null;
+        }
+        if (categories !== void 0) {
+          if (!Array.isArray(categories)) {
+            return res.status(400).json({ message: "Flokkar \xFEurfa a\xF0 vera fylki af strengjum" });
+          }
+          const cleaned = categories.map((c) => String(c).trim()).filter(Boolean);
+          updates.categories = cleaned.slice(0, 3);
         }
         const updated = await storage.updateStore(store.id, updates);
         if (!updated) {
@@ -671,7 +694,8 @@ function registerRoutes(app) {
           billingStatus,
           billingActive,
           createdAt: updated.createdAt ?? null,
-          isBanned: updated.isBanned ?? false
+          isBanned: updated.isBanned ?? false,
+          categories: updated.categories ?? []
         });
       } catch (err) {
         console.error("stores/me update error", err);
@@ -725,7 +749,8 @@ function registerRoutes(app) {
           billingStatus,
           billingActive,
           createdAt: updated.createdAt ?? null,
-          isBanned: updated.isBanned ?? false
+          isBanned: updated.isBanned ?? false,
+          categories: updated.categories ?? []
         });
       } catch (err) {
         console.error("activate-plan error:", err);

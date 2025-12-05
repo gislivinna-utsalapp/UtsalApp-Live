@@ -27,6 +27,39 @@ function buildImageUrl(rawUrl?: string | null): string | null {
   return rawUrl;
 }
 
+// Hjálparfall til að reikna tíma sem er eftir af tilboði út frá endsAt
+function getTimeLeft(endsAt?: string | null): string | null {
+  if (!endsAt) return null;
+
+  const end = new Date(endsAt);
+  if (isNaN(end.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = end.getTime() - now.getTime();
+
+  if (diffMs <= 0) {
+    return "Tilboðinu er lokið";
+  }
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    // Dæmi: "Endar eftir 2 daga og 5 klst"
+    return `Endar eftir ${days} daga og ${hours} klst`;
+  }
+
+  if (hours > 0) {
+    // Dæmi: "Endar eftir 3 klst og 20 mín"
+    return `Endar eftir ${hours} klst og ${minutes} mín`;
+  }
+
+  // Dæmi: "Endar eftir 15 mín"
+  return `Endar eftir ${minutes} mín`;
+}
+
 export function SalePostCard({ post }: Props) {
   const firstImage = post.images?.[0];
   const imageUrl = buildImageUrl(firstImage?.url ?? null);
@@ -44,9 +77,21 @@ export function SalePostCard({ post }: Props) {
   const description =
     typeof rawDescription === "string" ? rawDescription.trim() : "";
 
+  // Tími sem er eftir – byggt á endsAt sem kemur frá server
+  const timeLeftLabel = getTimeLeft((post as any).endsAt ?? null);
+
   return (
     <Link to={`/post/${post.id}`} className="block h-full">
       <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm">
+        {/* NAFN FYRIRTÆKIS EFST Í BOXINU */}
+        {post.store && post.store.name && (
+          <div className="px-2 pt-2 pb-1">
+            <p className="text-[11px] font-semibold text-gray-700 line-clamp-1">
+              {post.store.name}
+            </p>
+          </div>
+        )}
+
         {/* Myndabox – kassalagað (4/3) */}
         <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
           {imageUrl ? (
@@ -77,7 +122,7 @@ export function SalePostCard({ post }: Props) {
             {post.title}
           </p>
 
-          {/* Lýsing – við hliðina/undir upplýsingunum, sýnum eins mikið og kemst í 3 línur */}
+          {/* Lýsing */}
           {description && (
             <p className="text-[11px] leading-tight text-gray-700 line-clamp-3">
               {description}
@@ -98,6 +143,13 @@ export function SalePostCard({ post }: Props) {
                   {formatPrice(post.priceOriginal)}
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Tími sem er eftir af tilboði */}
+          {timeLeftLabel && (
+            <div className="mt-0.5 text-[11px] font-medium text-red-600">
+              {timeLeftLabel}
             </div>
           )}
         </div>

@@ -1,4 +1,3 @@
-// client/src/pages/CreatePost.tsx
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -27,7 +26,10 @@ const CATEGORY_OPTIONS = [
 type CreatePostPayload = {
   title: string;
   description: string;
+  // Fyrsti flokkurinn fyrir eldri backend-lógík
   category: string;
+  // NÝTT: allt að 3 flokkar á hverju tilboði
+  categories: string[];
   priceOriginal: number;
   priceSale: number;
   buyUrl?: string | null;
@@ -87,7 +89,7 @@ export default function CreatePost() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [priceOriginal, setPriceOriginal] = useState("");
   const [priceSale, setPriceSale] = useState("");
   const [buyUrl, setBuyUrl] = useState("");
@@ -112,6 +114,24 @@ export default function CreatePost() {
     setImagePreview(URL.createObjectURL(file));
   }
 
+  function toggleCategory(cat: string) {
+    setErrorMsg(null);
+
+    setSelectedCategories((prev) => {
+      const exists = prev.includes(cat);
+      if (exists) {
+        // taka flokk út
+        return prev.filter((c) => c !== cat);
+      }
+      if (prev.length >= 3) {
+        // hámark 3 flokkar
+        setErrorMsg("Hægt er að velja mest 3 flokka fyrir hvert tilboð.");
+        return prev;
+      }
+      return [...prev, cat];
+    });
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setErrorMsg(null);
@@ -122,8 +142,16 @@ export default function CreatePost() {
       return;
     }
 
-    if (!category.trim()) {
-      setErrorMsg("Veldu flokk fyrir tilboðið.");
+    if (selectedCategories.length === 0) {
+      setErrorMsg("Veldu að minnsta kosti einn flokk (allt að 3).");
+      return;
+    }
+
+    const trimmedCategories = selectedCategories.map((c) => c.trim());
+    const primaryCategory = trimmedCategories[0] ?? "";
+
+    if (!primaryCategory) {
+      setErrorMsg("Veldu giltan flokk.");
       return;
     }
 
@@ -150,7 +178,8 @@ export default function CreatePost() {
       const payload: CreatePostPayload = {
         title: title.trim(),
         description: description.trim(),
-        category: category.trim(),
+        category: primaryCategory, // fyrsti flokkurinn
+        categories: trimmedCategories, // allt að 3 flokkar
         priceOriginal: original,
         priceSale: sale,
         buyUrl: buyUrl.trim() || null,
@@ -226,25 +255,34 @@ export default function CreatePost() {
             />
           </div>
 
-          {/* Flokkur - DROPDOWN */}
+          {/* Flokkar - CHECKBOXAR (allt að 3) */}
           <div className="space-y-1">
-            <Label htmlFor="category">Flokkur</Label>
-            <select
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full border border-black rounded-md px-3 py-2 text-sm bg-white text-black"
-              required
-            >
-              <option value="">Veldu flokk…</option>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
+            <Label>Flokkar (allt að 3)</Label>
+            <div className="flex flex-col gap-1">
+              {CATEGORY_OPTIONS.map((opt) => {
+                const checked = selectedCategories.includes(opt);
+                const disableCheckbox =
+                  !checked && selectedCategories.length >= 3;
+
+                return (
+                  <label
+                    key={opt}
+                    className="flex items-center gap-2 text-sm cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={checked}
+                      disabled={disableCheckbox}
+                      onChange={() => toggleCategory(opt)}
+                    />
+                    <span>{opt}</span>
+                  </label>
+                );
+              })}
+            </div>
             <p className="text-[11px] text-muted-foreground">
-              Flokkar eru notaðir á „Flokkar“ síðunni og í leit.
+              Þú getur merkt tilboðið í allt að þrjá flokka.
             </p>
           </div>
 

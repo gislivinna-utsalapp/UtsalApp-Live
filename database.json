@@ -364,9 +364,9 @@
       "website": "",
       "logoUrl": "",
       "ownerEmail": "lo@lo.is",
-      "plan": "pro",
+      "plan": "premium",
       "trialEndsAt": "2025-12-06T18:23:33.578Z",
-      "billingStatus": "trial",
+      "billingStatus": "active",
       "id": "72dd703f-4044-422e-9ff0-d1cec1c83f34",
       "categories": []
     },

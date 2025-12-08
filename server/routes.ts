@@ -1,4 +1,3 @@
-// server/routes.ts
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
 import cors from "cors";
@@ -39,6 +38,13 @@ const VIEW_DEDUP_WINDOW_MS = 5_000; // 5 sekúndur
 
 const TRIAL_DAYS = 7;
 const TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
+
+// Pakkalímít – hámarksfjöldi virkra tilboða eftir pakka
+const PLAN_LIMITS: Record<string, number> = {
+  basic: 3,
+  pro: 10,
+  premium: 20,
+};
 
 // ------------------------- AUTH MIDDLEWARE -------------------------
 
@@ -135,7 +141,7 @@ async function requireActiveOrTrialStore(
 
       return res.status(403).json({
         message:
-          "Fríviku þinni er lokið. Hafðu samband við ÚtsalApp til að virkja áskrift.",
+          "Fríviku þinni er lokið. Virkjaðu áskrift til að halda áfram að setja inn tilboð.",
       });
     }
 
@@ -771,7 +777,7 @@ export function registerRoutes(app: Express): void {
     },
   );
 
-  // ------------------ STORES: ACTIVATE PLAN / FRÍVIKA ------------------
+  // ------------------ STORES: ACTIVATE PLAN / FRÍVIKA / ÁSKRIFT ------------------
   app.post(
     "/api/v1/stores/activate-plan",
     auth("store"),
@@ -802,18 +808,26 @@ export function registerRoutes(app: Express): void {
           ? new Date((store as any).trialEndsAt).getTime()
           : null;
 
-        let trialEndsAt: string | null = (store as any).trialEndsAt ?? null;
+        const trialExpired = isTrialExpired(store);
 
-        // Ef verslun hefur EKKI fengið fríviku áður → gefum 7 daga frá núna
+        const updates: any = {
+          plan: bodyPlan,
+        };
+
         if (!existingTrialEnds) {
-          trialEndsAt = new Date(now + TRIAL_MS).toISOString();
+          // Fyrsta skipti → gefum 7 daga fríviku
+          updates.trialEndsAt = new Date(now + TRIAL_MS).toISOString();
+          updates.billingStatus = "trial";
+        } else if (!trialExpired) {
+          // Trial í gangi → bara uppfæra plan, halda billingStatus óbreyttri (trial)
+          updates.trialEndsAt = (store as any).trialEndsAt;
+          updates.billingStatus = (store as any).billingStatus ?? "trial";
+        } else {
+          // Frívika er útrunnin → virkjum áskrift
+          updates.billingStatus = "active";
         }
 
-        const updated = await storage.updateStore(store.id, {
-          plan: bodyPlan,
-          trialEndsAt,
-          billingStatus: (store as any).billingStatus ?? "trial",
-        } as any);
+        const updated = await storage.updateStore(store.id, updates);
 
         if (!updated) {
           return res
@@ -977,7 +991,7 @@ export function registerRoutes(app: Express): void {
     }
   });
 
-  // ------------------ POSTS: CREATE ------------------
+  // ------------------ POSTS: CREATE (MEÐ PAKKA-LÍMÍTUM) ------------------
   app.post(
     "/api/v1/posts",
     auth("store"),
@@ -998,6 +1012,40 @@ export function registerRoutes(app: Express): void {
 
         if (!title || priceOriginal == null || priceSale == null || !category) {
           return res.status(400).json({ message: "Vantar upplýsingar" });
+        }
+
+        if (!req.user?.storeId) {
+          return res
+            .status(400)
+            .json({ message: "Engin tengd verslun fannst fyrir notanda" });
+        }
+
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+
+        // Ákveðum plan og hámark
+        const rawPlan =
+          (store as any).plan ?? (store as any).planType ?? "basic";
+        const planKey = String(rawPlan).toLowerCase();
+        const maxPosts = PLAN_LIMITS[planKey] ?? PLAN_LIMITS["basic"];
+
+        // Teljum virkar færslur (enda ekki liðinn eða engin endsAt)
+        const storePosts = await storage.getPostsByStore(req.user.storeId);
+        const now = Date.now();
+
+        const activePosts = storePosts.filter((p: any) => {
+          if (!p.endsAt) return true;
+          const endTs = new Date(p.endsAt).getTime();
+          if (!Number.isFinite(endTs)) return true;
+          return endTs > now;
+        });
+
+        if (activePosts.length >= maxPosts) {
+          return res.status(403).json({
+            message: `Þú hefur náð hámarksfjölda virkra tilboða (${maxPosts}) fyrir ${planKey} pakkann. Eyðu eldri tilboðum eða uppfærðu í stærri pakka til að bæta við fleiri.`,
+          });
         }
 
         const imageUrl =

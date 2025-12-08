@@ -183,6 +183,11 @@ var lastViewCache = {};
 var VIEW_DEDUP_WINDOW_MS = 5e3;
 var TRIAL_DAYS = 7;
 var TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1e3;
+var PLAN_LIMITS = {
+  basic: 3,
+  pro: 10,
+  premium: 20
+};
 function auth(requiredRole) {
   return (req, res, next) => {
     const header = req.headers.authorization;
@@ -246,7 +251,7 @@ async function requireActiveOrTrialStore(req, res, next) {
         });
       }
       return res.status(403).json({
-        message: "Fr\xEDviku \xFEinni er loki\xF0. Haf\xF0u samband vi\xF0 \xDAtsalApp til a\xF0 virkja \xE1skrift."
+        message: "Fr\xEDviku \xFEinni er loki\xF0. Virkja\xF0u \xE1skrift til a\xF0 halda \xE1fram a\xF0 setja inn tilbo\xF0."
       });
     }
     next();
@@ -722,15 +727,20 @@ function registerRoutes(app) {
         }
         const now = Date.now();
         const existingTrialEnds = store.trialEndsAt ? new Date(store.trialEndsAt).getTime() : null;
-        let trialEndsAt = store.trialEndsAt ?? null;
+        const trialExpired = isTrialExpired(store);
+        const updates = {
+          plan: bodyPlan
+        };
         if (!existingTrialEnds) {
-          trialEndsAt = new Date(now + TRIAL_MS).toISOString();
+          updates.trialEndsAt = new Date(now + TRIAL_MS).toISOString();
+          updates.billingStatus = "trial";
+        } else if (!trialExpired) {
+          updates.trialEndsAt = store.trialEndsAt;
+          updates.billingStatus = store.billingStatus ?? "trial";
+        } else {
+          updates.billingStatus = "active";
         }
-        const updated = await storage.updateStore(store.id, {
-          plan: bodyPlan,
-          trialEndsAt,
-          billingStatus: store.billingStatus ?? "trial"
-        });
+        const updated = await storage.updateStore(store.id, updates);
         if (!updated) {
           return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra pakka" });
         }
@@ -865,6 +875,29 @@ function registerRoutes(app) {
         } = req.body;
         if (!title || priceOriginal == null || priceSale == null || !category) {
           return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
+        }
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst fyrir notanda" });
+        }
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+        const rawPlan = store.plan ?? store.planType ?? "basic";
+        const planKey = String(rawPlan).toLowerCase();
+        const maxPosts = PLAN_LIMITS[planKey] ?? PLAN_LIMITS["basic"];
+        const storePosts = await storage.getPostsByStore(req.user.storeId);
+        const now = Date.now();
+        const activePosts = storePosts.filter((p) => {
+          if (!p.endsAt) return true;
+          const endTs = new Date(p.endsAt).getTime();
+          if (!Number.isFinite(endTs)) return true;
+          return endTs > now;
+        });
+        if (activePosts.length >= maxPosts) {
+          return res.status(403).json({
+            message: `\xDE\xFA hefur n\xE1\xF0 h\xE1marksfj\xF6lda virkra tilbo\xF0a (${maxPosts}) fyrir ${planKey} pakkann. Ey\xF0u eldri tilbo\xF0um e\xF0a uppf\xE6r\xF0u \xED st\xE6rri pakka til a\xF0 b\xE6ta vi\xF0 fleiri.`
+          });
         }
         const imageUrl = Array.isArray(images) && images.length > 0 ? images[0].url : "";
         const newPost = await storage.createPost({

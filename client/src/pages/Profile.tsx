@@ -20,7 +20,8 @@ type StoreInfo = {
   billingStatus?: string;
   billingActive?: boolean;
   createdAt?: string | null; // BÆTT VIÐ
-  categories?: string[]; // BÆTT VIÐ – flokkar verslunar
+  categories?: string[]; // flokkar verslunar
+  subcategories?: string[]; // BÆTT VIÐ – undirflokkar verslunar
 };
 
 type BillingInfo = {
@@ -132,12 +133,42 @@ function getCategoryDisplayLabel(category?: string | null): string {
 
 // NÝTT: valkostir fyrir flokka verslunar (top-level) – allt að 3 má haka við
 const STORE_CATEGORY_OPTIONS: string[] = [
+  "Viðburðir (t.d. Happy Hour)", // NÝR MEGA-FLOKKUR
   "Veitingar & Matur",
   "Fatnaður & Lífstíll",
   "Heimili & Húsgögn",
   "Tækni & Rafmagn",
   "Beauty, Heilsu & Þjónusta",
 ];
+
+// NÝTT: undirflokkar fyrir hvern megaflokk verslunar
+const STORE_SUBCATEGORY_OPTIONS: Record<string, Subcategory[]> = {
+  "Viðburðir (t.d. Happy Hour)": [
+    { value: "Happy Hour", label: "Happy Hour" },
+    { value: "Viðburðir", label: "Viðburðir" },
+  ],
+  "Veitingar & Matur": [
+    { value: "Matur & veitingar", label: "Matur & veitingar" },
+    { value: "Happy Hour", label: "Happy Hour" },
+  ],
+  "Fatnaður & Lífstíll": [
+    { value: "Fatnaður - Konur", label: "Fatnaður - Konur" },
+    { value: "Fatnaður - Karlar", label: "Fatnaður - Karlar" },
+    { value: "Fatnaður - Börn", label: "Fatnaður - Börn" },
+    { value: "Skór", label: "Skór" },
+    { value: "Íþróttavörur", label: "Íþróttavörur" },
+    { value: "Leikföng & börn", label: "Leikföng & börn" },
+  ],
+  "Heimili & Húsgögn": [
+    { value: "Heimili & húsgögn", label: "Heimili & húsgögn" },
+  ],
+  "Tækni & Rafmagn": [{ value: "Raftæki", label: "Raftæki" }],
+  "Beauty, Heilsu & Þjónusta": [
+    { value: "Snyrtivörur", label: "Snyrtivörur" },
+    { value: "Heilsuþjónusta", label: "Heilsuþjónusta" },
+    { value: "Annað", label: "Annað" },
+  ],
+};
 
 type PlanId = "basic" | "pro" | "premium";
 
@@ -279,6 +310,12 @@ export default function Profile() {
   const [selectedStoreCategories, setSelectedStoreCategories] = useState<
     string[]
   >(store?.categories ?? []);
+
+  // NÝTT: valdir undirflokkar verslunar
+  const [selectedStoreSubcategories, setSelectedStoreSubcategories] = useState<
+    string[]
+  >(store?.subcategories ?? []);
+
   const [savingCategories, setSavingCategories] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [categoriesSuccess, setCategoriesSuccess] = useState<string | null>(
@@ -302,10 +339,11 @@ export default function Profile() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
-  // Synca local state þegar store.categories uppfærist frá backend
+  // Synca local state þegar store.categories / subcategories uppfærast frá backend
   useEffect(() => {
     setSelectedStoreCategories(store?.categories ?? []);
-  }, [store?.categories]);
+    setSelectedStoreSubcategories(store?.subcategories ?? []);
+  }, [store?.categories, store?.subcategories]);
 
   // Synca editable verslunarupplýsingar þegar store uppfærist úr auth
   useEffect(() => {
@@ -427,13 +465,37 @@ export default function Profile() {
 
   function toggleStoreCategory(cat: string) {
     if (selectedStoreCategories.includes(cat)) {
+      // taka út megaflokk og alla undirflokka hans
       setSelectedStoreCategories(
         selectedStoreCategories.filter((c) => c !== cat),
       );
+      const subs = STORE_SUBCATEGORY_OPTIONS[cat] ?? [];
+      if (subs.length) {
+        const subValues = subs.map((s) => s.value);
+        setSelectedStoreSubcategories((prev) =>
+          prev.filter((v) => !subValues.includes(v)),
+        );
+      }
     } else {
       if (selectedStoreCategories.length >= 3) return;
       setSelectedStoreCategories([...selectedStoreCategories, cat]);
     }
+  }
+
+  function toggleStoreSubcategory(parentCategory: string, subValue: string) {
+    // tryggjum að parent sé valinn (ef pláss)
+    if (!selectedStoreCategories.includes(parentCategory)) {
+      if (selectedStoreCategories.length >= 3) {
+        return;
+      }
+      setSelectedStoreCategories([...selectedStoreCategories, parentCategory]);
+    }
+
+    setSelectedStoreSubcategories((prev) =>
+      prev.includes(subValue)
+        ? prev.filter((v) => v !== subValue)
+        : [...prev, subValue],
+    );
   }
 
   async function handleSaveCategories() {
@@ -446,6 +508,7 @@ export default function Profile() {
     try {
       const body = {
         categories: selectedStoreCategories,
+        subcategories: selectedStoreSubcategories,
       };
 
       const updated = await apiFetch<StoreInfo>("/api/v1/stores/me", {
@@ -454,6 +517,7 @@ export default function Profile() {
       });
 
       setSelectedStoreCategories(updated.categories ?? []);
+      setSelectedStoreSubcategories(updated.subcategories ?? []);
       setCategoriesSuccess("Flokkar verslunar hafa verið vistaðir.");
     } catch (err) {
       console.error("save categories error:", err);
@@ -797,11 +861,12 @@ export default function Profile() {
           </p>
         </div>
 
-        {/* Flokkar verslunar – allt að 3 valdir */}
+        {/* Flokkar verslunar – allt að 3 valdir + undirflokkar */}
         <div className="mt-4 border-t pt-3 space-y-2">
           <h3 className="text-sm font-semibold">Flokkar verslunar</h3>
           <p className="text-xs text-muted-foreground">
-            Merktu við allt að 3 flokka sem lýsa best versluninni þinni.
+            Merktu við allt að 3 megaflokka sem lýsa best versluninni þinni og
+            veldu síðan viðeigandi undirflokka (t.d. „Happy Hour“).
           </p>
 
           <div className="flex flex-col gap-1">
@@ -827,6 +892,51 @@ export default function Profile() {
               );
             })}
           </div>
+
+          {/* Undirflokkar fyrir völdu megaflokkana */}
+          {selectedStoreCategories.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Veldu undirflokka undir völdum megaflokkum. Þetta birtist hjá
+                prófíl verslunar (t.d. „Viðburðir · Happy Hour“).
+              </p>
+              <div className="space-y-2">
+                {selectedStoreCategories.map((parent) => {
+                  const subs = STORE_SUBCATEGORY_OPTIONS[parent] ?? [];
+                  if (!subs.length) return null;
+
+                  return (
+                    <div key={parent} className="space-y-1">
+                      <p className="text-xs font-semibold">{parent}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {subs.map((sub) => {
+                          const checked = selectedStoreSubcategories.includes(
+                            sub.value,
+                          );
+                          return (
+                            <button
+                              key={sub.value}
+                              type="button"
+                              onClick={() =>
+                                toggleStoreSubcategory(parent, sub.value)
+                              }
+                              className={`px-3 py-1 rounded-full border text-xs ${
+                                checked
+                                  ? "bg-[#FF7300] text-white border-[#FF7300]"
+                                  : "bg-white text-gray-800 border-gray-300"
+                              }`}
+                            >
+                              {sub.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {categoriesError && (
             <p className="text-xs text-red-600">{categoriesError}</p>

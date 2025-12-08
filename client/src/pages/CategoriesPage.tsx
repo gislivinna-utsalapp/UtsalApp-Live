@@ -62,7 +62,10 @@ const MEGA_CATEGORIES: MegaCategory[] = [
   {
     id: "events",
     name: "Viðburðir (t.d. Happy Hour)",
-    subcategories: [],
+    subcategories: [
+      // NÝTT: undirflokkur fyrir viðburði
+      { value: "Happy Hour", label: "Happy Hour" },
+    ],
   },
   {
     id: "food",
@@ -173,14 +176,14 @@ export default function CategoriesPage() {
         </p>
       </header>
 
-      {/* FLokkakerfi: 1) MEGA 2) UNDIR */}
+      {/* Flokkakerfi: 1) MEGA 2) UNDIR */}
       <section className="space-y-4">
         {/* MEGA-flokkar */}
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-wide text-gray-400">
             Megaflokkar
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-nowrap gap-2 overflow-x-auto pb-2">
             {MEGA_CATEGORIES.map((mega) => (
               <Button
                 key={mega.id}
@@ -198,19 +201,19 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Undirflokkar – bara þegar mega er EKKI „Allt“ eða „Viðburðir“ */}
+        {/* Undirflokkar – bara þegar mega er EKKI „Allt“ */}
         {activeMega &&
           activeMega.id !== "all" &&
-          activeMega.id !== "events" &&
           activeMega.subcategories.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide text-gray-400">
                 Undirflokkar
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-2">
                 <Button
                   variant={selectedCategory === null ? "default" : "outline"}
                   size="sm"
+                  className="whitespace-nowrap"
                   onClick={() => setSelectedCategory(null)}
                 >
                   Allt í þessum flokki
@@ -223,6 +226,7 @@ export default function CategoriesPage() {
                       selectedCategory === sub.value ? "default" : "outline"
                     }
                     size="sm"
+                    className="whitespace-nowrap"
                     onClick={() => setSelectedCategory(sub.value)}
                   >
                     {sub.label}

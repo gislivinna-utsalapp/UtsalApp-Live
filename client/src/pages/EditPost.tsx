@@ -1,14 +1,16 @@
-import { useEffect, useState, FormEvent } from "react";
+// client/src/pages/EditPost.tsx
+import { useEffect, useState, FormEvent, ChangeEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Sama og í CreatePost – mikilvægt að flokkarnir passi
+// Sama og í CreatePost – mikilvægt að halda þessu samræmdu
 const CATEGORY_OPTIONS = [
   "Fatnaður - Konur",
   "Fatnaður - Karlar",
@@ -19,435 +21,328 @@ const CATEGORY_OPTIONS = [
   "Raftæki",
   "Snyrtivörur",
   "Leikföng & börn",
-  "Matur & veitingar",
+  "Veitingar & matur",
+  "Viðburðir",
   "Happy Hour",
-  "Annað",
 ];
 
-type UpdatePostPayload = {
-  title?: string;
-  description?: string;
-  // Fyrsti flokkurinn
-  category?: string;
-  // Allir flokkar (allt að 3 í UI)
-  categories?: string[];
-  priceOriginal?: number;
-  priceSale?: number;
-  buyUrl?: string | null;
-  startsAt?: string | null;
-  endsAt?: string | null;
-  images?: { url: string }[];
+type EditPostFormState = {
+  title: string;
+  description: string;
+  category: string;
+  discountPercent: string;
+  originalPrice: string;
+  discountedPrice: string;
+  startDate: string;
+  endDate: string;
+  imageUrl: string | null; // relative slóð
 };
 
-// Notum sama API_BASE_URL og í CreatePost
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+export function EditPost() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
 
-// Endurnýtum upload-token-lógík úr CreatePost, en nú með API_BASE_URL
-async function uploadImage(file: File): Promise<string> {
-  const token =
-    localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
-
-  if (!token) {
-    throw new Error("Enginn token fannst. Skráðu þig út og inn aftur.");
-  }
-
-  const formData = new FormData();
-  formData.append("image", file);
-
-  // Sama og í CreatePost – backend-URL fyrst, annars relative slóð
-  const url = API_BASE_URL
-    ? `${API_BASE_URL}/api/v1/uploads`
-    : "/api/v1/uploads";
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      // EKKI setja Content-Type hér – browser sér um boundary fyrir FormData
-    },
-    body: formData,
+  const [loaded, setLoaded] = useState(false);
+  const [form, setForm] = useState<EditPostFormState>({
+    title: "",
+    description: "",
+    category: "",
+    discountPercent: "",
+    originalPrice: "",
+    discountedPrice: "",
+    startDate: "",
+    endDate: "",
+    imageUrl: null,
   });
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.error("Upload response text (edit):", text);
-    if (res.status === 401) {
-      throw new Error("Ekki innskráður. Skráðu þig inn aftur.");
-    }
-    throw new Error("Tókst ekki að hlaða upp mynd.");
-  }
-
-  const data = (await res.json().catch(() => null)) as { url?: string } | null;
-  if (!data?.url) {
-    throw new Error("Server skilaði ekki myndaslóð.");
-  }
-
-  return data.url;
-}
-
-export default function EditPost() {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-
-  // Form state
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [categories, setCategories] = useState<string[]>([]);
-  const [priceOriginal, setPriceOriginal] = useState("");
-  const [priceSale, setPriceSale] = useState("");
-  const [buyUrl, setBuyUrl] = useState("");
-  const [startsAt, setStartsAt] = useState("");
-  const [endsAt, setEndsAt] = useState("");
-
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
-
-  const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sækja núverandi tilboð
+  // Sækjum núverandi tilboð til að fylla í formið
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      setErrorMsg("Vantar auðkenni tilboðs.");
-      return;
-    }
+    let cancelled = false;
 
     async function loadPost() {
-      try {
-        setLoading(true);
-        setErrorMsg(null);
+      if (!id) return;
+      setError(null);
 
-        // apiFetch skilar þegar JSON – ekki .json() hér!
+      try {
         const post = await apiFetch<SalePostWithDetails>(`/api/v1/posts/${id}`);
 
-        setTitle(post.title || "");
-        setDescription(post.description || "");
+        if (cancelled) return;
 
-        const initialCats = (
-          post.categories && post.categories.length > 0
-            ? post.categories
-            : post.category
-              ? [post.category]
-              : []
-        ).filter(Boolean) as string[];
-
-        setCategories(initialCats);
-
-        setPriceOriginal(
-          post.priceOriginal != null ? String(post.priceOriginal) : "",
-        );
-        setPriceSale(post.priceSale != null ? String(post.priceSale) : "");
-        setBuyUrl(post.buyUrl || "");
-
-        if (post.startsAt) {
-          const d = new Date(post.startsAt);
-          setStartsAt(d.toISOString().slice(0, 10));
-        }
-        if (post.endsAt) {
-          const d = new Date(post.endsAt);
-          setEndsAt(d.toISOString().slice(0, 10));
-        }
-
-        const img =
+        const firstImageUrl =
           post.images && post.images.length > 0 ? post.images[0].url : null;
-        setExistingImageUrl(img);
-        setImagePreview(img);
+
+        setForm({
+          title: post.title ?? "",
+          description: post.description ?? "",
+          category: post.category ?? "",
+          discountPercent:
+            post.discountPercent != null ? String(post.discountPercent) : "",
+          originalPrice:
+            post.originalPrice != null ? String(post.originalPrice) : "",
+          discountedPrice:
+            post.discountedPrice != null ? String(post.discountedPrice) : "",
+          startDate: post.startDate ? post.startDate.slice(0, 10) : "",
+          endDate: post.endDate ? post.endDate.slice(0, 10) : "",
+          imageUrl: firstImageUrl,
+        });
+
+        setLoaded(true);
       } catch (err: any) {
-        console.error("Villa við að sækja auglýsingu:", err);
-        const msg =
-          err instanceof Error
-            ? err.message
-            : "Tókst ekki að sækja auglýsinguna.";
-        setErrorMsg(msg);
-      } finally {
-        setLoading(false);
+        console.error(err);
+        setError(
+          err.message || "Tókst ekki að sækja tilboðið fyrir breytingar",
+        );
       }
     }
 
     loadPost();
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setImageFile(null);
-      setImagePreview(existingImageUrl);
-      return;
-    }
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+  function handleChange(
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
+  ) {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function toggleCategory(cat: string) {
-    setErrorMsg(null);
+  async function handleImageChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    setCategories((prev) => {
-      const exists = prev.includes(cat);
-      if (exists) {
-        return prev.filter((c) => c !== cat);
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const uploadUrl = API_BASE_URL
+        ? `${API_BASE_URL}/api/v1/uploads`
+        : "/api/v1/uploads";
+
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const res = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("Tókst ekki að hlaða upp mynd");
       }
-      if (prev.length >= 3) {
-        setErrorMsg("Hægt er að velja mest 3 flokka fyrir hvert tilboð.");
-        return prev;
-      }
-      return [...prev, cat];
-    });
+
+      const data: { url: string } = await res.json();
+
+      setForm((prev) => ({ ...prev, imageUrl: data.url }));
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Tókst ekki að hlaða upp mynd");
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!id) {
-      setErrorMsg("Vantar auðkenni tilboðs.");
-      return;
-    }
-
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    if (!title.trim()) {
-      setErrorMsg("Titill vantar.");
-      return;
-    }
-
-    if (categories.length === 0) {
-      setErrorMsg("Veldu að minnsta kosti einn flokk (allt að 3).");
-      return;
-    }
-
-    const trimmedCategories = categories.map((c) => c.trim());
-    const primaryCategory = trimmedCategories[0] ?? "";
-
-    if (!primaryCategory) {
-      setErrorMsg("Veldu giltan flokk.");
-      return;
-    }
-
-    const original = Number(priceOriginal.replace(",", "."));
-    const sale = Number(priceSale.replace(",", "."));
-
-    if (!Number.isFinite(original) || !Number.isFinite(sale)) {
-      setErrorMsg("Verð þarf að vera tölur.");
-      return;
-    }
+    if (!id) return;
 
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      let finalImageUrl = existingImageUrl;
-
-      // Ef notandi valdi nýja mynd → hlaða henni upp
-      if (imageFile) {
-        finalImageUrl = await uploadImage(imageFile);
-      }
-
-      const payload: UpdatePostPayload = {
-        title: title.trim(),
-        description: description.trim(),
-        category: primaryCategory,
-        categories: trimmedCategories,
-        priceOriginal: original,
-        priceSale: sale,
-        buyUrl: buyUrl.trim() || null,
-        startsAt: startsAt || null,
-        endsAt: endsAt || null,
+      const payload: any = {
+        title: form.title,
+        description: form.description,
+        category: form.category || null,
+        discountPercent: form.discountPercent
+          ? Number(form.discountPercent)
+          : null,
+        originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
+        discountedPrice: form.discountedPrice
+          ? Number(form.discountedPrice)
+          : null,
+        startDate: form.startDate || null,
+        endDate: form.endDate || null,
+        images: form.imageUrl ? [{ url: form.imageUrl }] : [],
       };
-
-      if (finalImageUrl) {
-        payload.images = [{ url: finalImageUrl }];
-      }
 
       await apiFetch(`/api/v1/posts/${id}`, {
         method: "PUT",
-        body: JSON.stringify(payload),
+        body: payload,
       });
 
-      setSuccessMsg("Tilboð var uppfært.");
-      setTimeout(() => {
-        navigate("/profile");
-      }, 800);
+      navigate("/profile"); // eða linkinn sem þú vilt fara á eftir edit
     } catch (err: any) {
-      console.error("Villa við að uppfæra tilboð:", err);
-      const msg =
-        err instanceof Error ? err.message : "Tókst ekki að uppfæra tilboð.";
-      setErrorMsg(msg);
+      console.error(err);
+      setError(err.message || "Eitthvað fór úrskeiðis við að uppfæra tilboð");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
-        <p className="text-sm text-gray-500">Sæki tilboð…</p>
-      </div>
-    );
-  }
+  const previewImageSrc =
+    form.imageUrl &&
+    (API_BASE_URL ? `${API_BASE_URL}${form.imageUrl}` : form.imageUrl);
 
-  if (!id) {
+  if (!loaded && !error) {
     return (
-      <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
-        <p className="text-sm text-red-600">Vantar auðkenni tilboðs.</p>
+      <div className="max-w-xl mx-auto p-4">
+        <p className="text-sm text-gray-600">Sæki tilboð…</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
-      <h1 className="text-lg font-semibold mb-3">Breyta tilboði</h1>
-
+    <div className="max-w-xl mx-auto p-4">
       <Card className="p-4 space-y-4">
-        {errorMsg && (
-          <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
-            {errorMsg}
-          </div>
-        )}
+        <h1 className="text-xl font-semibold">Breyta tilboði</h1>
 
-        {successMsg && (
-          <div className="text-xs text-green-700 bg-green-50 border border-green-100 rounded-md px-3 py-2">
-            {successMsg}
+        {error && (
+          <div className="text-sm text-red-600 border border-red-200 rounded p-2">
+            {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Titill */}
-          <div className="space-y-1">
-            <Label htmlFor="title">Titill tilboðs</Label>
+          <div>
+            <Label htmlFor="title">Titill</Label>
             <Input
               id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              name="title"
+              value={form.title}
+              onChange={handleChange}
               required
             />
           </div>
 
-          {/* Lýsing */}
-          <div className="space-y-1">
+          <div>
             <Label htmlFor="description">Lýsing</Label>
             <textarea
               id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 text-sm min-h-[80px]"
+              name="description"
+              className="w-full border rounded px-3 py-2 text-sm"
+              rows={4}
+              value={form.description}
+              onChange={handleChange}
             />
           </div>
 
-          {/* Flokkar - CHECKBOXAR (allt að 3) */}
-          <div className="space-y-1">
-            <Label>Flokkar (allt að 3)</Label>
-            <div className="flex flex-col gap-1">
-              {CATEGORY_OPTIONS.map((opt) => {
-                const checked = categories.includes(opt);
-                const disableCheckbox = !checked && categories.length >= 3;
-
-                return (
-                  <label
-                    key={opt}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={checked}
-                      disabled={disableCheckbox}
-                      onChange={() => toggleCategory(opt)}
-                    />
-                    <span>{opt}</span>
-                  </label>
-                );
-              })}
-            </div>
+          <div>
+            <Label htmlFor="category">Flokkur</Label>
+            <select
+              id="category"
+              name="category"
+              className="w-full border rounded px-3 py-2 text-sm"
+              value={form.category}
+              onChange={handleChange}
+            >
+              <option value="">Veldu flokk</option>
+              {CATEGORY_OPTIONS.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Verð */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="priceOriginal">Verð áður</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="discountPercent">Afsláttur %</Label>
               <Input
-                id="priceOriginal"
-                value={priceOriginal}
-                onChange={(e) => setPriceOriginal(e.target.value)}
-                inputMode="decimal"
+                id="discountPercent"
+                name="discountPercent"
+                type="number"
+                min={0}
+                max={100}
+                value={form.discountPercent}
+                onChange={handleChange}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="priceSale">Tilboðsverð</Label>
+            <div>
+              <Label htmlFor="originalPrice">Upprunalegt verð</Label>
               <Input
-                id="priceSale"
-                value={priceSale}
-                onChange={(e) => setPriceSale(e.target.value)}
-                inputMode="decimal"
+                id="originalPrice"
+                name="originalPrice"
+                type="number"
+                min={0}
+                value={form.originalPrice}
+                onChange={handleChange}
               />
             </div>
           </div>
 
-          {/* Linkur til kaupa */}
-          <div className="space-y-1">
-            <Label htmlFor="buyUrl">Linkur til að kaupa (vefsíða)</Label>
+          <div>
+            <Label htmlFor="discountedPrice">Afsláttarverð</Label>
             <Input
-              id="buyUrl"
-              value={buyUrl}
-              onChange={(e) => setBuyUrl(e.target.value)}
+              id="discountedPrice"
+              name="discountedPrice"
+              type="number"
+              min={0}
+              value={form.discountedPrice}
+              onChange={handleChange}
             />
           </div>
 
-          {/* Dagssetningar */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="startsAt">Byrjar (valkvætt)</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="startDate">Gildir frá</Label>
               <Input
-                id="startsAt"
+                id="startDate"
+                name="startDate"
                 type="date"
-                value={startsAt}
-                onChange={(e) => setStartsAt(e.target.value)}
+                value={form.startDate}
+                onChange={handleChange}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="endsAt">Endar (valkvætt)</Label>
+            <div>
+              <Label htmlFor="endDate">Gildir til</Label>
               <Input
-                id="endsAt"
+                id="endDate"
+                name="endDate"
                 type="date"
-                value={endsAt}
-                onChange={(e) => setEndsAt(e.target.value)}
+                value={form.endDate}
+                onChange={handleChange}
               />
             </div>
           </div>
 
-          {/* Mynd */}
           <div className="space-y-2">
-            <Label htmlFor="image">Mynd fyrir tilboðið</Label>
+            <Label htmlFor="image">Mynd</Label>
             <Input
               id="image"
               type="file"
               accept="image/*"
               onChange={handleImageChange}
             />
-            {imagePreview && (
-              <div className="mt-2">
-                <p className="text-[11px] text-muted-foreground mb-1">
-                  Forskoðun:
-                </p>
-                <img
-                  src={imagePreview}
-                  alt="Forskoðun"
-                  className="w-full max-h-60 object-cover rounded-md border"
-                />
-              </div>
+            {isUploading && (
+              <p className="text-xs text-gray-500">Hleð upp mynd…</p>
+            )}
+            {previewImageSrc && (
+              <img
+                src={previewImageSrc}
+                alt="Forskoðun"
+                className="mt-2 rounded-md max-h-48 object-cover"
+              />
             )}
           </div>
 
           <Button
             type="submit"
-            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
-            disabled={isSubmitting}
+            className="w-full"
+            disabled={isSubmitting || isUploading}
           >
-            {isSubmitting ? "Uppfæri tilboð..." : "Vista breytingar"}
+            {isSubmitting ? "Vista breytingar…" : "Vista breytingar"}
           </Button>
         </form>
       </Card>
     </div>
   );
 }
+
+export default EditPost;

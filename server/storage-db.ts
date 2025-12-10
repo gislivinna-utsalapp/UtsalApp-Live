@@ -179,6 +179,35 @@ export class DbStorage {
     return updated as Store & any;
   }
 
+  // NÝTT: EYÐA VERSLUN + TENGDUM GÖGNUM (ADMIN)
+  async deleteStore(storeId: string): Promise<boolean> {
+    // Fjarlægjum verslunina
+    const originalStores = this.db.stores.length;
+    this.db.stores = this.db.stores.filter((s: any) => s.id !== storeId);
+
+    // Fjarlægjum öll tilboð frá þeirri verslun
+    const originalPosts = this.db.posts.length;
+    this.db.posts = this.db.posts.filter((p: any) => p.storeId !== storeId);
+
+    // Fjarlægjum notendur sem vísa í þessa verslun
+    const originalUsers = this.db.users.length;
+    this.db.users = this.db.users.filter(
+      (u: any) => (u as any).storeId !== storeId,
+    );
+
+    const changed =
+      this.db.stores.length !== originalStores ||
+      this.db.posts.length !== originalPosts ||
+      this.db.users.length !== originalUsers;
+
+    if (changed) {
+      saveDatabase(this.db);
+    }
+
+    // Skilum true bara ef verslun var til og var í raun fjarlægð
+    return this.db.stores.length !== originalStores;
+  }
+
   // POSTS
   async createPost(
     post: Omit<SalePost, "id"> & Record<string, any>,

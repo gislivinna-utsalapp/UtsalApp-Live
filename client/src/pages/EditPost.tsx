@@ -39,7 +39,10 @@ type UpdatePostPayload = {
   images?: { url: string }[];
 };
 
-// Endurnýtum upload-token-lógík úr CreatePost
+// Notum sama API_BASE_URL og í CreatePost
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+
+// Endurnýtum upload-token-lógík úr CreatePost, en nú með API_BASE_URL
 async function uploadImage(file: File): Promise<string> {
   const token =
     localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
@@ -51,10 +54,16 @@ async function uploadImage(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("image", file);
 
-  const res = await fetch("/api/v1/uploads", {
+  // Sama og í CreatePost – backend-URL fyrst, annars relative slóð
+  const url = API_BASE_URL
+    ? `${API_BASE_URL}/api/v1/uploads`
+    : "/api/v1/uploads";
+
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
+      // EKKI setja Content-Type hér – browser sér um boundary fyrir FormData
     },
     body: formData,
   });

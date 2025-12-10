@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import About from "./pages/About";
 import NotFound from "./pages/not-found";
 import AdminAllPost from "./pages/AdminAllPost";
+import StoreProfilePage from "./pages/StoreProfilePage"; // NÝTT: verslunarprófíll fyrir notendur
 
 function BottomNav() {
   const location = useLocation();
@@ -86,6 +87,9 @@ export default function App() {
         <Route path="/categories" element={<CategoriesPage />} />
         <Route path="/post/:id" element={<PostDetail />} />
         <Route path="/about" element={<About />} />
+
+        {/* PUBLIC store profile fyrir notendur */}
+        <Route path="/store/:storeId" element={<StoreProfilePage />} />
 
         {/* Auth */}
         <Route path="/login" element={<Login />} />

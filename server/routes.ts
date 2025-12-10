@@ -1,3 +1,4 @@
+// server/routes.ts
 import type { Express, Request, Response, NextFunction } from "express";
 import express from "express";
 import cors from "cors";
@@ -198,6 +199,8 @@ async function mapPostToFrontend(p: any) {
           billingStatus,
           createdAt: (store as any).createdAt ?? null,
           isBanned: (store as any).isBanned ?? false,
+          categories: (store as any).categories ?? [],
+          subcategories: (store as any).subcategories ?? [],
         }
       : null,
   };
@@ -276,7 +279,8 @@ export function registerRoutes(app: Express): void {
           trialEndsAt,
           billingStatus: "trial",
           isBanned: false,
-          categories: [], // NÝTT – engir flokka valdir við skráningu
+          categories: [],
+          subcategories: [],
         } as any);
 
         const user = await storage.createUser({
@@ -305,6 +309,7 @@ export function registerRoutes(app: Express): void {
             createdAt: (store as any).createdAt ?? null,
             isBanned: (store as any).isBanned ?? false,
             categories: (store as any).categories ?? [],
+            subcategories: (store as any).subcategories ?? [],
           },
         });
       } catch (err) {
@@ -360,7 +365,8 @@ export function registerRoutes(app: Express): void {
         trialEndsAt,
         billingStatus: "trial",
         isBanned: false,
-        categories: [], // NÝTT
+        categories: [],
+        subcategories: [],
       } as any);
 
       const user = await storage.createUser({
@@ -389,6 +395,7 @@ export function registerRoutes(app: Express): void {
           createdAt: (store as any).createdAt ?? null,
           isBanned: (store as any).isBanned ?? false,
           categories: (store as any).categories ?? [],
+          subcategories: (store as any).subcategories ?? [],
         },
       });
     } catch (err) {
@@ -481,6 +488,7 @@ export function registerRoutes(app: Express): void {
           createdAt: (store as any).createdAt ?? null,
           isBanned: (store as any).isBanned ?? false,
           categories: (store as any).categories ?? [],
+          subcategories: (store as any).subcategories ?? [],
         };
       }
 
@@ -551,6 +559,7 @@ export function registerRoutes(app: Express): void {
             createdAt: (store as any).createdAt ?? null,
             isBanned: (store as any).isBanned ?? false,
             categories: (store as any).categories ?? [],
+            subcategories: (store as any).subcategories ?? [],
           };
         }
 
@@ -693,13 +702,15 @@ export function registerRoutes(app: Express): void {
           return res.status(404).json({ message: "Verslun fannst ekki" });
         }
 
-        const { name, address, phone, website, categories } = req.body as {
-          name?: string;
-          address?: string | null;
-          phone?: string | null;
-          website?: string | null;
-          categories?: string[];
-        };
+        const { name, address, phone, website, categories, subcategories } =
+          req.body as {
+            name?: string;
+            address?: string | null;
+            phone?: string | null;
+            website?: string | null;
+            categories?: string[];
+            subcategories?: string[];
+          };
 
         const updates: any = {};
 
@@ -725,7 +736,7 @@ export function registerRoutes(app: Express): void {
           updates.website = website ? website.trim() : null;
         }
 
-        // NÝTT: uppfæra flokka verslunar – tryggjum fylki og max 3
+        // Uppfæra flokka verslunar – tryggjum fylki og max 3
         if (categories !== undefined) {
           if (!Array.isArray(categories)) {
             return res
@@ -738,6 +749,21 @@ export function registerRoutes(app: Express): void {
             .filter(Boolean);
 
           updates.categories = cleaned.slice(0, 3);
+        }
+
+        // NÝTT: vista undirflokka verslunar
+        if (subcategories !== undefined) {
+          if (!Array.isArray(subcategories)) {
+            return res.status(400).json({
+              message: "Undirflokkar þurfa að vera fylki af strengjum",
+            });
+          }
+
+          const cleanedSubs = subcategories
+            .map((s) => String(s).trim())
+            .filter(Boolean);
+
+          updates.subcategories = cleanedSubs;
         }
 
         const updated = await storage.updateStore(store.id, updates);
@@ -769,6 +795,7 @@ export function registerRoutes(app: Express): void {
           createdAt: (updated as any).createdAt ?? null,
           isBanned: (updated as any).isBanned ?? false,
           categories: (updated as any).categories ?? [],
+          subcategories: (updated as any).subcategories ?? [],
         });
       } catch (err) {
         console.error("stores/me update error", err);
@@ -858,6 +885,7 @@ export function registerRoutes(app: Express): void {
           createdAt: (updated as any).createdAt ?? null,
           isBanned: (updated as any).isBanned ?? false,
           categories: (updated as any).categories ?? [],
+          subcategories: (updated as any).subcategories ?? [],
         });
       } catch (err) {
         console.error("activate-plan error:", err);
@@ -873,6 +901,40 @@ export function registerRoutes(app: Express): void {
       res.json(stores);
     } catch (err) {
       console.error("stores list error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
+  // ------------------ STORES: SINGLE STORE PUBLIC PROFILE ------------------
+  app.get("/api/v1/stores/:storeId", async (req, res) => {
+    try {
+      const storeId = req.params.storeId;
+      const store = await storage.getStoreById(storeId);
+
+      if (!store) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+
+      // Ekki sýna bönnuð fyrirtæki í public prófíl
+      if ((store as any).isBanned) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+
+      const plan = (store as any).plan ?? (store as any).planType ?? "basic";
+
+      return res.json({
+        id: store.id,
+        name: store.name,
+        address: (store as any).address ?? "",
+        phone: (store as any).phone ?? "",
+        website: (store as any).website ?? "",
+        createdAt: (store as any).createdAt ?? null,
+        plan,
+        categories: (store as any).categories ?? [],
+        subcategories: (store as any).subcategories ?? [],
+      });
+    } catch (err) {
+      console.error("store public profile error:", err);
       res.status(500).json({ message: "Villa kom upp" });
     }
   });

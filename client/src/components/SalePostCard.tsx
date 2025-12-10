@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+// client/src/components/SalePostCard.tsx
+
+import { Link, useNavigate } from "react-router-dom";
 import type { SalePostWithDetails } from "@shared/schema";
 import { API_BASE_URL } from "@/lib/api";
 import { formatPrice, calculateDiscount } from "@/lib/utils";
@@ -47,20 +49,19 @@ function getTimeLeft(endsAt?: string | null): string | null {
   const minutes = totalMinutes % 60;
 
   if (days > 0) {
-    // Dæmi: "Endar eftir 2 daga og 5 klst"
     return `Endar eftir ${days} daga og ${hours} klst`;
   }
 
   if (hours > 0) {
-    // Dæmi: "Endar eftir 3 klst og 20 mín"
     return `Endar eftir ${hours} klst og ${minutes} mín`;
   }
 
-  // Dæmi: "Endar eftir 15 mín"
   return `Endar eftir ${minutes} mín`;
 }
 
 export function SalePostCard({ post }: Props) {
+  const navigate = useNavigate();
+
   const firstImage = post.images?.[0];
   const imageUrl = buildImageUrl(firstImage?.url ?? null);
 
@@ -80,15 +81,32 @@ export function SalePostCard({ post }: Props) {
   // Tími sem er eftir – byggt á endsAt sem kemur frá server
   const timeLeftLabel = getTimeLeft((post as any).endsAt ?? null);
 
+  // NÝTT: tryggjum að við eigum storeId til að fara á prófíl
+  const storeId =
+    (post as any).storeId ??
+    (post as any).store?.id ??
+    (post as any).store_id ??
+    null;
+
   return (
     <Link to={`/post/${post.id}`} className="block h-full">
       <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm">
-        {/* NAFN FYRIRTÆKIS EFST Í BOXINU */}
+        {/* NAFN FYRIRTÆKIS EFST Í BOXINU – NÚ VERÐUR CLICKABLE Á PRÓFÍL */}
         {post.store && post.store.name && (
           <div className="px-2 pt-2 pb-1">
-            <p className="text-[11px] font-semibold text-gray-700 line-clamp-1">
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-gray-700 line-clamp-1 underline-offset-2 hover:underline text-left"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (storeId) {
+                  navigate(`/store/${storeId}`);
+                }
+              }}
+            >
               {post.store.name}
-            </p>
+            </button>
           </div>
         )}
 

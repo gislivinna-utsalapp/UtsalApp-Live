@@ -137,6 +137,22 @@ var DbStorage = class {
     saveDatabase(this.db);
     return updated;
   }
+  // NÝTT: EYÐA VERSLUN + TENGDUM GÖGNUM (ADMIN)
+  async deleteStore(storeId) {
+    const originalStores = this.db.stores.length;
+    this.db.stores = this.db.stores.filter((s) => s.id !== storeId);
+    const originalPosts = this.db.posts.length;
+    this.db.posts = this.db.posts.filter((p) => p.storeId !== storeId);
+    const originalUsers = this.db.users.length;
+    this.db.users = this.db.users.filter(
+      (u) => u.storeId !== storeId
+    );
+    const changed = this.db.stores.length !== originalStores || this.db.posts.length !== originalPosts || this.db.users.length !== originalUsers;
+    if (changed) {
+      saveDatabase(this.db);
+    }
+    return this.db.stores.length !== originalStores;
+  }
   // POSTS
   async createPost(post) {
     const newPost = { ...post, id: crypto.randomUUID() };
@@ -291,7 +307,9 @@ async function mapPostToFrontend(p) {
       // fyrir eldri client
       billingStatus,
       createdAt: store.createdAt ?? null,
-      isBanned: store.isBanned ?? false
+      isBanned: store.isBanned ?? false,
+      categories: store.categories ?? [],
+      subcategories: store.subcategories ?? []
     } : null
   };
 }
@@ -340,8 +358,8 @@ function registerRoutes(app) {
           trialEndsAt,
           billingStatus: "trial",
           isBanned: false,
-          categories: []
-          // NÝTT – engir flokka valdir við skráningu
+          categories: [],
+          subcategories: []
         });
         const user = await storage.createUser({
           email,
@@ -366,7 +384,8 @@ function registerRoutes(app) {
             billingActive,
             createdAt: store.createdAt ?? null,
             isBanned: store.isBanned ?? false,
-            categories: store.categories ?? []
+            categories: store.categories ?? [],
+            subcategories: store.subcategories ?? []
           }
         });
       } catch (err) {
@@ -407,8 +426,8 @@ function registerRoutes(app) {
         trialEndsAt,
         billingStatus: "trial",
         isBanned: false,
-        categories: []
-        // NÝTT
+        categories: [],
+        subcategories: []
       });
       const user = await storage.createUser({
         email,
@@ -433,7 +452,8 @@ function registerRoutes(app) {
           billingActive,
           createdAt: store.createdAt ?? null,
           isBanned: store.isBanned ?? false,
-          categories: store.categories ?? []
+          categories: store.categories ?? [],
+          subcategories: store.subcategories ?? []
         }
       });
     } catch (err) {
@@ -499,7 +519,8 @@ function registerRoutes(app) {
           billingActive,
           createdAt: store.createdAt ?? null,
           isBanned: store.isBanned ?? false,
-          categories: store.categories ?? []
+          categories: store.categories ?? [],
+          subcategories: store.subcategories ?? []
         };
       }
       return res.json({
@@ -549,7 +570,8 @@ function registerRoutes(app) {
             billingActive,
             createdAt: store.createdAt ?? null,
             isBanned: store.isBanned ?? false,
-            categories: store.categories ?? []
+            categories: store.categories ?? [],
+            subcategories: store.subcategories ?? []
           };
         }
         return res.json({
@@ -655,7 +677,7 @@ function registerRoutes(app) {
         if (!store) {
           return res.status(404).json({ message: "Verslun fannst ekki" });
         }
-        const { name, address, phone, website, categories } = req.body;
+        const { name, address, phone, website, categories, subcategories } = req.body;
         const updates = {};
         if (name !== void 0) {
           const trimmed = name.trim();
@@ -680,6 +702,15 @@ function registerRoutes(app) {
           const cleaned = categories.map((c) => String(c).trim()).filter(Boolean);
           updates.categories = cleaned.slice(0, 3);
         }
+        if (subcategories !== void 0) {
+          if (!Array.isArray(subcategories)) {
+            return res.status(400).json({
+              message: "Undirflokkar \xFEurfa a\xF0 vera fylki af strengjum"
+            });
+          }
+          const cleanedSubs = subcategories.map((s) => String(s).trim()).filter(Boolean);
+          updates.subcategories = cleanedSubs;
+        }
         const updated = await storage.updateStore(store.id, updates);
         if (!updated) {
           return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra verslun" });
@@ -700,7 +731,8 @@ function registerRoutes(app) {
           billingActive,
           createdAt: updated.createdAt ?? null,
           isBanned: updated.isBanned ?? false,
-          categories: updated.categories ?? []
+          categories: updated.categories ?? [],
+          subcategories: updated.subcategories ?? []
         });
       } catch (err) {
         console.error("stores/me update error", err);
@@ -760,7 +792,8 @@ function registerRoutes(app) {
           billingActive,
           createdAt: updated.createdAt ?? null,
           isBanned: updated.isBanned ?? false,
-          categories: updated.categories ?? []
+          categories: updated.categories ?? [],
+          subcategories: updated.subcategories ?? []
         });
       } catch (err) {
         console.error("activate-plan error:", err);
@@ -774,6 +807,33 @@ function registerRoutes(app) {
       res.json(stores);
     } catch (err) {
       console.error("stores list error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+  app.get("/api/v1/stores/:storeId", async (req, res) => {
+    try {
+      const storeId = req.params.storeId;
+      const store = await storage.getStoreById(storeId);
+      if (!store) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+      if (store.isBanned) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+      const plan = store.plan ?? store.planType ?? "basic";
+      return res.json({
+        id: store.id,
+        name: store.name,
+        address: store.address ?? "",
+        phone: store.phone ?? "",
+        website: store.website ?? "",
+        createdAt: store.createdAt ?? null,
+        plan,
+        categories: store.categories ?? [],
+        subcategories: store.subcategories ?? []
+      });
+    } catch (err) {
+      console.error("store public profile error:", err);
       res.status(500).json({ message: "Villa kom upp" });
     }
   });

@@ -17,20 +17,34 @@ import crypto2 from "crypto";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-var DB_FILE = path.join(process.cwd(), "database.json");
-function loadDatabase() {
-  if (!fs.existsSync(DB_FILE)) {
-    const initial = { users: [], stores: [], posts: [] };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
-    return initial;
+import { fileURLToPath } from "url";
+var __filename = fileURLToPath(import.meta.url);
+var __dirname = path.dirname(__filename);
+var PROJECT_ROOT = path.resolve(__dirname, "..");
+var DB_FILE = process.env.DB_FILE ?? path.join(PROJECT_ROOT, "database.json");
+console.log("[db] Using database file:", DB_FILE);
+function ensureDbFileExists() {
+  const dir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
+  if (!fs.existsSync(DB_FILE)) {
+    const initial = {
+      users: [],
+      stores: [],
+      posts: []
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
+  }
+}
+function loadDatabase() {
+  ensureDbFileExists();
   const raw = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-  const db = {
+  return {
     users: raw.users ?? [],
     stores: raw.stores ?? [],
     posts: raw.posts ?? []
   };
-  return db;
 }
 function saveDatabase(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
@@ -42,11 +56,7 @@ var DbStorage = class {
     let changed = false;
     for (const s of this.db.stores) {
       if (s.plan === void 0) {
-        if (s.planType !== void 0) {
-          s.plan = s.planType;
-        } else {
-          s.plan = "basic";
-        }
+        s.plan = s.planType ?? "basic";
         changed = true;
       }
       if (s.trialEndsAt === void 0) {
@@ -54,11 +64,7 @@ var DbStorage = class {
         changed = true;
       }
       if (s.billingStatus === void 0) {
-        if (s.billingActive === true) {
-          s.billingStatus = "active";
-        } else {
-          s.billingStatus = "trial";
-        }
+        s.billingStatus = s.billingActive === true ? "active" : "trial";
         changed = true;
       }
       if (s.categories === void 0) {
@@ -78,15 +84,22 @@ var DbStorage = class {
       saveDatabase(this.db);
     }
   }
+  // -------------------------
   // USERS
+  // -------------------------
   async createUser(user) {
-    const newUser = { ...user, id: crypto.randomUUID() };
+    const newUser = {
+      ...user,
+      id: crypto.randomUUID()
+    };
     this.db.users.push(newUser);
     saveDatabase(this.db);
     return newUser;
   }
   async findUserByEmail(email) {
-    return this.db.users.find((u) => u.email === email);
+    return this.db.users.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase()
+    );
   }
   async findUserById(id) {
     return this.db.users.find((u) => u.id === id);
@@ -94,22 +107,23 @@ var DbStorage = class {
   async updateUser(userId, updates) {
     const index = this.db.users.findIndex((u) => u.id === userId);
     if (index === -1) return null;
-    const existing = this.db.users[index];
-    const updated = { ...existing, ...updates };
+    const updated = { ...this.db.users[index], ...updates };
     this.db.users[index] = updated;
     saveDatabase(this.db);
     return updated;
   }
+  // -------------------------
   // STORES
+  // -------------------------
   async createStore(store) {
     const newStore = {
       ...store,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
+      plan: store.plan ?? "basic",
+      trialEndsAt: store.trialEndsAt ?? null,
+      billingStatus: store.billingStatus ?? "trial",
+      categories: store.categories ?? []
     };
-    if (newStore.plan === void 0) newStore.plan = "basic";
-    if (newStore.trialEndsAt === void 0) newStore.trialEndsAt = null;
-    if (newStore.billingStatus === void 0) newStore.billingStatus = "trial";
-    if (newStore.categories === void 0) newStore.categories = [];
     this.db.stores.push(newStore);
     saveDatabase(this.db);
     return newStore;
@@ -123,37 +137,33 @@ var DbStorage = class {
   async updateStore(storeId, updates) {
     const index = this.db.stores.findIndex((s) => s.id === storeId);
     if (index === -1) return null;
-    const existing = this.db.stores[index];
-    const updated = { ...existing, ...updates };
+    const updated = { ...this.db.stores[index], ...updates };
     if (updated.plan === void 0) updated.plan = "basic";
     if (updated.trialEndsAt === void 0) updated.trialEndsAt = null;
-    if (updated.billingStatus === void 0) {
-      updated.billingStatus = "trial";
-    }
+    if (updated.billingStatus === void 0) updated.billingStatus = "trial";
     if (updated.categories === void 0) {
-      updated.categories = existing.categories ?? [];
+      updated.categories = this.db.stores[index].categories ?? [];
     }
     this.db.stores[index] = updated;
     saveDatabase(this.db);
     return updated;
   }
-  // NÝTT: EYÐA VERSLUN + TENGDUM GÖGNUM (ADMIN)
   async deleteStore(storeId) {
-    const originalStores = this.db.stores.length;
+    const before = this.db.stores.length;
     this.db.stores = this.db.stores.filter((s) => s.id !== storeId);
-    const originalPosts = this.db.posts.length;
     this.db.posts = this.db.posts.filter((p) => p.storeId !== storeId);
-    const originalUsers = this.db.users.length;
     this.db.users = this.db.users.filter(
       (u) => u.storeId !== storeId
     );
-    const changed = this.db.stores.length !== originalStores || this.db.posts.length !== originalPosts || this.db.users.length !== originalUsers;
-    if (changed) {
+    if (this.db.stores.length !== before) {
       saveDatabase(this.db);
+      return true;
     }
-    return this.db.stores.length !== originalStores;
+    return false;
   }
+  // -------------------------
   // POSTS
+  // -------------------------
   async createPost(post) {
     const newPost = { ...post, id: crypto.randomUUID() };
     this.db.posts.push(newPost);
@@ -172,25 +182,25 @@ var DbStorage = class {
   async updatePost(postId, updates) {
     const index = this.db.posts.findIndex((p) => p.id === postId);
     if (index === -1) return null;
-    const existing = this.db.posts[index];
-    const updated = { ...existing, ...updates };
+    const updated = { ...this.db.posts[index], ...updates };
     this.db.posts[index] = updated;
     saveDatabase(this.db);
     return updated;
   }
   async deletePost(postId) {
-    const original = this.db.posts.length;
+    const before = this.db.posts.length;
     this.db.posts = this.db.posts.filter((p) => p.id !== postId);
-    const changed = this.db.posts.length !== original;
-    if (changed) saveDatabase(this.db);
-    return changed;
+    if (this.db.posts.length !== before) {
+      saveDatabase(this.db);
+      return true;
+    }
+    return false;
   }
 };
 var storage = new DbStorage();
 
 // server/routes.ts
 var JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
-var ADMIN_EMAIL = "b@b.is".toLowerCase();
 var UPLOAD_DIR = path2.join(process.cwd(), "uploads");
 if (!fs2.existsSync(UPLOAD_DIR)) {
   fs2.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -215,8 +225,8 @@ function auth(requiredRole) {
         header.substring(7),
         JWT_SECRET
       );
-      if (decoded?.email && decoded.email.toLowerCase() === ADMIN_EMAIL) {
-        decoded.role = "admin";
+      if (!decoded?.id || !decoded?.email || !decoded?.role) {
+        return res.status(401).json({ message: "\xD3gildur token" });
       }
       req.user = decoded;
       if (requiredRole && decoded.role !== requiredRole) {
@@ -489,8 +499,7 @@ function registerRoutes(app) {
           store = updated;
         }
       }
-      const baseRole = user.role;
-      const effectiveRole = email === ADMIN_EMAIL ? "admin" : baseRole;
+      const effectiveRole = user.role ?? "store";
       const token = jwt.sign(
         {
           id: user.id,
@@ -579,6 +588,7 @@ function registerRoutes(app) {
             id: req.user.id,
             email: req.user.email,
             role: req.user.role
+            // ✅ role kemur úr token (sem kemur úr DB)
           },
           store: storePayload
         });
@@ -609,7 +619,10 @@ function registerRoutes(app) {
         if (!user) {
           return res.status(404).json({ message: "Notandi fannst ekki" });
         }
-        const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+        const ok = await bcrypt.compare(
+          currentPassword,
+          user.passwordHash
+        );
         if (!ok) {
           return res.status(400).json({ message: "Gamla lykilor\xF0i\xF0 stemmir ekki" });
         }
@@ -715,7 +728,7 @@ function registerRoutes(app) {
         if (!updated) {
           return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra verslun" });
         }
-        const plan = updated.plan ?? updated.planType ?? "basic";
+        const plan = updated.plan ?? "basic";
         const billingStatus = updated.billingStatus ?? (updated.billingActive ? "active" : "trial");
         const billingActive = billingStatus === "active" || billingStatus === "trial";
         return res.json({
@@ -776,7 +789,7 @@ function registerRoutes(app) {
         if (!updated) {
           return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra pakka" });
         }
-        const plan = updated.plan ?? updated.planType ?? "basic";
+        const plan = updated.plan ?? "basic";
         const billingStatus = updated.billingStatus ?? (updated.billingActive ? "active" : "trial");
         const billingActive = billingStatus === "active" || billingStatus === "trial";
         return res.json({
@@ -820,7 +833,7 @@ function registerRoutes(app) {
       if (store.isBanned) {
         return res.status(404).json({ message: "Verslun fannst ekki" });
       }
-      const plan = store.plan ?? store.planType ?? "basic";
+      const plan = store.plan ?? "basic";
       return res.json({
         id: store.id,
         name: store.name,
@@ -868,9 +881,7 @@ function registerRoutes(app) {
       filtered.sort((a, b) => {
         const pa = getPlanRankForPost(a, storesById);
         const pb = getPlanRankForPost(b, storesById);
-        if (pb !== pa) {
-          return pb - pa;
-        }
+        if (pb !== pa) return pb - pa;
         const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bd - ad;
@@ -904,9 +915,7 @@ function registerRoutes(app) {
         const updated = await storage.updatePost(post.id, {
           viewCount: currentCount + 1
         });
-        if (updated) {
-          effective = updated;
-        }
+        if (updated) effective = updated;
         lastViewCache[key] = now;
       }
       const mapped = await mapPostToFrontend(effective);
@@ -943,7 +952,7 @@ function registerRoutes(app) {
         if (!store) {
           return res.status(404).json({ message: "Verslun fannst ekki" });
         }
-        const rawPlan = store.plan ?? store.planType ?? "basic";
+        const rawPlan = store.plan ?? "basic";
         const planKey = String(rawPlan).toLowerCase();
         const maxPosts = PLAN_LIMITS[planKey] ?? PLAN_LIMITS["basic"];
         const storePosts = await storage.getPostsByStore(req.user.storeId);
@@ -1056,12 +1065,9 @@ function registerRoutes(app) {
   );
   app.delete(
     "/api/v1/admin/posts/:id",
-    auth(),
+    auth("admin"),
     async (req, res) => {
       try {
-        if (!req.user || req.user.role !== "admin") {
-          return res.status(403).json({ message: "Ekki heimild" });
-        }
         const postId = req.params.id;
         const all = await storage.listPosts();
         const target = all.find((p) => p.id === postId);
@@ -1078,12 +1084,9 @@ function registerRoutes(app) {
   );
   app.delete(
     "/api/v1/admin/stores/:id",
-    auth(),
+    auth("admin"),
     async (req, res) => {
       try {
-        if (!req.user || req.user.role !== "admin") {
-          return res.status(403).json({ message: "Ekki heimild" });
-        }
         const storeId = req.params.id;
         const deleted = await storage.deleteStore(storeId);
         if (!deleted) {
@@ -1098,12 +1101,9 @@ function registerRoutes(app) {
   );
   app.post(
     "/api/v1/admin/stores/:id/ban",
-    auth(),
+    auth("admin"),
     async (req, res) => {
       try {
-        if (!req.user || req.user.role !== "admin") {
-          return res.status(403).json({ message: "Ekki heimild" });
-        }
         const storeId = req.params.id;
         const { isBanned } = req.body;
         const updated = await storage.updateStore(storeId, {

@@ -19,9 +19,9 @@ type StoreInfo = {
   trialEndsAt?: string | null;
   billingStatus?: string;
   billingActive?: boolean;
-  createdAt?: string | null; // BÆTT VIÐ
-  categories?: string[]; // flokkar verslunar
-  subcategories?: string[]; // BÆTT VIÐ – undirflokkar verslunar
+  createdAt?: string | null;
+  categories?: string[];
+  subcategories?: string[];
 };
 
 type BillingInfo = {
@@ -30,7 +30,7 @@ type BillingInfo = {
   billingStatus: string;
   trialExpired: boolean;
   daysLeft: number | null;
-  createdAt?: string | null; // BÆTT VIÐ – kemur frá /stores/me/billing
+  createdAt?: string | null;
 };
 
 type StorePost = {
@@ -43,7 +43,7 @@ type StorePost = {
   buyUrl?: string | null;
   images?: { url: string; alt?: string }[];
   viewCount?: number;
-  endsAt?: string | null; // BÆTT VIÐ – lokadagsetning tilboðs
+  endsAt?: string | null;
 };
 
 // --- NÝTT: skilgreinum mega-flokka og undirflokka fyrir snyrtilegt "Flokkur" label ---
@@ -119,13 +119,11 @@ function getCategoryDisplayLabel(category?: string | null): string {
     for (const sub of mega.subcategories) {
       const subNorm = normalizeCategory(sub.value);
       if (subNorm && subNorm === normalized) {
-        // Dæmi: "Veitingar & Matur · Happy Hour"
         return `${mega.name} · ${sub.label}`;
       }
     }
   }
 
-  // Ef við finnum hann ekki í skilgreiningunum, sýnum bara upprunalegt gildi
   return category;
 }
 
@@ -133,7 +131,7 @@ function getCategoryDisplayLabel(category?: string | null): string {
 
 // NÝTT: valkostir fyrir flokka verslunar (top-level) – allt að 3 má haka við
 const STORE_CATEGORY_OPTIONS: string[] = [
-  "Viðburðir (t.d. Happy Hour)", // NÝR MEGA-FLOKKUR
+  "Viðburðir (t.d. Happy Hour)",
   "Veitingar & Matur",
   "Fatnaður & Lífstíll",
   "Heimili & Húsgögn",
@@ -213,7 +211,6 @@ function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
   const remaining = getTimeRemaining(endsAt);
 
   if (typeof remaining === "string") {
-    // ef util skilar streng, notum hann beint (t.d. "Útsölunni er lokið")
     return remaining;
   }
 
@@ -237,7 +234,6 @@ function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
       return "1 dagur eftir af tilboðinu";
     }
 
-    // Engir heilir dagar eftir en samt í gangi
     if (hours > 0) {
       return "Endar innan 24 klst";
     }
@@ -285,33 +281,25 @@ export default function Profile() {
   const { authUser, isStore, logout } = useAuth();
 
   const store: StoreInfo | null = authUser?.store ?? null;
-
-  // NÝTT: er notandinn admin út frá role?
   const isAdmin = authUser?.user?.role === "admin";
 
-  // Billing + pakki koma frá backend í stað localStorage
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
 
-  // Valinn pakki í UI (það sem user smellir á)
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
 
-  // Staðbundin skilaboð fyrir notanda
   const [planSuccessMsg, setPlanSuccessMsg] = useState<string | null>(null);
   const [planErrorMsg, setPlanErrorMsg] = useState<string | null>(null);
   const [activatingPlanId, setActivatingPlanId] = useState<PlanId | null>(null);
 
-  // Eyðing tilboða
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // NÝTT: valdir flokkar verslunar (allt að 3)
   const [selectedStoreCategories, setSelectedStoreCategories] = useState<
     string[]
   >(store?.categories ?? []);
 
-  // NÝTT: valdir undirflokkar verslunar
   const [selectedStoreSubcategories, setSelectedStoreSubcategories] = useState<
     string[]
   >(store?.subcategories ?? []);
@@ -322,7 +310,6 @@ export default function Profile() {
     null,
   );
 
-  // NÝTT: editable verslunarupplýsingar (form)
   const [editName, setEditName] = useState<string>(store?.name ?? "");
   const [editAddress, setEditAddress] = useState<string>(store?.address ?? "");
   const [editPhone, setEditPhone] = useState<string>(store?.phone ?? "");
@@ -331,7 +318,6 @@ export default function Profile() {
   const [storeSaveError, setStoreSaveError] = useState<string | null>(null);
   const [storeSaveSuccess, setStoreSaveSuccess] = useState<string | null>(null);
 
-  // NÝTT: lykilorð
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -339,13 +325,11 @@ export default function Profile() {
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
 
-  // Synca local state þegar store.categories / subcategories uppfærast frá backend
   useEffect(() => {
     setSelectedStoreCategories(store?.categories ?? []);
     setSelectedStoreSubcategories(store?.subcategories ?? []);
   }, [store?.categories, store?.subcategories]);
 
-  // Synca editable verslunarupplýsingar þegar store uppfærist úr auth
   useEffect(() => {
     setEditName(store?.name ?? "");
     setEditAddress(store?.address ?? "");
@@ -353,7 +337,6 @@ export default function Profile() {
     setEditWebsite(store?.website ?? "");
   }, [store?.id, store?.name, store?.address, store?.phone, store?.website]);
 
-  // Tilboð verslunar
   const {
     data: storePosts = [],
     isLoading: loadingPosts,
@@ -367,11 +350,11 @@ export default function Profile() {
     },
   });
 
-  // Sækjum billing info úr backend þegar verslun er til
   useEffect(() => {
     if (!store?.id) return;
 
     let cancelled = false;
+
     async function loadBilling() {
       setBillingLoading(true);
       setBillingError(null);
@@ -380,7 +363,6 @@ export default function Profile() {
         if (!cancelled) {
           setBilling(data);
 
-          // Stillum valinn pakka út frá backend plan
           const backendPlan = (data.plan || "").toLowerCase();
           if (
             backendPlan === "basic" ||
@@ -400,9 +382,7 @@ export default function Profile() {
           );
         }
       } finally {
-        if (!cancelled) {
-          setBillingLoading(false);
-        }
+        if (!cancelled) setBillingLoading(false);
       }
     }
 
@@ -412,7 +392,6 @@ export default function Profile() {
     };
   }, [store?.id]);
 
-  // NÝTT: skýrt aðgreint trial vs virk áskrift
   const isBillingActive = billing?.billingStatus === "active";
 
   const trialActive =
@@ -447,9 +426,6 @@ export default function Profile() {
   const mainButtonDisabled =
     !selectedPlan || billingLoading || !!activatingPlanId;
 
-  const hasUsedTrial =
-    !!billing?.trialEndsAt && billing.billingStatus !== "trial";
-
   let mainButtonLabel: string;
   if (!selectedPlan) {
     mainButtonLabel = "Veldu áskriftarleið";
@@ -465,7 +441,6 @@ export default function Profile() {
 
   function toggleStoreCategory(cat: string) {
     if (selectedStoreCategories.includes(cat)) {
-      // taka út megaflokk og alla undirflokka hans
       setSelectedStoreCategories(
         selectedStoreCategories.filter((c) => c !== cat),
       );
@@ -483,11 +458,8 @@ export default function Profile() {
   }
 
   function toggleStoreSubcategory(parentCategory: string, subValue: string) {
-    // tryggjum að parent sé valinn (ef pláss)
     if (!selectedStoreCategories.includes(parentCategory)) {
-      if (selectedStoreCategories.length >= 3) {
-        return;
-      }
+      if (selectedStoreCategories.length >= 3) return;
       setSelectedStoreCategories([...selectedStoreCategories, parentCategory]);
     }
 
@@ -529,7 +501,6 @@ export default function Profile() {
     }
   }
 
-  // NÝTT: vista grunnupplýsingar verslunar
   async function handleSaveStoreInfo() {
     if (!store?.id) return;
 
@@ -550,7 +521,6 @@ export default function Profile() {
         body: JSON.stringify(body),
       });
 
-      // Uppfæra local form með því sem server skilar (just in case)
       setEditName(updated.name ?? "");
       setEditAddress(updated.address ?? "");
       setEditPhone(updated.phone ?? "");
@@ -571,7 +541,6 @@ export default function Profile() {
     if (!store?.id) return;
     if (!selectedPlan) return;
 
-    // geymum fyrri stöðu til að velja rétt skilaboð
     const wasBillingActive = billing?.billingStatus === "active";
     const wasTrialActive =
       billing !== null &&
@@ -586,13 +555,11 @@ export default function Profile() {
     setActivatingPlanId(selectedPlan);
 
     try {
-      // Virkjum / uppfærum pakka í backend
       await apiFetch<StoreInfo>("/api/v1/stores/activate-plan", {
         method: "POST",
         body: JSON.stringify({ plan: selectedPlan }),
       });
 
-      // Sækjum nýjustu billing stöðu eftir breytingu
       const updatedBilling = await apiFetch<BillingInfo>(
         "/api/v1/stores/me/billing",
       );
@@ -612,8 +579,6 @@ export default function Profile() {
           `Frívika þín hefur verið virkjuð í ${planName} pakka.`,
         );
       }
-
-      // Enginn redirect – notandi er áfram á prófílnum
     } catch (err) {
       console.error("activate-plan error:", err);
       let msg =
@@ -625,11 +590,9 @@ export default function Profile() {
       if (match) {
         try {
           const parsed = JSON.parse(match[0]);
-          if (parsed.message) {
-            msg = parsed.message;
-          }
+          if (parsed.message) msg = parsed.message;
         } catch {
-          // höldum msg óbreyttri ef parse klikkar
+          // ignore
         }
       }
 
@@ -656,7 +619,6 @@ export default function Profile() {
         method: "DELETE",
       });
 
-      // Uppfærum listann – einfaldast að láta react-query refetcha
       await queryClient.invalidateQueries({
         queryKey: ["store-posts", store?.id],
       });
@@ -670,7 +632,6 @@ export default function Profile() {
     }
   }
 
-  // NÝTT: breyta lykilorði
   async function handleChangePassword() {
     setPasswordSaving(true);
     setPasswordError(null);
@@ -719,13 +680,13 @@ export default function Profile() {
   if (!authUser || !isStore || !store) {
     return (
       <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
-        <Card className="p-4 space-y-3">
-          <p className="text-sm">
+        <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
+          <p className="text-sm text-muted-foreground">
             Þú þarft að vera innskráður sem verslun til að sjá prófíl.
           </p>
           <Button
             onClick={() => navigate("/login")}
-            className="bg-[#FF7300] hover:bg-[#e56600] text-white text-sm"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
           >
             Skrá inn
           </Button>
@@ -745,7 +706,9 @@ export default function Profile() {
       {/* Haus: hver er innskráður */}
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold">Prófíll verslunar</h1>
+          <h1 className="text-lg font-semibold text-foreground">
+            Prófíll verslunar
+          </h1>
           <p className="text-xs text-muted-foreground">
             Innskráður sem {authUser.user.email} (verslun
             {isAdmin ? " – ADMIN" : ""})
@@ -762,8 +725,8 @@ export default function Profile() {
       </header>
 
       {/* Upplýsingar um verslun + editable form */}
-      <Card className="p-4 space-y-3">
-        <h2 className="text-sm font-semibold">Verslun</h2>
+      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
+        <h2 className="text-sm font-semibold text-foreground">Verslun</h2>
         <p className="text-xs text-muted-foreground">
           Hér getur þú uppfært helstu upplýsingar verslunar eins og þær birtast
           í ÚtsalApp.
@@ -771,33 +734,39 @@ export default function Profile() {
 
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <label className="text-xs font-medium">Nafn verslunar</label>
+            <label className="text-xs font-medium text-foreground">
+              Nafn verslunar
+            </label>
             <input
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs font-medium">Heimilisfang</label>
+            <label className="text-xs font-medium text-foreground">
+              Heimilisfang
+            </label>
             <input
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={editAddress}
               onChange={(e) => setEditAddress(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs font-medium">Sími</label>
+            <label className="text-xs font-medium text-foreground">Sími</label>
             <input
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={editPhone}
               onChange={(e) => setEditPhone(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs font-medium">Vefsíða</label>
+            <label className="text-xs font-medium text-foreground">
+              Vefsíða
+            </label>
             <input
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={editWebsite}
               onChange={(e) => setEditWebsite(e.target.value)}
             />
@@ -805,22 +774,22 @@ export default function Profile() {
         </div>
 
         {createdAtLabel && (
-          <p className="text-xs">
+          <p className="text-xs text-foreground">
             <span className="font-medium">Stofnað í ÚtsalApp:</span>{" "}
             {createdAtLabel}
           </p>
         )}
 
         {storeSaveError && (
-          <p className="text-xs text-red-600">{storeSaveError}</p>
+          <p className="text-xs text-destructive">{storeSaveError}</p>
         )}
         {storeSaveSuccess && (
-          <p className="text-xs text-green-600">{storeSaveSuccess}</p>
+          <p className="text-xs text-foreground">{storeSaveSuccess}</p>
         )}
 
         <Button
           size="sm"
-          className="mt-1 text-xs bg-[#FF7300] hover:bg-[#e56600] text-white disabled:opacity-60 disabled:cursor-not-allowed"
+          className="mt-1 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
           onClick={handleSaveStoreInfo}
           disabled={storeSaveLoading}
         >
@@ -828,8 +797,8 @@ export default function Profile() {
         </Button>
 
         {/* Áskriftarupplýsingar í sama korti */}
-        <div className="pt-3 border-t mt-3 space-y-1 text-sm">
-          <p>
+        <div className="pt-3 border-t border-border mt-3 space-y-1 text-sm">
+          <p className="text-foreground">
             <span className="font-medium">Valinn pakki:</span>{" "}
             {displayPlan === "basic"
               ? "Basic"
@@ -839,34 +808,39 @@ export default function Profile() {
                   ? "Premium"
                   : "Engin áskrift valin"}
           </p>
+
           {trialLabel && (
-            <p className="text-sm">
+            <p className="text-sm text-foreground">
               <span className="font-medium">Prufutímabil:</span> {trialLabel}
             </p>
           )}
+
           {!trialLabel && !isBillingActive && (
             <p className="text-sm text-muted-foreground">
               Engin frívika virk. Veldu áskriftarleið og smelltu á hnappinn hér
               fyrir neðan til að byrja.
             </p>
           )}
+
           {isBillingActive && (
-            <p className="text-sm text-[#059669]">
-              Áskrift er virk. Þú getur haldið áfram að setja inn tilboð á meðan
-              áskriftin er í gildi.
+            <p className="text-sm text-foreground">
+              <span className="font-medium">Áskrift:</span> Virk
             </p>
           )}
-          <p className="text-sm">
+
+          <p className="text-sm text-foreground">
             <span className="font-medium">Greiðslustaða:</span> {billingLabel}
           </p>
         </div>
 
-        {/* Flokkar verslunar – allt að 3 valdir + undirflokkar */}
-        <div className="mt-4 border-t pt-3 space-y-2">
-          <h3 className="text-sm font-semibold">Flokkar verslunar</h3>
+        {/* Flokkar verslunar */}
+        <div className="mt-4 border-t border-border pt-3 space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">
+            Flokkar verslunar
+          </h3>
           <p className="text-xs text-muted-foreground">
             Merktu við allt að 3 megaflokka sem lýsa best versluninni þinni og
-            veldu síðan viðeigandi undirflokka (t.d. „Happy Hour“).
+            veldu síðan viðeigandi undirflokka.
           </p>
 
           <div className="flex flex-col gap-1">
@@ -878,11 +852,11 @@ export default function Profile() {
               return (
                 <label
                   key={cat}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
+                  className="flex items-center gap-2 text-sm cursor-pointer text-foreground"
                 >
                   <input
                     type="checkbox"
-                    className="h-4 w-4"
+                    className="h-4 w-4 accent-[hsl(var(--primary))]"
                     checked={checked}
                     disabled={disableCheckbox}
                     onChange={() => toggleStoreCategory(cat)}
@@ -893,13 +867,14 @@ export default function Profile() {
             })}
           </div>
 
-          {/* Undirflokkar fyrir völdu megaflokkana */}
+          {/* Undirflokkar */}
           {selectedStoreCategories.length > 0 && (
             <div className="pt-2 space-y-2">
               <p className="text-xs text-muted-foreground">
                 Veldu undirflokka undir völdum megaflokkum. Þetta birtist hjá
-                prófíl verslunar (t.d. „Viðburðir · Happy Hour“).
+                prófíl verslunar.
               </p>
+
               <div className="space-y-2">
                 {selectedStoreCategories.map((parent) => {
                   const subs = STORE_SUBCATEGORY_OPTIONS[parent] ?? [];
@@ -907,7 +882,9 @@ export default function Profile() {
 
                   return (
                     <div key={parent} className="space-y-1">
-                      <p className="text-xs font-semibold">{parent}</p>
+                      <p className="text-xs font-semibold text-foreground">
+                        {parent}
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {subs.map((sub) => {
                           const checked = selectedStoreSubcategories.includes(
@@ -920,10 +897,10 @@ export default function Profile() {
                               onClick={() =>
                                 toggleStoreSubcategory(parent, sub.value)
                               }
-                              className={`px-3 py-1 rounded-full border text-xs ${
+                              className={`px-3 py-1 rounded-full border text-xs transition-colors ${
                                 checked
-                                  ? "bg-[#FF7300] text-white border-[#FF7300]"
-                                  : "bg-white text-gray-800 border-gray-300"
+                                  ? "bg-accent text-accent-foreground border-accent"
+                                  : "bg-card text-foreground border-border hover:bg-muted"
                               }`}
                             >
                               {sub.label}
@@ -939,16 +916,16 @@ export default function Profile() {
           )}
 
           {categoriesError && (
-            <p className="text-xs text-red-600">{categoriesError}</p>
+            <p className="text-xs text-destructive">{categoriesError}</p>
           )}
           {categoriesSuccess && (
-            <p className="text-xs text-green-600">{categoriesSuccess}</p>
+            <p className="text-xs text-foreground">{categoriesSuccess}</p>
           )}
 
           <div className="pt-1">
             <Button
               size="sm"
-              className="text-xs bg-[#FF7300] hover:bg-[#e56600] text-white disabled:opacity-60 disabled:cursor-not-allowed"
+              className="text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSaveCategories}
               disabled={savingCategories}
             >
@@ -959,22 +936,26 @@ export default function Profile() {
       </Card>
 
       {/* Pakkar + frívika / áskrift */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Pakkar og frívika / áskrift</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            Pakkar og frívika / áskrift
+          </h2>
         </div>
 
         {billingLoading && (
           <p className="text-xs text-muted-foreground">Sæki stöðu áskriftar…</p>
         )}
 
-        {billingError && <p className="text-xs text-red-600">{billingError}</p>}
+        {billingError && (
+          <p className="text-xs text-destructive">{billingError}</p>
+        )}
 
         {!billingLoading && !billingError && (
           <>
             {isBillingActive && activePlan && (
-              <p className="text-xs text-[#059669]">
-                Áskrift er virk á pakkann{" "}
+              <p className="text-xs text-foreground">
+                <span className="font-medium">Áskrift:</span> Virk á{" "}
                 <span className="font-medium">
                   {activePlan === "basic"
                     ? "Basic"
@@ -987,8 +968,8 @@ export default function Profile() {
             )}
 
             {!isBillingActive && trialActive && activePlan && (
-              <p className="text-xs text-[#059669]">
-                Frí prufuvika er virk á pakkann{" "}
+              <p className="text-xs text-foreground">
+                <span className="font-medium">Frívika:</span> Virk á{" "}
                 <span className="font-medium">
                   {activePlan === "basic"
                     ? "Basic"
@@ -1012,13 +993,13 @@ export default function Profile() {
           </>
         )}
 
-        {planErrorMsg && <p className="text-xs text-red-600">{planErrorMsg}</p>}
-
+        {planErrorMsg && (
+          <p className="text-xs text-destructive">{planErrorMsg}</p>
+        )}
         {planSuccessMsg && (
-          <p className="text-xs text-green-600">{planSuccessMsg}</p>
+          <p className="text-xs text-foreground">{planSuccessMsg}</p>
         )}
 
-        {/* Pakkarnir sjálfir */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {PLANS.map((plan) => {
             const isSelected = selectedPlan === plan.id;
@@ -1028,35 +1009,44 @@ export default function Profile() {
             return (
               <div
                 key={plan.id}
-                className={`border rounded-lg p-3 text-xs flex flex-col gap-2 cursor-pointer ${
+                className={`border rounded-lg p-3 text-xs flex flex-col gap-2 cursor-pointer transition-colors ${
                   isSelected
-                    ? "border-[#FF7300] bg-orange-50"
-                    : "border-gray-200 bg-white hover:bg-gray-50"
+                    ? "border-primary bg-muted"
+                    : "border-border bg-card hover:bg-muted"
                 }`}
                 onClick={() => setSelectedPlan(plan.id)}
               >
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-sm font-semibold">{plan.name}</h3>
-                  <span className="font-bold">{plan.price}</span>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {plan.name}
+                  </h3>
+                  <span className="font-bold text-foreground">
+                    {plan.price}
+                  </span>
                 </div>
+
                 <p className="text-[11px] text-muted-foreground">
                   {plan.description}
                 </p>
+
                 {isSelected && (
-                  <p className="text-[11px] text-[#FF7300] font-medium">
+                  <p className="text-[11px] text-primary font-medium">
                     Valin áskriftarleið
                   </p>
                 )}
+
                 {isActive && trialActive && (
-                  <p className="text-[11px] text-[#059669] font-medium">
+                  <p className="text-[11px] text-foreground font-medium">
                     Frívika virk á þessum pakka
                   </p>
                 )}
+
                 {isActive && isBillingActive && (
-                  <p className="text-[11px] text-[#059669] font-medium">
+                  <p className="text-[11px] text-foreground font-medium">
                     Áskrift virk á þessum pakka
                   </p>
                 )}
+
                 {isActivating && (
                   <p className="text-[11px] text-muted-foreground">
                     Uppfæri pakka…
@@ -1067,10 +1057,9 @@ export default function Profile() {
           })}
         </div>
 
-        {/* EINN hnappur fyrir neðan pakkana */}
         <div className="pt-2">
           <Button
-            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={mainButtonDisabled}
             onClick={handleActivatePlan}
           >
@@ -1080,16 +1069,17 @@ export default function Profile() {
       </Card>
 
       {/* Aðgerðir fyrir verslun */}
-      <Card className="p-4 space-y-3">
-        <h2 className="text-sm font-semibold">Aðgerðir</h2>
+      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
+        <h2 className="text-sm font-semibold text-foreground">Aðgerðir</h2>
         <div className="flex flex-wrap gap-2 items-center">
           <Button
-            className="bg-[#FF7300] hover:bg-[#e56600] text-white text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => navigate("/create-post")}
             disabled={!canCreateOffers}
           >
             Búa til nýtt tilboð
           </Button>
+
           {!canCreateOffers && (
             <p className="text-[11px] text-muted-foreground">
               Virkjaðu fríviku eða áskrift til að byrja að setja inn tilboð.
@@ -1098,39 +1088,45 @@ export default function Profile() {
         </div>
       </Card>
 
-      {/* NÝTT: Breyta lykilorði */}
-      <Card className="p-4 space-y-3">
-        <h2 className="text-sm font-semibold">Breyta lykilorði</h2>
+      {/* Breyta lykilorði */}
+      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
+        <h2 className="text-sm font-semibold text-foreground">
+          Breyta lykilorði
+        </h2>
         <p className="text-xs text-muted-foreground">
           Hér getur þú uppfært innskráningarlykilorðið fyrir þína verslun.
         </p>
 
         <div className="grid gap-3 md:grid-cols-3">
           <div>
-            <label className="text-xs font-medium">Núverandi lykilorð</label>
+            <label className="text-xs font-medium text-foreground">
+              Núverandi lykilorð
+            </label>
             <input
               type="password"
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs font-medium">Nýtt lykilorð</label>
+            <label className="text-xs font-medium text-foreground">
+              Nýtt lykilorð
+            </label>
             <input
               type="password"
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
             />
           </div>
           <div>
-            <label className="text-xs font-medium">
+            <label className="text-xs font-medium text-foreground">
               Staðfesting á nýju lykilorði
             </label>
             <input
               type="password"
-              className="mt-1 w-full border rounded px-3 py-2 text-sm"
+              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
@@ -1138,15 +1134,15 @@ export default function Profile() {
         </div>
 
         {passwordError && (
-          <p className="text-xs text-red-600">{passwordError}</p>
+          <p className="text-xs text-destructive">{passwordError}</p>
         )}
         {passwordSuccess && (
-          <p className="text-xs text-green-600">{passwordSuccess}</p>
+          <p className="text-xs text-foreground">{passwordSuccess}</p>
         )}
 
         <Button
           size="sm"
-          className="text-xs bg-[#FF7300] hover:bg-[#e56600] text-white disabled:opacity-60 disabled:cursor-not-allowed"
+          className="text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
           onClick={handleChangePassword}
           disabled={passwordSaving}
         >
@@ -1155,15 +1151,19 @@ export default function Profile() {
       </Card>
 
       {/* Tilboð verslunar */}
-      <Card className="p-4 space-y-3">
+      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Tilboð verslunar</h2>
+          <h2 className="text-sm font-semibold text-foreground">
+            Tilboð verslunar
+          </h2>
           <p className="text-[11px] text-muted-foreground">
             {storePosts.length} tilboð
           </p>
         </div>
 
-        {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+        {deleteError && (
+          <p className="text-xs text-destructive">{deleteError}</p>
+        )}
 
         {loadingPosts && (
           <p className="text-xs text-muted-foreground">
@@ -1172,7 +1172,7 @@ export default function Profile() {
         )}
 
         {postsError && !loadingPosts && (
-          <p className="text-xs text-red-600">
+          <p className="text-xs text-destructive">
             Tókst ekki að sækja tilboð verslunar.
           </p>
         )}
@@ -1188,7 +1188,6 @@ export default function Profile() {
         {!loadingPosts && !postsError && storePosts.length > 0 && (
           <div className="space-y-3">
             {storePosts.map((post) => {
-              // --- MYNDABREYTING: byggjum rétta slóð ---
               const rawImageUrl = post.images?.[0]?.url ?? "";
               let firstImageUrl = "";
 
@@ -1198,17 +1197,13 @@ export default function Profile() {
                   rawImageUrl.startsWith("https://") ||
                   rawImageUrl.startsWith("data:")
                 ) {
-                  // Full slóð eða data-URL
                   firstImageUrl = rawImageUrl;
                 } else if (API_BASE_URL) {
-                  // Relative slóð (t.d. /uploads/xxx) → hengjum API_BASE_URL fyrir framan
                   firstImageUrl = `${API_BASE_URL}${rawImageUrl}`;
                 } else {
-                  // Dev-tilvik þar sem API_BASE_URL er tómt – höldum gamla hegðun
                   firstImageUrl = rawImageUrl;
                 }
               }
-              // --- MYNDABREYTING ENDAR HÉR ---
 
               const isDeleting = deletingPostId === post.id;
               const timeRemainingLabel = getPostTimeRemainingLabel(post.endsAt);
@@ -1216,7 +1211,7 @@ export default function Profile() {
               return (
                 <div
                   key={post.id}
-                  className="border border-gray-200 rounded-md p-3 text-sm flex gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="border border-border rounded-md p-3 text-sm flex gap-3 cursor-pointer hover:bg-muted transition-colors"
                   onClick={() => navigate(`/post/${post.id}`)}
                 >
                   {firstImageUrl && (
@@ -1230,25 +1225,30 @@ export default function Profile() {
                   <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium truncate">{post.title}</p>
+                        <p className="font-medium truncate text-foreground">
+                          {post.title}
+                        </p>
+
                         {post.category && (
                           <p className="text-[11px] text-muted-foreground truncate">
                             Flokkur: {getCategoryDisplayLabel(post.category)}
                           </p>
                         )}
+
                         {post.description && (
                           <p className="text-[11px] text-muted-foreground line-clamp-2">
                             {post.description}
                           </p>
                         )}
                       </div>
+
                       {typeof post.viewCount === "number" && (
                         <p className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
                           {post.viewCount} skoðanir
                           {timeRemainingLabel && (
                             <>
                               <br />
-                              <span className="text-[10px] text-neutral-500">
+                              <span className="text-[10px] text-muted-foreground">
                                 {timeRemainingLabel}
                               </span>
                             </>
@@ -1257,10 +1257,9 @@ export default function Profile() {
                       )}
                     </div>
 
-                    {/* Ef engar skoðanir en viljum samt sýna dagafjölda */}
                     {typeof post.viewCount !== "number" &&
                       timeRemainingLabel && (
-                        <p className="text-[11px] text-neutral-500">
+                        <p className="text-[11px] text-muted-foreground">
                           {timeRemainingLabel}
                         </p>
                       )}
@@ -1272,7 +1271,7 @@ export default function Profile() {
                         </span>
                       )}
                       {typeof post.priceSale === "number" && (
-                        <span className="font-semibold">
+                        <span className="font-semibold text-foreground">
                           {post.priceSale.toLocaleString("is-IS")} kr.
                         </span>
                       )}
@@ -1291,10 +1290,11 @@ export default function Profile() {
                       >
                         Breyta tilboði
                       </Button>
+
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-xs border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
+                        className="text-xs border-destructive text-destructive hover:bg-muted w-full sm:w-auto"
                         disabled={isDeleting}
                         onClick={(e) => {
                           e.stopPropagation();

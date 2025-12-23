@@ -6,6 +6,20 @@
       "role": "store",
       "storeId": "f5804d88-a50a-48db-b7d0-77fc1634ff8e",
       "id": "d196563b-ae25-43c7-b517-3f2b2c47307a"
+    },
+    {
+      "email": "gislig@utsalapp.is",
+      "passwordHash": "$2b$10$m/TLaZiqw4pEjWt5YufGF.Hpp3G7i7ppcRrH5FcKI2tVCEHrQtEOC",
+      "role": "store",
+      "storeId": "f160624f-df84-4f4e-ba6e-d70a13aa365b",
+      "id": "337c09b3-0aae-423c-8643-5955b2d5bc44"
+    },
+    {
+      "email": "gisli@utsalapp.is",
+      "passwordHash": "$2b$10$JsOZ/mFBDMlpps7SnM66We0K5xAijix2dSz6R24PB6Z3RH9idYKSS",
+      "role": "admin",
+      "storeId": "5dd74967-a8d1-4456-8615-53f22c0023cf",
+      "id": "b9402ce4-5981-4944-95ef-fe75a98276c8"
     }
   ],
   "stores": [
@@ -22,6 +36,36 @@
       "isBanned": false,
       "categories": [],
       "id": "f5804d88-a50a-48db-b7d0-77fc1634ff8e"
+    },
+    {
+      "name": "ÚtsalApp",
+      "address": "Ísland",
+      "phone": "7891809",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "gislig@utsalapp.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-24T11:05:28.132Z",
+      "billingStatus": "trial",
+      "isBanned": false,
+      "categories": [],
+      "subcategories": [],
+      "id": "f160624f-df84-4f4e-ba6e-d70a13aa365b"
+    },
+    {
+      "name": "ÚtsalApp",
+      "address": "Ísland",
+      "phone": "7891809",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "gisli@utsalapp.is",
+      "plan": "basic",
+      "trialEndsAt": "2025-12-24T13:36:49.898Z",
+      "billingStatus": "trial",
+      "isBanned": false,
+      "categories": [],
+      "subcategories": [],
+      "id": "5dd74967-a8d1-4456-8615-53f22c0023cf"
     }
   ],
   "posts": [
@@ -52,7 +96,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:26:31.075Z",
-      "viewCount": 2,
+      "viewCount": 3,
       "id": "1665324f-9135-42dc-a38e-95b06d20f9e1"
     },
     {
@@ -67,8 +111,23 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:30:41.119Z",
-      "viewCount": 0,
+      "viewCount": 1,
       "id": "687234bd-c581-4823-9314-f5d44370eb17"
+    },
+    {
+      "title": "Kaffi laugalækur",
+      "description": "Velkomin á Kaffi laugalæk 🥰",
+      "category": "Annað",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/4b5eb7e1-85bd-47da-b324-745c07d62c7f.jpg",
+      "storeId": "f5804d88-a50a-48db-b7d0-77fc1634ff8e",
+      "buyUrl": null,
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2025-12-10T15:50:17.675Z",
+      "viewCount": 0,
+      "id": "e7091793-f8da-495d-aff8-9d6c07039ac1"
     }
   ]
 }

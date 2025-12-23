@@ -81,7 +81,7 @@ export function SalePostCard({ post }: Props) {
   // Tími sem er eftir – byggt á endsAt sem kemur frá server
   const timeLeftLabel = getTimeLeft((post as any).endsAt ?? null);
 
-  // NÝTT: tryggjum að við eigum storeId til að fara á prófíl
+  // tryggjum að við eigum storeId til að fara á prófíl
   const storeId =
     (post as any).storeId ??
     (post as any).store?.id ??
@@ -90,13 +90,13 @@ export function SalePostCard({ post }: Props) {
 
   return (
     <Link to={`/post/${post.id}`} className="block h-full">
-      <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm">
-        {/* NAFN FYRIRTÆKIS EFST Í BOXINU – NÚ VERÐUR CLICKABLE Á PRÓFÍL */}
+      <div className="flex h-full flex-col overflow-hidden rounded-xl bg-card text-card-foreground border border-border shadow-sm">
+        {/* NAFN FYRIRTÆKIS EFST Í BOXINU – CLICKABLE Á PRÓFÍL */}
         {post.store && post.store.name && (
           <div className="px-2 pt-2 pb-1">
             <button
               type="button"
-              className="text-[11px] font-semibold text-gray-700 line-clamp-1 underline-offset-2 hover:underline text-left"
+              className="text-[11px] font-semibold text-muted-foreground line-clamp-1 underline-offset-2 hover:underline text-left"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -111,7 +111,7 @@ export function SalePostCard({ post }: Props) {
         )}
 
         {/* Myndabox – kassalagað (4/3) */}
-        <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
+        <div className="relative w-full aspect-[4/3] bg-muted overflow-hidden">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -120,14 +120,14 @@ export function SalePostCard({ post }: Props) {
               loading="lazy"
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
+            <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
               Engin mynd skráð
             </div>
           )}
 
-          {/* Afsláttur í % ofan á myndina */}
+          {/* Afsláttur í % ofan á myndina (accent bleikur) */}
           {discount !== null && discount > 0 && (
-            <div className="absolute top-1.5 left-1.5 rounded-full bg-black/80 text-white text-[11px] font-bold px-2 py-1">
+            <div className="absolute top-1.5 left-1.5 rounded-full bg-accent text-accent-foreground text-[11px] font-bold px-2 py-1 shadow-sm">
               -{discount}%
             </div>
           )}
@@ -136,13 +136,13 @@ export function SalePostCard({ post }: Props) {
         {/* Texti + verð fyrir neðan */}
         <div className="flex flex-1 flex-col gap-1 p-2">
           {/* Titill */}
-          <p className="text-xs font-semibold text-gray-900 line-clamp-2">
+          <p className="text-xs font-semibold text-foreground line-clamp-2">
             {post.title}
           </p>
 
           {/* Lýsing */}
           {description && (
-            <p className="text-[11px] leading-tight text-gray-700 line-clamp-3">
+            <p className="text-[11px] leading-tight text-muted-foreground line-clamp-3">
               {description}
             </p>
           )}
@@ -151,13 +151,13 @@ export function SalePostCard({ post }: Props) {
           {(post.priceSale ?? post.priceOriginal) && (
             <div className="mt-1 flex items-baseline gap-1">
               {post.priceSale && (
-                <span className="text-sm font-bold text-[#fc7102]">
+                <span className="text-sm font-bold text-primary">
                   {formatPrice(post.priceSale)}
                 </span>
               )}
 
               {post.priceOriginal && (
-                <span className="text-[11px] text-gray-400 line-through">
+                <span className="text-[11px] text-muted-foreground/70 line-through">
                   {formatPrice(post.priceOriginal)}
                 </span>
               )}
@@ -166,7 +166,7 @@ export function SalePostCard({ post }: Props) {
 
           {/* Tími sem er eftir af tilboði */}
           {timeLeftLabel && (
-            <div className="mt-0.5 text-[11px] font-medium text-red-600">
+            <div className="mt-0.5 text-[11px] font-medium text-destructive">
               {timeLeftLabel}
             </div>
           )}

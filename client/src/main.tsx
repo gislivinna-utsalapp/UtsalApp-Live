@@ -11,6 +11,10 @@ import { AuthProvider } from "@/lib/auth";
 
 const queryClient = new QueryClient();
 
+// HARD STOP: tryggjum að appið sé ekki í dark mode (þó einhver setji "dark" class)
+document.documentElement.classList.remove("dark");
+document.body.classList.remove("dark");
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

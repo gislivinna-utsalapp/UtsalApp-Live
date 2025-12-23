@@ -28,15 +28,11 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      // Notum central login úr AuthProvider
       await login(email.trim(), password.trim());
-
-      // Eftir vel heppnaða innskráningu:
-      // Farðu frekar á /profile (ekki forsíðu)
       navigate("/profile", { replace: true });
     } catch (err) {
       console.error("login error:", err);
-      let msg =
+      const msg =
         err instanceof Error
           ? err.message
           : "Tókst ekki að skrá inn. Vinsamlegast reyndu aftur.";
@@ -48,8 +44,8 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-gray-50">
-      <Card className="w-full max-w-xs sm:max-w-sm p-6 space-y-6">
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-background">
+      <Card className="w-full max-w-xs sm:max-w-sm p-6 space-y-6 bg-card text-card-foreground border border-border">
         <div className="text-center space-y-2">
           <img
             src="/utsalapp-logo.jpg"
@@ -59,7 +55,7 @@ export default function Login() {
         </div>
 
         {errorMsg && (
-          <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
+          <div className="text-xs text-destructive bg-muted border border-border rounded-md px-3 py-2">
             {errorMsg}
           </div>
         )}
@@ -75,6 +71,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="verslun@daemi.is"
+              className="bg-card text-foreground border border-border"
             />
           </div>
 
@@ -88,12 +85,13 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              className="bg-card text-foreground border border-border"
             />
           </div>
 
           <Button
             type="submit"
-            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={isSubmitting}
           >
             {isSubmitting ? "Skrái inn..." : "Skrá inn"}
@@ -104,7 +102,7 @@ export default function Login() {
           <p>Áttirðu ekki aðgang áður?</p>
           <Link
             to="/register-store"
-            className="text-[#FF7300] font-medium hover:underline"
+            className="text-accent font-semibold hover:underline"
           >
             Skrá verslun
           </Link>

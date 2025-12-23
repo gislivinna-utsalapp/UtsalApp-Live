@@ -51,11 +51,13 @@ export default function PostDetail() {
   if (!id) {
     return (
       <div className="max-w-3xl mx-auto p-4 pb-24">
-        <p className="text-center text-sm text-neutral-400">
+        <p className="text-center text-sm text-muted-foreground">
           Engin auglýsing fannst (vantar auðkenni).
         </p>
         <div className="mt-4 text-center">
-          <Button onClick={() => navigate(-1)}>Til baka</Button>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Til baka
+          </Button>
         </div>
       </div>
     );
@@ -64,7 +66,9 @@ export default function PostDetail() {
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto p-4 pb-24">
-        <p className="text-center text-sm text-neutral-400">Sæki auglýsingu…</p>
+        <p className="text-center text-sm text-muted-foreground">
+          Sæki auglýsingu…
+        </p>
       </div>
     );
   }
@@ -72,11 +76,13 @@ export default function PostDetail() {
   if (error) {
     return (
       <div className="max-w-3xl mx-auto p-4 pb-24">
-        <p className="text-center text-sm text-neutral-300">
+        <p className="text-center text-sm text-muted-foreground">
           Tókst ekki að sækja auglýsinguna.
         </p>
         <div className="mt-4 text-center">
-          <Button onClick={() => navigate(-1)}>Til baka</Button>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Til baka
+          </Button>
         </div>
       </div>
     );
@@ -85,11 +91,13 @@ export default function PostDetail() {
   if (!post) {
     return (
       <div className="max-w-3xl mx-auto p-4 pb-24">
-        <p className="text-center text-sm text-neutral-400">
+        <p className="text-center text-sm text-muted-foreground">
           Auglýsing finnst ekki.
         </p>
         <div className="mt-4 text-center">
-          <Button onClick={() => navigate(-1)}>Til baka</Button>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            Til baka
+          </Button>
         </div>
       </div>
     );
@@ -129,38 +137,37 @@ export default function PostDetail() {
     }
   }
 
-  // NÚNA notum við buildImageUrl → sama og forsíðan
   const mainImage = buildImageUrl(
     post.images && post.images.length > 0 ? post.images[0].url : null,
   );
 
   return (
-    <div className="max-w-3xl mx-auto pb-24">
-      <header className="sticky top-0 z-10 bg-black/95 backdrop-blur border-b border-neutral-800 px-4 py-3 flex items-center gap-3">
+    <div className="max-w-3xl mx-auto pb-24 bg-background">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-neutral-300 hover:text-white"
+          className="text-sm text-muted-foreground hover:text-foreground"
         >
           ← Til baka
         </button>
-        <h1 className="text-base font-semibold truncate text-white">
+        <h1 className="text-base font-semibold truncate text-foreground">
           {post.title || "Útsölutilboð"}
         </h1>
       </header>
 
       <main className="px-4 py-4 space-y-4">
-        <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
-          {/* NAFN FYRIRTÆKIS EFST Í AUKSLÝSINGABOXINU */}
+        <Card className="overflow-hidden bg-card text-card-foreground border border-border rounded-2xl shadow-sm">
+          {/* NAFN FYRIRTÆKIS EFST Í AUGLÝSINGABOXINU */}
           {post.store && post.store.name && (
-            <div className="px-4 pt-4 pb-2 border-b border-neutral-100">
-              <p className="text-xs font-semibold text-neutral-700">
+            <div className="px-4 pt-4 pb-2 border-b border-border">
+              <p className="text-xs font-semibold text-muted-foreground">
                 {post.store.name}
               </p>
             </div>
           )}
 
           {mainImage && (
-            <div className="aspect-[3/4] w-full bg-neutral-100 overflow-hidden">
+            <div className="aspect-[3/4] w-full bg-muted overflow-hidden">
               <img
                 src={mainImage}
                 alt={post.title}
@@ -172,11 +179,11 @@ export default function PostDetail() {
           <div className="p-4 space-y-4">
             {/* Titill + verslun */}
             <div className="space-y-1">
-              <h2 className="text-xl font-semibold mb-1 text-black">
+              <h2 className="text-xl font-semibold mb-1 text-foreground">
                 {post.title}
               </h2>
               {post.store && (
-                <p className="text-sm text-neutral-600">
+                <p className="text-sm text-muted-foreground">
                   {post.store.name}
                   {" · "}
                   {post.store.address && post.store.address.trim().length > 0
@@ -188,28 +195,28 @@ export default function PostDetail() {
 
             {/* Afsláttur + verð */}
             <div className="space-y-2">
-              {discount && (
-                <div className="inline-flex items-baseline gap-2 rounded-full bg-black text-white px-3 py-1 border border-black">
+              {discount ? (
+                <div className="inline-flex items-baseline gap-2 rounded-full bg-accent text-accent-foreground px-3 py-1 border border-border">
                   <span className="text-xs font-semibold uppercase tracking-wide">
                     Afsláttur
                   </span>
                   <span className="text-sm font-bold">-{discount}%</span>
                 </div>
-              )}
+              ) : null}
 
               <div className="flex items-baseline gap-3">
-                <div className="text-2xl font-bold text-black">
+                <div className="text-2xl font-bold text-foreground">
                   {formatPrice(post.priceSale)}
                 </div>
                 {post.priceOriginal && post.priceOriginal > post.priceSale && (
-                  <div className="text-sm text-neutral-500 line-through">
+                  <div className="text-sm text-muted-foreground line-through">
                     {formatPrice(post.priceOriginal)}
                   </div>
                 )}
               </div>
 
               {timeRemainingText && (
-                <p className="text-xs text-neutral-600 font-medium">
+                <p className="text-xs text-muted-foreground font-medium">
                   {timeRemainingText}
                 </p>
               )}
@@ -217,16 +224,16 @@ export default function PostDetail() {
 
             {/* Lýsing */}
             {post.description && (
-              <p className="text-sm text-neutral-800 whitespace-pre-line">
+              <p className="text-sm text-foreground whitespace-pre-line">
                 {post.description}
               </p>
             )}
 
             {/* Flokkur */}
             {post.category && (
-              <p className="text-xs text-neutral-500">
+              <p className="text-xs text-muted-foreground">
                 Flokkur:{" "}
-                <span className="font-medium text-neutral-700">
+                <span className="font-medium text-foreground">
                   {post.category}
                 </span>
               </p>
@@ -241,11 +248,11 @@ export default function PostDetail() {
                   rel="noreferrer"
                   className="block"
                 >
-                  <Button className="w-full bg-black hover:bg-neutral-900 text-white text-sm py-2">
+                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-sm py-2">
                     Smelltu hér til að kaupa tilboðið
                   </Button>
                 </a>
-                <p className="mt-1 text-[11px] text-neutral-500 text-center">
+                <p className="mt-1 text-[11px] text-muted-foreground text-center">
                   Þú ferð á síðu verslunar til að ljúka kaupunum.
                 </p>
               </div>

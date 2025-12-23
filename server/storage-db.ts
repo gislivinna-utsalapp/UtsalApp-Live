@@ -2,9 +2,29 @@
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { fileURLToPath } from "url";
 import type { User, Store, SalePost } from "@shared/schema";
 
-const DB_FILE = path.join(process.cwd(), "database.json");
+/**
+ * -------------------------
+ * DATABASE FILE PATH (FIX)
+ * -------------------------
+ *
+ * Aldrei treysta á process.cwd() í Replit / Deploy.
+ * Við festum DB við project root (einu stigi upp frá /server).
+ *
+ * Einnig hægt að override-a með DB_FILE env ef þarf síðar.
+ */
+
+// ESM-safe __dirname / __filename
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const PROJECT_ROOT = path.resolve(__dirname, "..");
+const DB_FILE = process.env.DB_FILE ?? path.join(PROJECT_ROOT, "database.json");
+
+// Debug – þetta mun segja þér EINU sinni nákvæmlega hvar DB er
+console.log("[db] Using database file:", DB_FILE);
 
 interface DatabaseShape {
   users: User[];
@@ -12,22 +32,32 @@ interface DatabaseShape {
   posts: (SalePost & Record<string, any>)[];
 }
 
-function loadDatabase(): DatabaseShape {
-  if (!fs.existsSync(DB_FILE)) {
-    const initial: DatabaseShape = { users: [], stores: [], posts: [] };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
-    return initial;
+function ensureDbFileExists() {
+  const dir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
+
+  if (!fs.existsSync(DB_FILE)) {
+    const initial: DatabaseShape = {
+      users: [],
+      stores: [],
+      posts: [],
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
+  }
+}
+
+function loadDatabase(): DatabaseShape {
+  ensureDbFileExists();
+
   const raw = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
 
-  // Tryggjum shape
-  const db: DatabaseShape = {
+  return {
     users: raw.users ?? [],
     stores: raw.stores ?? [],
     posts: raw.posts ?? [],
   };
-
-  return db;
 }
 
 function saveDatabase(db: DatabaseShape) {
@@ -40,48 +70,37 @@ export class DbStorage {
   constructor() {
     this.db = loadDatabase();
 
-    // "Migration": samræma plan / trial / billing reiti
+    // -------------------------
+    // MIGRATION / NORMALIZATION
+    // -------------------------
     let changed = false;
 
     for (const s of this.db.stores as any[]) {
-      // Gamli reiturinn: planType -> nýtt: plan
       if (s.plan === undefined) {
-        if (s.planType !== undefined) {
-          s.plan = s.planType;
-        } else {
-          s.plan = "basic";
-        }
+        s.plan = s.planType ?? "basic";
         changed = true;
       }
 
-      // trialEndsAt má vera null en ekki undefined
       if (s.trialEndsAt === undefined) {
         s.trialEndsAt = null;
         changed = true;
       }
 
-      // Gamli reiturinn: billingActive -> nýtt: billingStatus
       if (s.billingStatus === undefined) {
-        if (s.billingActive === true) {
-          s.billingStatus = "active";
-        } else {
-          // default: verslun í trial nema annað sé skilgreint
-          s.billingStatus = "trial";
-        }
+        s.billingStatus = s.billingActive === true ? "active" : "trial";
         changed = true;
       }
 
-      // NÝTT: tryggjum að categories sé til sem fylki
       if (s.categories === undefined) {
         s.categories = [];
         changed = true;
       }
 
-      // Hreinsa gamla reiti ef þeir eru til
       if (s.planType !== undefined) {
         delete s.planType;
         changed = true;
       }
+
       if (s.billingActive !== undefined) {
         delete s.billingActive;
         changed = true;
@@ -93,16 +112,23 @@ export class DbStorage {
     }
   }
 
+  // -------------------------
   // USERS
+  // -------------------------
   async createUser(user: Omit<User, "id">): Promise<User> {
-    const newUser: User = { ...user, id: crypto.randomUUID() };
+    const newUser: User = {
+      ...user,
+      id: crypto.randomUUID(),
+    };
     this.db.users.push(newUser);
     saveDatabase(this.db);
     return newUser;
   }
 
   async findUserByEmail(email: string): Promise<User | undefined> {
-    return this.db.users.find((u) => u.email === email);
+    return this.db.users.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase(),
+    );
   }
 
   async findUserById(id: string): Promise<User | undefined> {
@@ -116,37 +142,34 @@ export class DbStorage {
     const index = this.db.users.findIndex((u) => u.id === userId);
     if (index === -1) return null;
 
-    const existing: any = this.db.users[index];
-    const updated: any = { ...existing, ...updates };
-
+    const updated = { ...this.db.users[index], ...updates };
     this.db.users[index] = updated;
     saveDatabase(this.db);
-
     return updated as User;
   }
 
+  // -------------------------
   // STORES
+  // -------------------------
   async createStore(
     store: Omit<Store, "id"> & Record<string, any>,
   ): Promise<Store & any> {
     const newStore: any = {
       ...store,
       id: crypto.randomUUID(),
+      plan: store.plan ?? "basic",
+      trialEndsAt: store.trialEndsAt ?? null,
+      billingStatus: store.billingStatus ?? "trial",
+      categories: store.categories ?? [],
     };
-
-    // Sjálfgefin gildi fyrir plan / trial / billing
-    if (newStore.plan === undefined) newStore.plan = "basic";
-    if (newStore.trialEndsAt === undefined) newStore.trialEndsAt = null;
-    if (newStore.billingStatus === undefined) newStore.billingStatus = "trial";
-    if (newStore.categories === undefined) newStore.categories = [];
 
     this.db.stores.push(newStore);
     saveDatabase(this.db);
-    return newStore as Store & any;
+    return newStore;
   }
 
   async getStoreById(id: string): Promise<(Store & any) | undefined> {
-    return this.db.stores.find((s: any) => s.id === id) as any;
+    return this.db.stores.find((s: any) => s.id === id);
   }
 
   async listStores(): Promise<(Store & any)[]> {
@@ -157,65 +180,49 @@ export class DbStorage {
     storeId: string,
     updates: Partial<Store> & Record<string, any>,
   ): Promise<(Store & any) | null> {
-    const index = (this.db.stores as any[]).findIndex((s) => s.id === storeId);
+    const index = this.db.stores.findIndex((s) => s.id === storeId);
     if (index === -1) return null;
 
-    const existing: any = this.db.stores[index];
-    const updated: any = { ...existing, ...updates };
+    const updated = { ...this.db.stores[index], ...updates };
 
-    // Tryggjum gildi eftir update
     if (updated.plan === undefined) updated.plan = "basic";
     if (updated.trialEndsAt === undefined) updated.trialEndsAt = null;
-    if (updated.billingStatus === undefined) {
-      updated.billingStatus = "trial";
-    }
+    if (updated.billingStatus === undefined) updated.billingStatus = "trial";
     if (updated.categories === undefined) {
-      updated.categories = existing.categories ?? [];
+      updated.categories = this.db.stores[index].categories ?? [];
     }
 
-    (this.db.stores as any[])[index] = updated;
+    this.db.stores[index] = updated;
     saveDatabase(this.db);
-
     return updated as Store & any;
   }
 
-  // NÝTT: EYÐA VERSLUN + TENGDUM GÖGNUM (ADMIN)
   async deleteStore(storeId: string): Promise<boolean> {
-    // Fjarlægjum verslunina
-    const originalStores = this.db.stores.length;
-    this.db.stores = this.db.stores.filter((s: any) => s.id !== storeId);
+    const before = this.db.stores.length;
 
-    // Fjarlægjum öll tilboð frá þeirri verslun
-    const originalPosts = this.db.posts.length;
-    this.db.posts = this.db.posts.filter((p: any) => p.storeId !== storeId);
-
-    // Fjarlægjum notendur sem vísa í þessa verslun
-    const originalUsers = this.db.users.length;
+    this.db.stores = this.db.stores.filter((s) => s.id !== storeId);
+    this.db.posts = this.db.posts.filter((p) => p.storeId !== storeId);
     this.db.users = this.db.users.filter(
       (u: any) => (u as any).storeId !== storeId,
     );
 
-    const changed =
-      this.db.stores.length !== originalStores ||
-      this.db.posts.length !== originalPosts ||
-      this.db.users.length !== originalUsers;
-
-    if (changed) {
+    if (this.db.stores.length !== before) {
       saveDatabase(this.db);
+      return true;
     }
-
-    // Skilum true bara ef verslun var til og var í raun fjarlægð
-    return this.db.stores.length !== originalStores;
+    return false;
   }
 
+  // -------------------------
   // POSTS
+  // -------------------------
   async createPost(
     post: Omit<SalePost, "id"> & Record<string, any>,
   ): Promise<SalePost & any> {
     const newPost: any = { ...post, id: crypto.randomUUID() };
     this.db.posts.push(newPost);
     saveDatabase(this.db);
-    return newPost as SalePost & any;
+    return newPost;
   }
 
   async listPosts(): Promise<(SalePost & any)[]> {
@@ -223,11 +230,11 @@ export class DbStorage {
   }
 
   async getPostsByStore(storeId: string): Promise<(SalePost & any)[]> {
-    return this.db.posts.filter((p: any) => p.storeId === storeId) as any;
+    return this.db.posts.filter((p) => p.storeId === storeId) as any;
   }
 
   async getPostById(postId: string): Promise<(SalePost & any) | undefined> {
-    return this.db.posts.find((p: any) => p.id === postId) as any;
+    return this.db.posts.find((p) => p.id === postId);
   }
 
   async updatePost(
@@ -237,22 +244,21 @@ export class DbStorage {
     const index = this.db.posts.findIndex((p) => p.id === postId);
     if (index === -1) return null;
 
-    const existing: any = this.db.posts[index];
-    const updated: any = { ...existing, ...updates };
-
+    const updated = { ...this.db.posts[index], ...updates };
     this.db.posts[index] = updated;
     saveDatabase(this.db);
-
-    return updated as SalePost & any;
+    return updated;
   }
 
   async deletePost(postId: string): Promise<boolean> {
-    const original = this.db.posts.length;
+    const before = this.db.posts.length;
     this.db.posts = this.db.posts.filter((p) => p.id !== postId);
-    const changed = this.db.posts.length !== original;
 
-    if (changed) saveDatabase(this.db);
-    return changed;
+    if (this.db.posts.length !== before) {
+      saveDatabase(this.db);
+      return true;
+    }
+    return false;
   }
 }
 

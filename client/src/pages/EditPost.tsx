@@ -177,7 +177,7 @@ export function EditPost() {
         body: payload,
       });
 
-      navigate("/profile"); // eða linkinn sem þú vilt fara á eftir edit
+      navigate("/profile");
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Eitthvað fór úrskeiðis við að uppfæra tilboð");
@@ -192,19 +192,21 @@ export function EditPost() {
 
   if (!loaded && !error) {
     return (
-      <div className="max-w-xl mx-auto p-4">
-        <p className="text-sm text-gray-600">Sæki tilboð…</p>
+      <div className="max-w-xl mx-auto p-4 bg-background text-foreground">
+        <p className="text-sm text-muted-foreground">Sæki tilboð…</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl mx-auto p-4">
-      <Card className="p-4 space-y-4">
-        <h1 className="text-xl font-semibold">Breyta tilboði</h1>
+    <div className="max-w-xl mx-auto p-4 bg-background text-foreground">
+      <Card className="p-4 space-y-4 bg-card text-card-foreground border border-border">
+        <h1 className="text-xl font-semibold text-foreground">
+          Breyta tilboði
+        </h1>
 
         {error && (
-          <div className="text-sm text-red-600 border border-red-200 rounded p-2">
+          <div className="text-sm text-destructive bg-muted border border-border rounded p-2">
             {error}
           </div>
         )}
@@ -218,6 +220,7 @@ export function EditPost() {
               value={form.title}
               onChange={handleChange}
               required
+              className="bg-card text-foreground border border-border"
             />
           </div>
 
@@ -226,7 +229,7 @@ export function EditPost() {
             <textarea
               id="description"
               name="description"
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               rows={4}
               value={form.description}
               onChange={handleChange}
@@ -238,7 +241,7 @@ export function EditPost() {
             <select
               id="category"
               name="category"
-              className="w-full border rounded px-3 py-2 text-sm"
+              className="w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
               value={form.category}
               onChange={handleChange}
             >
@@ -249,6 +252,9 @@ export function EditPost() {
                 </option>
               ))}
             </select>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Uppfærðu flokk ef tilboðið hefur breyst.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -262,6 +268,7 @@ export function EditPost() {
                 max={100}
                 value={form.discountPercent}
                 onChange={handleChange}
+                className="bg-card text-foreground border border-border"
               />
             </div>
             <div>
@@ -273,6 +280,7 @@ export function EditPost() {
                 min={0}
                 value={form.originalPrice}
                 onChange={handleChange}
+                className="bg-card text-foreground border border-border"
               />
             </div>
           </div>
@@ -286,6 +294,7 @@ export function EditPost() {
               min={0}
               value={form.discountedPrice}
               onChange={handleChange}
+              className="bg-card text-foreground border border-border"
             />
           </div>
 
@@ -298,6 +307,7 @@ export function EditPost() {
                 type="date"
                 value={form.startDate}
                 onChange={handleChange}
+                className="bg-card text-foreground border border-border"
               />
             </div>
             <div>
@@ -308,6 +318,7 @@ export function EditPost() {
                 type="date"
                 value={form.endDate}
                 onChange={handleChange}
+                className="bg-card text-foreground border border-border"
               />
             </div>
           </div>
@@ -319,25 +330,41 @@ export function EditPost() {
               type="file"
               accept="image/*"
               onChange={handleImageChange}
+              className="bg-card text-foreground border border-border"
             />
+
             {isUploading && (
-              <p className="text-xs text-gray-500">Hleð upp mynd…</p>
+              <p className="text-xs text-muted-foreground">Hleð upp mynd…</p>
             )}
+
             {previewImageSrc && (
-              <img
-                src={previewImageSrc}
-                alt="Forskoðun"
-                className="mt-2 rounded-md max-h-48 object-cover"
-              />
+              <div className="mt-2">
+                <p className="text-xs text-muted-foreground mb-2">Forskoðun</p>
+                <img
+                  src={previewImageSrc}
+                  alt="Forskoðun"
+                  className="rounded-md max-h-48 object-cover border border-border"
+                />
+              </div>
             )}
           </div>
 
           <Button
             type="submit"
-            className="w-full"
+            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={isSubmitting || isUploading}
           >
             {isSubmitting ? "Vista breytingar…" : "Vista breytingar"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => navigate(-1)}
+            disabled={isSubmitting || isUploading}
+          >
+            Hætta við
           </Button>
         </form>
       </Card>

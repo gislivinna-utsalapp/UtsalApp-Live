@@ -95,7 +95,7 @@
       "title": "Hjálparstarf kirkjunnar",
       "description": "Hjálpaðu efnalítilli fjölskyldu að eiga fyrir jólagjöfum undir tréð í ár ❤",
       "category": "Leikföng & börn",
-      "price": 45000,
+      "price": 4500,
       "oldPrice": 10000,
       "imageUrl": "/uploads/64cfd862-b9eb-4260-9cde-d036de92711f.jpg",
       "storeId": "f5804d88-a50a-48db-b7d0-77fc1634ff8e",
@@ -103,7 +103,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:02:43.506Z",
-      "viewCount": 3,
+      "viewCount": 5,
       "id": "37c0f46a-81b7-43ea-90b9-e2d6f659b990"
     },
     {
@@ -112,13 +112,13 @@
       "category": "Happy Hour",
       "price": 0,
       "oldPrice": 0,
-      "imageUrl": "/uploads/a66b4bc6-654f-416a-97b1-1a85a4b27111.jpg",
+      "imageUrl": "/uploads/7375fa0d-62cc-49bc-b6d2-a1ed406fcec8.jpg",
       "storeId": "f5804d88-a50a-48db-b7d0-77fc1634ff8e",
       "buyUrl": "https://utsalapp-live.netlify.app/",
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:26:31.075Z",
-      "viewCount": 3,
+      "viewCount": 5,
       "id": "1665324f-9135-42dc-a38e-95b06d20f9e1"
     },
     {
@@ -127,19 +127,19 @@
       "category": "Matur & veitingar",
       "price": 3000,
       "oldPrice": 9000,
-      "imageUrl": "/uploads/680b9c0c-ff68-4459-b72a-a2ba6fd2d06a.jpg",
+      "imageUrl": "/uploads/7e69bd0d-48dd-4df6-86f1-2ec2b08e2a7c.jpg",
       "storeId": "f5804d88-a50a-48db-b7d0-77fc1634ff8e",
       "buyUrl": "https://maedrastyrkur.is/?utm_source=M%C3%A6%C3%B0rastyrksnefnd%20-%20j%C3%B3las%C3%B6fnun%202025&utm_content=Myndband%202&utm_campaign=Almennt&fbclid=IwdGRjcAOmKxFleHRuA2FlbQEwAGFkaWQBqyz3-rJnVHNydGMGYXBwX2lkDDM1MDY4NTUzMTcyOAABHu9uguRPzNIHnhdRwAxVJw4w7tcp0WISZClWLOZj-JEwKXuKq0kIt5oRB64b_aem_MHB4gqqy5s_vrms074ihCQ&utm_medium=paid&utm_id=120239255395840228&utm_term=120239255395830228",
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:30:41.119Z",
-      "viewCount": 1,
+      "viewCount": 2,
       "id": "687234bd-c581-4823-9314-f5d44370eb17"
     },
     {
       "title": "Kaffi laugalækur",
       "description": "Velkomin á Kaffi laugalæk 🥰",
-      "category": "Annað",
+      "category": "matur",
       "price": 0,
       "oldPrice": 0,
       "imageUrl": "/uploads/4b5eb7e1-85bd-47da-b324-745c07d62c7f.jpg",
@@ -148,7 +148,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T15:50:17.675Z",
-      "viewCount": 0,
+      "viewCount": 3,
       "id": "e7091793-f8da-495d-aff8-9d6c07039ac1"
     },
     {
@@ -157,13 +157,13 @@
       "category": "Viðburðir",
       "price": 0,
       "oldPrice": 0,
-      "imageUrl": "/uploads/83c77104-0c69-4913-b517-8f6b29ca8782.jpg",
+      "imageUrl": "/uploads/bc07b262-5074-4654-92f5-40f57f0e50f1.jpg",
       "storeId": "77ed426b-a5f0-428c-8f7f-cdc598bc1051",
       "buyUrl": null,
       "startsAt": "2025-12-28",
       "endsAt": "2026-02-06",
       "createdAt": "2025-12-28T14:26:31.156Z",
-      "viewCount": 2,
+      "viewCount": 6,
       "id": "446dd4d8-8460-48b0-974f-a3b22fb325af"
     }
   ]

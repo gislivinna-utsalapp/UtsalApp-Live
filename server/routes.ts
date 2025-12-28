@@ -1039,17 +1039,21 @@ export function registerRoutes(app: Express): void {
     requireActiveOrTrialStore,
     async (req: AuthRequest, res) => {
       try {
-        const {
-          title,
-          description,
-          category,
-          priceOriginal,
-          priceSale,
-          buyUrl,
-          startsAt,
-          endsAt,
-          images,
-        } = req.body;
+        // ✅ Samhæfni: leyfa bæði naming (priceOriginal/priceSale og originalPrice/discountedPrice)
+        const title = req.body?.title;
+        const description = req.body?.description;
+        const category = req.body?.category;
+        const buyUrl = req.body?.buyUrl;
+        const images = req.body?.images;
+
+        const priceOriginal =
+          req.body?.priceOriginal ?? req.body?.originalPrice ?? null;
+
+        const priceSale =
+          req.body?.priceSale ?? req.body?.discountedPrice ?? null;
+
+        const startsAt = req.body?.startsAt ?? req.body?.startDate ?? null;
+        const endsAt = req.body?.endsAt ?? req.body?.endDate ?? null;
 
         if (!title || priceOriginal == null || priceSale == null || !category) {
           return res.status(400).json({ message: "Vantar upplýsingar" });
@@ -1131,26 +1135,32 @@ export function registerRoutes(app: Express): void {
           return res.status(403).json({ message: "Ekki heimild" });
         }
 
-        const {
-          title,
-          description,
-          category,
-          priceOriginal,
-          priceSale,
-          buyUrl,
-          startsAt,
-          endsAt,
-          images,
-        } = req.body;
+        const title = req.body?.title;
+        const description = req.body?.description;
+        const category = req.body?.category;
+        const buyUrl = req.body?.buyUrl;
+        const images = req.body?.images;
+
+        // ✅ Samhæfni: leyfa bæði naming
+        const priceOriginal =
+          req.body?.priceOriginal ?? req.body?.originalPrice ?? undefined;
+
+        const priceSale =
+          req.body?.priceSale ?? req.body?.discountedPrice ?? undefined;
+
+        const startsAt = req.body?.startsAt ?? req.body?.startDate ?? undefined;
+        const endsAt = req.body?.endsAt ?? req.body?.endDate ?? undefined;
 
         const updates: any = {};
 
         if (title !== undefined) updates.title = title;
         if (description !== undefined) updates.description = description;
         if (category !== undefined) updates.category = category;
+
         if (priceOriginal !== undefined)
           updates.oldPrice = Number(priceOriginal);
         if (priceSale !== undefined) updates.price = Number(priceSale);
+
         if (buyUrl !== undefined) updates.buyUrl = buyUrl || null;
         if (startsAt !== undefined) updates.startsAt = startsAt || null;
         if (endsAt !== undefined) updates.endsAt = endsAt || null;
@@ -1276,7 +1286,7 @@ export function registerRoutes(app: Express): void {
   app.post(
     "/api/v1/uploads",
     auth("store"),
-    upload.single("image"),
+    upload.single("file"), // ✅ var "image" -> match-a client FormData.append("file", ...)
     async (req: AuthRequest, res: Response) => {
       try {
         if (!req.file) {

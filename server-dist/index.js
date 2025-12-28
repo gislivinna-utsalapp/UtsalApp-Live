@@ -931,17 +931,15 @@ function registerRoutes(app) {
     requireActiveOrTrialStore,
     async (req, res) => {
       try {
-        const {
-          title,
-          description,
-          category,
-          priceOriginal,
-          priceSale,
-          buyUrl,
-          startsAt,
-          endsAt,
-          images
-        } = req.body;
+        const title = req.body?.title;
+        const description = req.body?.description;
+        const category = req.body?.category;
+        const buyUrl = req.body?.buyUrl;
+        const images = req.body?.images;
+        const priceOriginal = req.body?.priceOriginal ?? req.body?.originalPrice ?? null;
+        const priceSale = req.body?.priceSale ?? req.body?.discountedPrice ?? null;
+        const startsAt = req.body?.startsAt ?? req.body?.startDate ?? null;
+        const endsAt = req.body?.endsAt ?? req.body?.endDate ?? null;
         if (!title || priceOriginal == null || priceSale == null || !category) {
           return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
         }
@@ -1005,17 +1003,15 @@ function registerRoutes(app) {
         if (existing.storeId !== req.user?.storeId) {
           return res.status(403).json({ message: "Ekki heimild" });
         }
-        const {
-          title,
-          description,
-          category,
-          priceOriginal,
-          priceSale,
-          buyUrl,
-          startsAt,
-          endsAt,
-          images
-        } = req.body;
+        const title = req.body?.title;
+        const description = req.body?.description;
+        const category = req.body?.category;
+        const buyUrl = req.body?.buyUrl;
+        const images = req.body?.images;
+        const priceOriginal = req.body?.priceOriginal ?? req.body?.originalPrice ?? void 0;
+        const priceSale = req.body?.priceSale ?? req.body?.discountedPrice ?? void 0;
+        const startsAt = req.body?.startsAt ?? req.body?.startDate ?? void 0;
+        const endsAt = req.body?.endsAt ?? req.body?.endDate ?? void 0;
         const updates = {};
         if (title !== void 0) updates.title = title;
         if (description !== void 0) updates.description = description;
@@ -1125,7 +1121,8 @@ function registerRoutes(app) {
   app.post(
     "/api/v1/uploads",
     auth("store"),
-    upload.single("image"),
+    upload.single("file"),
+    // ✅ var "image" -> match-a client FormData.append("file", ...)
     async (req, res) => {
       try {
         if (!req.file) {

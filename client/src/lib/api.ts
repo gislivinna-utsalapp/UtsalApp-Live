@@ -7,14 +7,10 @@ export const API_BASE_URL =
 // Býr til fulla URL út frá relative path + mögulegri base-url
 function buildUrl(path: string): string {
   // Ef path er þegar absolute (http/https)
-  if (/^https?:\/\//i.test(path)) {
-    return path;
-  }
+  if (/^https?:\/\//i.test(path)) return path;
 
-  // Engin skilgreind base-url: notum relative slóð (virkar í Replit)
-  if (!API_BASE_URL) {
-    return path;
-  }
+  // Engin skilgreind base-url: notum relative slóð (virkar í Replit þegar FE+BE eru á sama origin)
+  if (!API_BASE_URL) return path;
 
   const base = API_BASE_URL.endsWith("/")
     ? API_BASE_URL.slice(0, -1)
@@ -23,54 +19,166 @@ function buildUrl(path: string): string {
   return `${base}${p}`;
 }
 
-// Sameiginlegt API-fall sem bætir við Authorization haus ef token er til
+function readToken(): string | null {
+  try {
+    return localStorage.getItem("token");
+  } catch {
+    return null;
+  }
+}
+
+function withAuthHeaders(
+  headers: Record<string, string>,
+  { includeAuth = true }: { includeAuth?: boolean } = {},
+): Record<string, string> {
+  if (!includeAuth) return headers;
+
+  const token = readToken();
+  if (token && !headers["Authorization"]) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/**
+ * Debug helper: keyrðu þetta í console eða sýndu í UI ef þarf
+ * til að staðfesta hvort token er til.
+ */
+export function getAuthDebug() {
+  const token = readToken();
+  return {
+    apiBaseUrl: API_BASE_URL || "(empty → relative /api calls)",
+    hasToken: Boolean(token),
+    tokenPreview: token ? `${token.slice(0, 12)}…${token.slice(-8)}` : null,
+  };
+}
+
+/**
+ * Sameiginlegt API-fall:
+ * - Styður bæði JSON og FormData
+ * - Bætir við Authorization ef token er til
+ * - Sendir credentials (cookies/session) sjálfgefið
+ */
 export async function apiFetch<T = unknown>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
   const url = buildUrl(path);
 
-  // Grunn headers
+  const isFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  // Sækjum token úr localStorage og bætum við Bearer haus ef hann er til
-  try {
-    const token = localStorage.getItem("token");
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-  } catch {
-    // ef localStorage er ekki til (t.d. SSR), sleppum bara
+  // Setjum JSON Content-Type bara ef EKKI FormData og ef notandi hefur ekki þegar skilgreint.
+  if (!isFormData && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
   }
 
+  withAuthHeaders(headers);
+
   const res = await fetch(url, {
+    credentials: "include",
     ...options,
     headers,
   });
 
+  const contentType = res.headers.get("content-type") || "";
   const rawText = await res.text().catch(() => "");
 
   if (!res.ok) {
-    // Reynum að ná „message“ úr JSON ef hægt
+    let msg = `API error ${res.status} ${res.statusText}`;
+
+    if (rawText) {
+      if (contentType.includes("application/json")) {
+        try {
+          const j = JSON.parse(rawText) as any;
+          if (j?.message) msg += ` – ${j.message}`;
+          else msg += ` – ${rawText}`;
+        } catch {
+          msg += ` – ${rawText}`;
+        }
+      } else {
+        msg += ` – ${rawText}`;
+      }
+    }
+
+    throw new Error(msg);
+  }
+
+  if (!rawText) return undefined as T;
+
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(rawText) as T;
+    } catch {
+      return rawText as unknown as T;
+    }
+  }
+
+  return rawText as unknown as T;
+}
+
+/**
+ * Sér fall fyrir uploads:
+ * - POST FormData
+ * - Setur credentials og Authorization ef token er til
+ * - Setur EKKI Content-Type (browser sér um boundary)
+ */
+export async function apiUpload<T = unknown>(
+  path: string,
+  formData: FormData,
+  options: Omit<RequestInit, "method" | "body"> = {},
+): Promise<T> {
+  const url = buildUrl(path);
+
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> | undefined),
+  };
+
+  // Auth (token) ef til
+  withAuthHeaders(headers);
+
+  const res = await fetch(url, {
+    method: "POST",
+    body: formData,
+    credentials: "include",
+    ...options,
+    headers,
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  const rawText = await res.text().catch(() => "");
+
+  if (!res.ok) {
     let msg = `API error ${res.status} ${res.statusText}`;
     if (rawText) {
-      msg += ` – ${rawText}`;
+      if (contentType.includes("application/json")) {
+        try {
+          const j = JSON.parse(rawText) as any;
+          if (j?.message) msg += ` – ${j.message}`;
+          else msg += ` – ${rawText}`;
+        } catch {
+          msg += ` – ${rawText}`;
+        }
+      } else {
+        msg += ` – ${rawText}`;
+      }
     }
     throw new Error(msg);
   }
 
-  if (!rawText) {
-    // 204 No Content eða tómt svar
-    return undefined as T;
+  if (!rawText) return undefined as T;
+
+  if (contentType.includes("application/json")) {
+    try {
+      return JSON.parse(rawText) as T;
+    } catch {
+      return rawText as unknown as T;
+    }
   }
 
-  // Reynum að parse-a sem JSON, annars skilum við bara texta
-  try {
-    return JSON.parse(rawText) as T;
-  } catch {
-    return rawText as unknown as T;
-  }
+  return rawText as unknown as T;
 }

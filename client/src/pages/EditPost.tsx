@@ -1,32 +1,15 @@
-// client/src/pages/EditPost.tsx
-import { useEffect, useState, FormEvent, ChangeEvent } from "react";
+import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { apiFetch, API_BASE_URL } from "@/lib/api";
-import type { SalePostWithDetails } from "@shared/schema";
+import { apiFetch, apiUpload, API_BASE_URL } from "@/lib/api";
 
+// shadcn/ui:
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 
-// Sama og í CreatePost – mikilvægt að halda þessu samræmdu
-const CATEGORY_OPTIONS = [
-  "Fatnaður - Konur",
-  "Fatnaður - Karlar",
-  "Fatnaður - Börn",
-  "Skór",
-  "Íþróttavörur",
-  "Heimili & húsgögn",
-  "Raftæki",
-  "Snyrtivörur",
-  "Leikföng & börn",
-  "Veitingar & matur",
-  "Viðburðir",
-  "Happy Hour",
-];
-
-type EditPostFormState = {
+type FormState = {
   title: string;
   description: string;
   category: string;
@@ -35,15 +18,31 @@ type EditPostFormState = {
   discountedPrice: string;
   startDate: string;
   endDate: string;
-  imageUrl: string | null; // relative slóð
+  imageUrl: string;
 };
 
-export function EditPost() {
+type PostApi = {
+  id: string;
+  title?: string;
+  description?: string;
+  category?: string | null;
+  // backend skilar mapPostToFrontend:
+  // priceOriginal/priceSale heita í mapPostToFrontend: priceOriginal & priceSale? (þú notar priceOriginal/priceSale þar)
+  // en í PostApi hjá þér var discountPercent/originalPrice/discountedPrice/startDate/endDate
+  // Við lesum bara images/title/desc/category hér og skiljum rest eftir eins og þú varst með.
+  discountPercent?: number | null;
+  originalPrice?: number | null;
+  discountedPrice?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  images?: Array<{ url: string }>;
+};
+
+export default function EditPost() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
-  const [loaded, setLoaded] = useState(false);
-  const [form, setForm] = useState<EditPostFormState>({
+  const [form, setForm] = useState<FormState>({
     title: "",
     description: "",
     category: "",
@@ -52,97 +51,88 @@ export function EditPost() {
     discountedPrice: "",
     startDate: "",
     endDate: "",
-    imageUrl: null,
+    imageUrl: "",
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sækjum núverandi tilboð til að fylla í formið
+  const previewImageSrc = useMemo(() => {
+    if (!form.imageUrl) return "";
+    return API_BASE_URL ? `${API_BASE_URL}${form.imageUrl}` : form.imageUrl;
+  }, [form.imageUrl]);
+
   useEffect(() => {
-    let cancelled = false;
+    if (!id) return;
 
-    async function loadPost() {
-      if (!id) return;
+    (async () => {
       setError(null);
+      setLoaded(false);
 
       try {
-        const post = await apiFetch<SalePostWithDetails>(`/api/v1/posts/${id}`);
+        const post = await apiFetch<PostApi>(`/api/v1/posts/${id}`, {
+          method: "GET",
+        });
 
-        if (cancelled) return;
-
-        const firstImageUrl =
-          post.images && post.images.length > 0 ? post.images[0].url : null;
+        const firstImg = post?.images?.[0]?.url || "";
 
         setForm({
-          title: post.title ?? "",
-          description: post.description ?? "",
-          category: post.category ?? "",
+          title: post?.title || "",
+          description: post?.description || "",
+          category: (post?.category as any) || "",
           discountPercent:
-            post.discountPercent != null ? String(post.discountPercent) : "",
+            post?.discountPercent === null ||
+            post?.discountPercent === undefined
+              ? ""
+              : String(post.discountPercent),
           originalPrice:
-            post.originalPrice != null ? String(post.originalPrice) : "",
+            post?.originalPrice === null || post?.originalPrice === undefined
+              ? ""
+              : String(post.originalPrice),
           discountedPrice:
-            post.discountedPrice != null ? String(post.discountedPrice) : "",
-          startDate: post.startDate ? post.startDate.slice(0, 10) : "",
-          endDate: post.endDate ? post.endDate.slice(0, 10) : "",
-          imageUrl: firstImageUrl,
+            post?.discountedPrice === null ||
+            post?.discountedPrice === undefined
+              ? ""
+              : String(post.discountedPrice),
+          startDate: post?.startDate || "",
+          endDate: post?.endDate || "",
+          imageUrl: firstImg,
         });
 
         setLoaded(true);
       } catch (err: any) {
         console.error(err);
-        setError(
-          err.message || "Tókst ekki að sækja tilboðið fyrir breytingar",
-        );
+        setError(err?.message || "Tókst ekki að sækja tilboð");
+      } finally {
+        setLoaded(true);
       }
-    }
-
-    loadPost();
-
-    return () => {
-      cancelled = true;
-    };
+    })();
   }, [id]);
 
-  function handleChange(
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  }
-
-  async function handleImageChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  async function handleImageUpload(file: File) {
     setIsUploading(true);
     setError(null);
 
     try {
-      const uploadUrl = API_BASE_URL
-        ? `${API_BASE_URL}/api/v1/uploads`
-        : "/api/v1/uploads";
-
       const formData = new FormData();
-      formData.append("image", file);
+      // Samræmt við server: upload.single("file")
+      formData.append("file", file);
 
-      const res = await fetch(uploadUrl, {
-        method: "POST",
-        body: formData,
-      });
+      const data = await apiUpload<{ url: string }>(
+        "/api/v1/uploads",
+        formData,
+      );
 
-      if (!res.ok) {
-        throw new Error("Tókst ekki að hlaða upp mynd");
+      if (!data?.url) {
+        throw new Error("Upload tókst en server skilaði ekki url.");
       }
-
-      const data: { url: string } = await res.json();
 
       setForm((prev) => ({ ...prev, imageUrl: data.url }));
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Tókst ekki að hlaða upp mynd");
+      setError(err?.message || "Tókst ekki að hlaða upp mynd");
     } finally {
       setIsUploading(false);
     }
@@ -152,6 +142,11 @@ export function EditPost() {
     e.preventDefault();
     if (!id) return;
 
+    if (isUploading) {
+      setError("Bíddu aðeins – mynd er enn að hlaðast upp.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -159,36 +154,35 @@ export function EditPost() {
       const payload: any = {
         title: form.title,
         description: form.description,
-        category: form.category || null,
-        discountPercent: form.discountPercent
-          ? Number(form.discountPercent)
-          : null,
-        originalPrice: form.originalPrice ? Number(form.originalPrice) : null,
-        discountedPrice: form.discountedPrice
+        category: form.category || "",
+
+        // Samræmt við backend update route sem notar priceOriginal/priceSale
+        priceOriginal: form.originalPrice
+          ? Number(form.originalPrice)
+          : undefined,
+        priceSale: form.discountedPrice
           ? Number(form.discountedPrice)
-          : null,
-        startDate: form.startDate || null,
-        endDate: form.endDate || null,
+          : undefined,
+
+        startsAt: form.startDate || null,
+        endsAt: form.endDate || null,
+
         images: form.imageUrl ? [{ url: form.imageUrl }] : [],
       };
 
       await apiFetch(`/api/v1/posts/${id}`, {
         method: "PUT",
-        body: payload,
+        body: JSON.stringify(payload),
       });
 
       navigate("/profile");
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Eitthvað fór úrskeiðis við að uppfæra tilboð");
+      setError(err?.message || "Eitthvað fór úrskeiðis við að uppfæra tilboð");
     } finally {
       setIsSubmitting(false);
     }
   }
-
-  const previewImageSrc =
-    form.imageUrl &&
-    (API_BASE_URL ? `${API_BASE_URL}${form.imageUrl}` : form.imageUrl);
 
   if (!loaded && !error) {
     return (
@@ -211,139 +205,119 @@ export function EditPost() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label htmlFor="title">Titill</Label>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Titill</label>
             <Input
-              id="title"
-              name="title"
               value={form.title}
-              onChange={handleChange}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, title: e.target.value }))
+              }
               required
-              className="bg-card text-foreground border border-border"
             />
           </div>
 
-          <div>
-            <Label htmlFor="description">Lýsing</Label>
-            <textarea
-              id="description"
-              name="description"
-              className="w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              rows={4}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Lýsing</label>
+            <Textarea
               value={form.description}
-              onChange={handleChange}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, description: e.target.value }))
+              }
+              rows={4}
             />
           </div>
 
-          <div>
-            <Label htmlFor="category">Flokkur</Label>
-            <select
-              id="category"
-              name="category"
-              className="w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={form.category}
-              onChange={handleChange}
-            >
-              <option value="">Veldu flokk</option>
-              {CATEGORY_OPTIONS.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Uppfærðu flokk ef tilboðið hefur breyst.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="discountPercent">Afsláttur %</Label>
-              <Input
-                id="discountPercent"
-                name="discountPercent"
-                type="number"
-                min={0}
-                max={100}
-                value={form.discountPercent}
-                onChange={handleChange}
-                className="bg-card text-foreground border border-border"
-              />
-            </div>
-            <div>
-              <Label htmlFor="originalPrice">Upprunalegt verð</Label>
-              <Input
-                id="originalPrice"
-                name="originalPrice"
-                type="number"
-                min={0}
-                value={form.originalPrice}
-                onChange={handleChange}
-                className="bg-card text-foreground border border-border"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="discountedPrice">Afsláttarverð</Label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Flokkur</label>
             <Input
-              id="discountedPrice"
-              name="discountedPrice"
-              type="number"
-              min={0}
-              value={form.discountedPrice}
-              onChange={handleChange}
-              className="bg-card text-foreground border border-border"
+              value={form.category}
+              onChange={(e) =>
+                setForm((p) => ({ ...p, category: e.target.value }))
+              }
+              required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="startDate">Gildir frá</Label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Afsláttur %</label>
               <Input
-                id="startDate"
-                name="startDate"
+                value={form.discountPercent}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, discountPercent: e.target.value }))
+                }
+                inputMode="numeric"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Upphaflegt verð</label>
+              <Input
+                value={form.originalPrice}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, originalPrice: e.target.value }))
+                }
+                inputMode="numeric"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Afsláttarverð</label>
+              <Input
+                value={form.discountedPrice}
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, discountedPrice: e.target.value }))
+                }
+                inputMode="numeric"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Gildir frá</label>
+              <Input
                 type="date"
                 value={form.startDate}
-                onChange={handleChange}
-                className="bg-card text-foreground border border-border"
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, startDate: e.target.value }))
+                }
               />
             </div>
-            <div>
-              <Label htmlFor="endDate">Gildir til</Label>
+
+            <div className="space-y-2 col-span-2">
+              <label className="text-sm font-medium">Gildir til</label>
               <Input
-                id="endDate"
-                name="endDate"
                 type="date"
                 value={form.endDate}
-                onChange={handleChange}
-                className="bg-card text-foreground border border-border"
+                onChange={(e) =>
+                  setForm((p) => ({ ...p, endDate: e.target.value }))
+                }
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="image">Mynd</Label>
+            <label className="text-sm font-medium">Mynd</label>
             <Input
-              id="image"
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
-              className="bg-card text-foreground border border-border"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void handleImageUpload(f);
+              }}
+              disabled={isUploading || isSubmitting}
             />
 
             {isUploading && (
-              <p className="text-xs text-muted-foreground">Hleð upp mynd…</p>
+              <p className="text-sm text-muted-foreground">Hleð upp mynd…</p>
             )}
 
             {previewImageSrc && (
-              <div className="mt-2">
-                <p className="text-xs text-muted-foreground mb-2">Forskoðun</p>
+              <div className="border border-border rounded overflow-hidden">
                 <img
                   src={previewImageSrc}
-                  alt="Forskoðun"
-                  className="rounded-md max-h-48 object-cover border border-border"
+                  alt="Preview"
+                  className="w-full h-auto"
                 />
               </div>
             )}
@@ -351,25 +325,13 @@ export function EditPost() {
 
           <Button
             type="submit"
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             disabled={isSubmitting || isUploading}
-          >
-            {isSubmitting ? "Vista breytingar…" : "Vista breytingar"}
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
             className="w-full"
-            onClick={() => navigate(-1)}
-            disabled={isSubmitting || isUploading}
           >
-            Hætta við
+            {isSubmitting ? "Vista…" : "Vista breytingar"}
           </Button>
         </form>
       </Card>
     </div>
   );
 }
-
-export default EditPost;

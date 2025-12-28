@@ -20,6 +20,13 @@
       "role": "admin",
       "storeId": "5dd74967-a8d1-4456-8615-53f22c0023cf",
       "id": "b9402ce4-5981-4944-95ef-fe75a98276c8"
+    },
+    {
+      "email": "ut@ut.is",
+      "passwordHash": "$2b$10$SEmM6OMs0ds/.cX1Tg7G4u55pI/VaRj57PRZPolVHT5auUjp04Qym",
+      "role": "store",
+      "storeId": "77ed426b-a5f0-428c-8f7f-cdc598bc1051",
+      "id": "e0603749-5e4d-4dd0-8c1e-78f2fb1340f9"
     }
   ],
   "stores": [
@@ -66,6 +73,21 @@
       "categories": [],
       "subcategories": [],
       "id": "5dd74967-a8d1-4456-8615-53f22c0023cf"
+    },
+    {
+      "name": "Útsalapp",
+      "address": "",
+      "phone": "7891809",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "ut@ut.is",
+      "plan": "premium",
+      "trialEndsAt": "2025-12-30T14:56:49.492Z",
+      "billingStatus": "trial",
+      "isBanned": false,
+      "categories": [],
+      "subcategories": [],
+      "id": "77ed426b-a5f0-428c-8f7f-cdc598bc1051"
     }
   ],
   "posts": [
@@ -128,6 +150,21 @@
       "createdAt": "2025-12-10T15:50:17.675Z",
       "viewCount": 0,
       "id": "e7091793-f8da-495d-aff8-9d6c07039ac1"
+    },
+    {
+      "title": "Gleðileg Jól",
+      "description": "Jól 2025",
+      "category": "Viðburðir",
+      "price": 0,
+      "oldPrice": 0,
+      "imageUrl": "/uploads/83c77104-0c69-4913-b517-8f6b29ca8782.jpg",
+      "storeId": "77ed426b-a5f0-428c-8f7f-cdc598bc1051",
+      "buyUrl": null,
+      "startsAt": "2025-12-28",
+      "endsAt": "2026-02-06",
+      "createdAt": "2025-12-28T14:26:31.156Z",
+      "viewCount": 2,
+      "id": "446dd4d8-8460-48b0-974f-a3b22fb325af"
     }
   ]
 }

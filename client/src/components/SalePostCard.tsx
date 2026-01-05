@@ -1,7 +1,7 @@
+// client/src/components/SalePostCard.tsx
 import { Link } from "react-router-dom";
 import type { SalePostWithDetails } from "@shared/schema";
 import { API_BASE_URL } from "@/lib/api";
-import { formatPrice, calculateDiscount } from "@/lib/utils";
 
 type Props = {
   post: SalePostWithDetails;
@@ -16,6 +16,7 @@ function buildImageUrl(rawUrl?: string | null): string | null {
     return rawUrl;
   }
 
+  // Ef við höfum API_BASE_URL (Netlify / production)
   if (API_BASE_URL) {
     const base = API_BASE_URL.endsWith("/")
       ? API_BASE_URL.slice(0, -1)
@@ -24,135 +25,79 @@ function buildImageUrl(rawUrl?: string | null): string | null {
     return `${base}${path}`;
   }
 
+  // Fallback: relative slóð (virkar í Replit dev þar sem frontend+backend eru á sama host)
   return rawUrl;
 }
 
-// Hjálparfall til að reikna tíma sem er eftir af tilboði út frá endsAt
-function getTimeLeft(endsAt?: string | null): string | null {
-  if (!endsAt) return null;
-
-  const end = new Date(endsAt);
-  if (isNaN(end.getTime())) return null;
-
-  const now = new Date();
-  const diffMs = end.getTime() - now.getTime();
-
-  if (diffMs <= 0) {
-    return "Tilboðinu er lokið";
-  }
-
-  const totalMinutes = Math.floor(diffMs / (1000 * 60));
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) {
-    // Dæmi: "Endar eftir 2 daga og 5 klst"
-    return `Endar eftir ${days} daga og ${hours} klst`;
-  }
-
-  if (hours > 0) {
-    // Dæmi: "Endar eftir 3 klst og 20 mín"
-    return `Endar eftir ${hours} klst og ${minutes} mín`;
-  }
-
-  // Dæmi: "Endar eftir 15 mín"
-  return `Endar eftir ${minutes} mín`;
-}
-
 export function SalePostCard({ post }: Props) {
-  const firstImage = post.images?.[0];
-  const imageUrl = buildImageUrl(firstImage?.url ?? null);
+  const imageUrl = buildImageUrl(post.images?.[0]?.url ?? null);
 
-  // Afsláttur í %
-  const rawDiscount =
-    post.priceOriginal != null && post.priceSale != null
-      ? calculateDiscount(post.priceOriginal, post.priceSale)
+  const discountPercent =
+    post.priceOriginal && post.priceSale
+      ? Math.round(
+          ((post.priceOriginal - post.priceSale) / post.priceOriginal) * 100,
+        )
       : null;
 
-  const discount = typeof rawDiscount === "number" ? rawDiscount : null;
-
-  // Lýsing (tekin ef hún er til – annars tómur strengur)
-  const rawDescription = (post as any).description ?? (post as any).body ?? "";
-  const description =
-    typeof rawDescription === "string" ? rawDescription.trim() : "";
-
-  // Tími sem er eftir – byggt á endsAt sem kemur frá server
-  const timeLeftLabel = getTimeLeft((post as any).endsAt ?? null);
-
   return (
-    <Link to={`/post/${post.id}`} className="block h-full">
-      <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm">
-        {/* NAFN FYRIRTÆKIS EFST Í BOXINU */}
-        {post.store && post.store.name && (
-          <div className="px-2 pt-2 pb-1">
-            <p className="text-[11px] font-semibold text-gray-700 line-clamp-1">
-              {post.store.name}
-            </p>
+    <Link
+      to={`/post/${post.id}`}
+      className="block rounded-2xl overflow-hidden shadow-md bg-white/95 border border-orange-900/30 hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
+    >
+      <div className="relative h-36 w-full overflow-hidden bg-neutral-900">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={post.images?.[0]?.alt || post.title}
+            className="h-full w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-full w-full flex items-center justify-center text-xs text-neutral-400">
+            Engin mynd skráð
           </div>
         )}
 
-        {/* Myndabox – kassalagað (4/3) */}
-        <div className="relative w-full aspect-[4/3] bg-gray-100 overflow-hidden">
-          {imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={firstImage?.alt || post.title}
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-gray-400">
-              Engin mynd skráð
-            </div>
-          )}
+        {discountPercent !== null && (
+          <div className="absolute top-2 right-2 bg-[#FF7A00] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md">
+            -{discountPercent}%
+          </div>
+        )}
+      </div>
 
-          {/* Afsláttur í % ofan á myndina */}
-          {discount !== null && discount > 0 && (
-            <div className="absolute top-1.5 left-1.5 rounded-full bg-black/80 text-white text-[11px] font-bold px-2 py-1">
-              -{discount}%
-            </div>
-          )}
-        </div>
-
-        {/* Texti + verð fyrir neðan */}
-        <div className="flex flex-1 flex-col gap-1 p-2">
-          {/* Titill */}
-          <p className="text-xs font-semibold text-gray-900 line-clamp-2">
-            {post.title}
+      <div className="p-3 space-y-1">
+        {post.store && (
+          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+            {post.store.name}
           </p>
+        )}
+        <h3 className="font-semibold text-sm text-neutral-900 line-clamp-1">
+          {post.title}
+        </h3>
+        {post.description && (
+          <p className="text-xs text-neutral-600 line-clamp-2">
+            {post.description}
+          </p>
+        )}
 
-          {/* Lýsing */}
-          {description && (
-            <p className="text-[11px] leading-tight text-gray-700 line-clamp-3">
-              {description}
-            </p>
+        <div className="pt-1.5 flex items-baseline gap-1.5">
+          {post.priceSale != null && (
+            <span className="text-sm font-bold text-[#FF7A00]">
+              ISK {post.priceSale.toLocaleString("is-IS")}
+            </span>
           )}
-
-          {/* Verðupplýsingar */}
-          {(post.priceSale ?? post.priceOriginal) && (
-            <div className="mt-1 flex items-baseline gap-1">
-              {post.priceSale && (
-                <span className="text-sm font-bold text-[#fc7102]">
-                  {formatPrice(post.priceSale)}
-                </span>
-              )}
-
-              {post.priceOriginal && (
-                <span className="text-[11px] text-gray-400 line-through">
-                  {formatPrice(post.priceOriginal)}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* Tími sem er eftir af tilboði */}
-          {timeLeftLabel && (
-            <div className="mt-0.5 text-[11px] font-medium text-red-600">
-              {timeLeftLabel}
-            </div>
+          {post.priceOriginal != null && (
+            <span className="text-[11px] line-through text-neutral-400">
+              ISK {post.priceOriginal.toLocaleString("is-IS")}
+            </span>
           )}
         </div>
+
+        {typeof post.viewCount === "number" && (
+          <p className="mt-0.5 text-[10px] text-neutral-500">
+            {post.viewCount} skoðanir
+          </p>
+        )}
       </div>
     </Link>
   );

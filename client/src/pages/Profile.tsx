@@ -21,7 +21,6 @@ type StoreInfo = {
   billingStatus?: string;
   billingActive?: boolean;
   createdAt?: string | null; // BÆTT VIÐ
-  categories?: string[]; // BÆTT VIÐ – flokkar verslunar
 };
 
 type BillingInfo = {
@@ -45,100 +44,6 @@ type StorePost = {
   viewCount?: number;
   endsAt?: string | null; // BÆTT VIÐ – lokadagsetning tilboðs
 };
-
-// --- NÝTT: skilgreinum mega-flokka og undirflokka fyrir snyrtilegt "Flokkur" label ---
-
-type Subcategory = {
-  value: string;
-  label: string;
-};
-
-type MegaCategory = {
-  id: string;
-  name: string;
-  description?: string;
-  subcategories: Subcategory[];
-};
-
-const MEGA_CATEGORIES: MegaCategory[] = [
-  {
-    id: "food",
-    name: "Veitingar & Matur",
-    description: "Tilboð á mat, drykkjum og happy hour.",
-    subcategories: [
-      { value: "Matur & veitingar", label: "Matur & veitingar" },
-      { value: "Happy Hour", label: "Happy Hour" },
-    ],
-  },
-  {
-    id: "fashion",
-    name: "Fatnaður & Lífstíll",
-    description: "Fatnaður, skór og íþróttatíska.",
-    subcategories: [
-      { value: "Fatnaður - Konur", label: "Fatnaður - Konur" },
-      { value: "Fatnaður - Karlar", label: "Fatnaður - Karlar" },
-      { value: "Fatnaður - Börn", label: "Fatnaður - Börn" },
-      { value: "Skór", label: "Skór" },
-      { value: "Íþróttavörur", label: "Íþróttavörur" },
-      { value: "Leikföng & börn", label: "Leikföng & börn" },
-    ],
-  },
-  {
-    id: "home",
-    name: "Heimili & Húsgögn",
-    description: "Húsgögn, innréttingar og heimilislíf.",
-    subcategories: [{ value: "Heimili & húsgögn", label: "Heimili & húsgögn" }],
-  },
-  {
-    id: "tech",
-    name: "Tækni & Rafmagn",
-    description: "Raftæki, græjur og snjallheimili.",
-    subcategories: [{ value: "Raftæki", label: "Raftæki" }],
-  },
-  {
-    id: "beauty-other",
-    name: "Beauty, Heilsu & Annað",
-    description: "Snyrting, heilsuvörur og annað.",
-    subcategories: [
-      { value: "Snyrtivörur", label: "Snyrtivörur" },
-      { value: "Annað", label: "Annað" },
-    ],
-  },
-];
-
-function normalizeCategory(value?: string | null): string | null {
-  if (!value) return null;
-  return value.trim().toLowerCase();
-}
-
-function getCategoryDisplayLabel(category?: string | null): string {
-  if (!category) return "Óflokkað";
-  const normalized = normalizeCategory(category);
-
-  for (const mega of MEGA_CATEGORIES) {
-    for (const sub of mega.subcategories) {
-      const subNorm = normalizeCategory(sub.value);
-      if (subNorm && subNorm === normalized) {
-        // Dæmi: "Veitingar & Matur · Happy Hour"
-        return `${mega.name} · ${sub.label}`;
-      }
-    }
-  }
-
-  // Ef við finnum hann ekki í skilgreiningunum, sýnum bara upprunalegt gildi
-  return category;
-}
-
-// --- END NÝTT ---
-
-// NÝTT: valkostir fyrir flokka verslunar (top-level) – allt að 3 má haka við
-const STORE_CATEGORY_OPTIONS: string[] = [
-  "Veitingar & Matur",
-  "Fatnaður & Lífstíll",
-  "Heimili & Húsgögn",
-  "Tækni & Rafmagn",
-  "Beauty, Heilsu & Þjónusta",
-];
 
 type PlanId = "basic" | "pro" | "premium";
 
@@ -256,9 +161,6 @@ export default function Profile() {
 
   const store: StoreInfo | null = authUser?.store ?? null;
 
-  // NÝTT: er notandinn admin út frá role?
-  const isAdmin = authUser?.user?.role === "admin";
-
   // Billing + pakki koma frá backend í stað localStorage
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
@@ -275,21 +177,6 @@ export default function Profile() {
   // Eyðing tilboða
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // NÝTT: valdir flokkar verslunar (allt að 3)
-  const [selectedStoreCategories, setSelectedStoreCategories] = useState<
-    string[]
-  >(store?.categories ?? []);
-  const [savingCategories, setSavingCategories] = useState(false);
-  const [categoriesError, setCategoriesError] = useState<string | null>(null);
-  const [categoriesSuccess, setCategoriesSuccess] = useState<string | null>(
-    null,
-  );
-
-  // Synca local state þegar store.categories uppfærist frá backend
-  useEffect(() => {
-    setSelectedStoreCategories(store?.categories ?? []);
-  }, [store?.categories]);
 
   // Tilboð verslunar
   const {
@@ -382,46 +269,6 @@ export default function Profile() {
     : trialActive
       ? "Uppfæra í þennan pakka"
       : "Virkja fríviku á þessum pakka";
-
-  function toggleStoreCategory(cat: string) {
-    if (selectedStoreCategories.includes(cat)) {
-      setSelectedStoreCategories(
-        selectedStoreCategories.filter((c) => c !== cat),
-      );
-    } else {
-      if (selectedStoreCategories.length >= 3) return;
-      setSelectedStoreCategories([...selectedStoreCategories, cat]);
-    }
-  }
-
-  async function handleSaveCategories() {
-    if (!store?.id) return;
-
-    setSavingCategories(true);
-    setCategoriesError(null);
-    setCategoriesSuccess(null);
-
-    try {
-      const body = {
-        categories: selectedStoreCategories,
-      };
-
-      const updated = await apiFetch<StoreInfo>("/api/v1/stores/me", {
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
-
-      setSelectedStoreCategories(updated.categories ?? []);
-      setCategoriesSuccess("Flokkar verslunar hafa verið vistaðir.");
-    } catch (err) {
-      console.error("save categories error:", err);
-      setCategoriesError(
-        "Tókst ekki að vista flokka. Reyndu aftur eða hafðu samband ef vandinn heldur áfram.",
-      );
-    } finally {
-      setSavingCategories(false);
-    }
-  }
 
   async function handleActivatePlan() {
     if (!store?.id) return;
@@ -549,8 +396,7 @@ export default function Profile() {
         <div>
           <h1 className="text-lg font-semibold">Prófíll verslunar</h1>
           <p className="text-xs text-muted-foreground">
-            Innskráður sem {authUser.user.email} (verslun
-            {isAdmin ? " – ADMIN" : ""})
+            Innskráður sem {authUser.user.email} (verslun)
           </p>
         </div>
         <Button
@@ -624,56 +470,6 @@ export default function Profile() {
           <p>
             <span className="font-medium">Greiðslustaða:</span> {billingLabel}
           </p>
-        </div>
-
-        {/* NÝTT: flokkar verslunar – allt að 3 valdir */}
-        <div className="mt-4 border-t pt-3 space-y-2">
-          <h3 className="text-sm font-semibold">Flokkar verslunar</h3>
-          <p className="text-xs text-muted-foreground">
-            Merktu við allt að 3 flokka sem lýsa best versluninni þinni.
-          </p>
-
-          <div className="flex flex-col gap-1">
-            {STORE_CATEGORY_OPTIONS.map((cat) => {
-              const checked = selectedStoreCategories.includes(cat);
-              const disableCheckbox =
-                !checked && selectedStoreCategories.length >= 3;
-
-              return (
-                <label
-                  key={cat}
-                  className="flex items-center gap-2 text-sm cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={checked}
-                    disabled={disableCheckbox}
-                    onChange={() => toggleStoreCategory(cat)}
-                  />
-                  <span>{cat}</span>
-                </label>
-              );
-            })}
-          </div>
-
-          {categoriesError && (
-            <p className="text-xs text-red-600">{categoriesError}</p>
-          )}
-          {categoriesSuccess && (
-            <p className="text-xs text-green-600">{categoriesSuccess}</p>
-          )}
-
-          <div className="pt-1">
-            <Button
-              size="sm"
-              className="text-xs bg-[#FF7300] hover:bg-[#e56600] text-white disabled:opacity-60 disabled:cursor-not-allowed"
-              onClick={handleSaveCategories}
-              disabled={savingCategories}
-            >
-              {savingCategories ? "Vista flokka…" : "Vista flokka"}
-            </Button>
-          </div>
         </div>
       </Card>
 
@@ -869,7 +665,7 @@ export default function Profile() {
                         <p className="font-medium truncate">{post.title}</p>
                         {post.category && (
                           <p className="text-[11px] text-muted-foreground truncate">
-                            Flokkur: {getCategoryDisplayLabel(post.category)}
+                            Flokkur: {post.category}
                           </p>
                         )}
                         {post.description && (

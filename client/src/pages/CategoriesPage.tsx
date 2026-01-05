@@ -1,6 +1,7 @@
 // client/src/pages/CategoriesPage.tsx
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
@@ -12,103 +13,69 @@ async function fetchPosts(): Promise<SalePostWithDetails[]> {
   return apiFetch<SalePostWithDetails[]>("/api/v1/posts");
 }
 
-// Undirflokkar – nota sömu gildi og í CreatePost.tsx / gagnagrunni
-type Subcategory = {
-  value: string;
-  label: string;
-};
-
-type MegaCategory = {
-  id: string;
-  name: string;
-  subcategories: Subcategory[];
-};
-
-// Hjálparfall til að normalisera flokka
-function normalizeCategory(value?: string | null): string | null {
-  if (!value) return null;
-  return value.trim().toLowerCase();
-}
-
-// Nýtt: sækja alla flokka sem tilboð er í (category + categories[])
-function getPostCategories(post: SalePostWithDetails): string[] {
-  const set = new Set<string>();
-
-  if (post.category) {
-    const n = normalizeCategory(post.category);
-    if (n) set.add(n);
-  }
-
-  if (Array.isArray((post as any).categories)) {
-    for (const c of (post as any).categories as string[]) {
-      const n = normalizeCategory(c);
-      if (n) set.add(n);
-    }
-  }
-
-  return Array.from(set);
-}
-
-// Viðburðaflokkar (núna byggt á „Happy Hour“ – hægt að stækka síðar)
-const EVENT_CATEGORY_VALUES = ["Happy Hour"];
-
-// MEGA-flokkar: Allt + Viðburðir + 5 „venjulegir“
-const MEGA_CATEGORIES: MegaCategory[] = [
-  {
-    id: "all",
-    name: "Allt",
-    subcategories: [],
-  },
-  {
-    id: "events",
-    name: "Viðburðir (t.d. Happy Hour)",
-    subcategories: [],
-  },
-  {
-    id: "food",
-    name: "Veitingar & Matur",
-    subcategories: [
-      { value: "Matur & veitingar", label: "Matur & veitingar" },
-      { value: "Happy Hour", label: "Happy Hour" },
-    ],
-  },
-  {
-    id: "fashion",
-    name: "Fatnaður & Lífstíll",
-    subcategories: [
-      { value: "Fatnaður - Konur", label: "Fatnaður - Konur" },
-      { value: "Fatnaður - Karlar", label: "Fatnaður - Karlar" },
-      { value: "Fatnaður - Börn", label: "Fatnaður - Börn" },
-      { value: "Skór", label: "Skór" },
-      { value: "Íþróttavörur", label: "Íþróttavörur" },
-      { value: "Leikföng & börn", label: "Leikföng & börn" },
-    ],
-  },
-  {
-    id: "home",
-    name: "Heimili & Húsgögn",
-    subcategories: [{ value: "Heimili & húsgögn", label: "Heimili & húsgögn" }],
-  },
-  {
-    id: "tech",
-    name: "Tækni & Rafmagn",
-    subcategories: [{ value: "Raftæki", label: "Raftæki" }],
-  },
-  {
-    id: "beauty-other",
-    name: "Beauty, Heilsu & Annað",
-    subcategories: [
-      { value: "Snyrtivörur", label: "Snyrtivörur" },
-      { value: "Annað", label: "Annað" },
-    ],
-  },
+// Grunnflokkar – samræmdir við CreatePost.tsx
+const BASE_CATEGORIES = [
+  "Fatnaður - Konur",
+  "Fatnaður - Karlar",
+  "Fatnaður - Börn",
+  "Skór",
+  "Íþróttavörur",
+  "Heimili & húsgögn",
+  "Raftæki",
+  "Snyrtivörur",
+  "Leikföng & börn",
+  "Matur & veitingar",
+  "Happy Hour",
+  "Annað",
 ];
 
-export default function CategoriesPage() {
-  // Sjálfgefið: „Allt“
-  const [selectedMegaId, setSelectedMegaId] = useState<string>("all");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+// Normalizer til að mappa gömul og vitlaus heiti yfir í ný, rétt heiti
+function normalizeCategory(raw: string | null | undefined): string {
+  const c = (raw || "").trim();
+  if (!c) return "";
 
+  const lower = c.toLowerCase();
+
+  // Allt sem byrjar á "rafmagn" => Raftæki
+  if (lower.startsWith("rafmagn")) {
+    return "Raftæki";
+  }
+
+  // "veitingar" => Matur & veitingar
+  if (lower === "veitingar") {
+    return "Matur & veitingar";
+  }
+
+  // Möguleg afbrigði af mat/veitingum sem gætu hafa slæðst inn
+  if (lower === "matur og veitingar") {
+    return "Matur & veitingar";
+  }
+
+  // Vitlaust skrifaðar snyrtivörur => Snyrtivörur
+  if (lower === "snyrtivorur") {
+    return "Snyrtivörur";
+  }
+
+  // Vitlaust skrifað "annad" => Annað
+  if (lower === "annad") {
+    return "Annað";
+  }
+
+  // "heimili" => Heimili & húsgögn
+  if (lower === "heimili") {
+    return "Heimili & húsgögn";
+  }
+
+  // Ef þetta er eitt af okkar kanónísku heitum, skilum því beint
+  if (BASE_CATEGORIES.includes(c)) {
+    return c;
+  }
+
+  // Default: tryggjum að strengurinn byrji á stórum staf
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
+export default function CategoriesPage() {
   const {
     data: posts = [],
     isLoading,
@@ -118,147 +85,130 @@ export default function CategoriesPage() {
     queryFn: fetchPosts,
   });
 
-  const activeMega = useMemo(() => {
-    return MEGA_CATEGORIES.find((m) => m.id === selectedMegaId) ?? null;
-  }, [selectedMegaId]);
+  // Normaliserum flokka fyrir öll tilboð
+  const normalizedPosts = posts.map((p) => ({
+    ...p,
+    _normCategory: normalizeCategory(p.category),
+  }));
 
-  const filteredPosts = useMemo(() => {
-    let result = posts;
+  // Flokkar byggðir bæði á grunnlista + raunverulegum gögnum
+  const categories = Array.from(
+    new Set([
+      ...BASE_CATEGORIES,
+      ...normalizedPosts
+        .map((p) => p._normCategory)
+        .filter((c) => c && c.length > 0),
+    ]),
+  ).sort();
 
-    // 1. Sía eftir megaflokki
-    if (selectedMegaId === "events") {
-      // „Viðburðir“: nota EVENT_CATEGORY_VALUES
-      const eventSet = new Set(
-        EVENT_CATEGORY_VALUES.map((v) => normalizeCategory(v)).filter(
-          (v): v is string => v !== null,
-        ),
-      );
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-      result = result.filter((post) => {
-        const cats = getPostCategories(post);
-        return cats.some((c) => eventSet.has(c));
-      });
-    } else if (selectedMegaId !== "all" && activeMega) {
-      // Aðrir mega-flokkar en „Allt“
-      const allowed = new Set(
-        activeMega.subcategories
-          .map((s) => normalizeCategory(s.value))
-          .filter((v): v is string => v !== null),
-      );
-
-      result = result.filter((post) => {
-        const cats = getPostCategories(post);
-        return cats.some((c) => allowed.has(c));
-      });
-    }
-
-    // 2. Sía eftir undirflokki (ef valinn)
-    if (selectedCategory) {
-      const target = normalizeCategory(selectedCategory);
-      result = result.filter((post) => {
-        const cats = getPostCategories(post);
-        return !!target && cats.includes(target);
-      });
-    }
-
-    return result;
-  }, [posts, selectedMegaId, activeMega, selectedCategory]);
+  const visiblePosts =
+    selectedCategory === null
+      ? normalizedPosts
+      : normalizedPosts.filter((p) => p._normCategory === selectedCategory);
 
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
-      <header className="space-y-2">
-        <h1 className="text-xl font-semibold text-white">Flokkar</h1>
-        <p className="text-sm text-gray-300">
-          Veldu megaflokk og undirflokk til að skoða tilboðin.
-        </p>
+      <header className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-white">Flokkar</h1>
+          <p className="text-xs text-neutral-400">
+            Veldu flokk til að sjá útsölutilboð í þeim flokki.
+          </p>
+        </div>
       </header>
 
-      {/* FLokkakerfi: 1) MEGA 2) UNDIR */}
-      <section className="space-y-4">
-        {/* MEGA-flokkar */}
-        <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-gray-400">
-            Megaflokkar
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {MEGA_CATEGORIES.map((mega) => (
-              <Button
-                key={mega.id}
-                variant={selectedMegaId === mega.id ? "default" : "outline"}
-                size="sm"
-                className="whitespace-nowrap"
-                onClick={() => {
-                  setSelectedMegaId(mega.id);
-                  setSelectedCategory(null);
-                }}
-              >
-                {mega.name}
-              </Button>
-            ))}
-          </div>
-        </div>
+      {isLoading && (
+        <p className="text-sm text-neutral-400">Sæki tilboð og flokka…</p>
+      )}
 
-        {/* Undirflokkar – bara þegar mega er EKKI „Allt“ eða „Viðburðir“ */}
-        {activeMega &&
-          activeMega.id !== "all" &&
-          activeMega.id !== "events" &&
-          activeMega.subcategories.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide text-gray-400">
-                Undirflokkar
+      {error && !isLoading && (
+        <p className="text-sm text-red-400">
+          Tókst ekki að sækja tilboð til að byggja flokka.
+        </p>
+      )}
+
+      {!isLoading && !error && (
+        <>
+          {/* Flokkar */}
+          <section className="space-y-2">
+            <h2 className="text-sm font-semibold text-white">Flokkar</h2>
+
+            {categories.length === 0 && (
+              <p className="text-xs text-neutral-500">
+                Engir flokkar fundust ennþá.
               </p>
+            )}
+
+            {categories.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant={selectedCategory === null ? "default" : "outline"}
                   size="sm"
+                  variant="outline"
+                  className={
+                    selectedCategory === null
+                      ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
+                      : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                  }
                   onClick={() => setSelectedCategory(null)}
                 >
-                  Allt í þessum flokki
+                  Allt
                 </Button>
 
-                {activeMega.subcategories.map((sub) => (
+                {categories.map((cat) => (
                   <Button
-                    key={sub.value}
-                    variant={
-                      selectedCategory === sub.value ? "default" : "outline"
-                    }
+                    key={cat}
                     size="sm"
-                    onClick={() => setSelectedCategory(sub.value)}
+                    variant="outline"
+                    className={
+                      selectedCategory === cat
+                        ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
+                        : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                    }
+                    onClick={() =>
+                      setSelectedCategory(selectedCategory === cat ? null : cat)
+                    }
                   >
-                    {sub.label}
+                    {cat}
                   </Button>
                 ))}
               </div>
+            )}
+          </section>
+
+          {/* Tilboð í völdum flokki */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">
+                {selectedCategory
+                  ? `Tilboð í flokki: ${selectedCategory}`
+                  : "Öll tilboð"}
+              </h2>
+              <p className="text-[11px] text-neutral-400">
+                {visiblePosts.length} tilboð
+              </p>
             </div>
-          )}
-      </section>
 
-      {isLoading && (
-        <Card className="p-4">
-          <p>Er að hlaða tilboðum...</p>
-        </Card>
-      )}
+            {visiblePosts.length === 0 && (
+              <Card className="p-4 bg-white text-black border border-neutral-200 rounded-2xl">
+                <p className="text-xs text-neutral-700">
+                  Engin tilboð fundust í þessum flokki.
+                </p>
+              </Card>
+            )}
 
-      {error && (
-        <Card className="p-4">
-          <p>Villa kom upp við að sækja tilboð.</p>
-        </Card>
-      )}
-
-      {!isLoading && !error && filteredPosts.length === 0 && (
-        <Card className="p-4">
-          <p>Engin tilboð passa þessa flokka eins og er.</p>
-        </Card>
-      )}
-
-      {!isLoading && !error && filteredPosts.length > 0 && (
-        <section>
-          <div className="grid grid-cols-2 gap-3">
-            {filteredPosts.map((post) => (
-              <SalePostCard key={post.id} post={post} />
-            ))}
-          </div>
-        </section>
+            {visiblePosts.length > 0 && (
+              <div className="grid grid-cols-2 gap-3">
+                {visiblePosts.map((post) => (
+                  <Link key={post.id} to={`/post/${post.id}`}>
+                    <SalePostCard post={post} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
       )}
     </main>
   );

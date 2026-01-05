@@ -1,3 +1,4 @@
+// client/src/pages/EditPost.tsx
 import { useEffect, useState, FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -16,21 +17,17 @@ const CATEGORY_OPTIONS = [
   "Skór",
   "Íþróttavörur",
   "Heimili & húsgögn",
-  "Raftæki",
+  "Rafmagnstæki",
   "Snyrtivörur",
   "Leikföng & börn",
   "Matur & veitingar",
-  "Happy Hour",
   "Annað",
 ];
 
 type UpdatePostPayload = {
   title?: string;
   description?: string;
-  // Fyrsti flokkurinn
   category?: string;
-  // Allir flokkar (allt að 3 í UI)
-  categories?: string[];
   priceOriginal?: number;
   priceSale?: number;
   buyUrl?: string | null;
@@ -83,7 +80,7 @@ export default function EditPost() {
   // Form state
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [categories, setCategories] = useState<string[]>([]);
+  const [category, setCategory] = useState("");
   const [priceOriginal, setPriceOriginal] = useState("");
   const [priceSale, setPriceSale] = useState("");
   const [buyUrl, setBuyUrl] = useState("");
@@ -117,17 +114,7 @@ export default function EditPost() {
 
         setTitle(post.title || "");
         setDescription(post.description || "");
-
-        const initialCats = (
-          post.categories && post.categories.length > 0
-            ? post.categories
-            : post.category
-              ? [post.category]
-              : []
-        ).filter(Boolean) as string[];
-
-        setCategories(initialCats);
-
+        setCategory(post.category || "");
         setPriceOriginal(
           post.priceOriginal != null ? String(post.priceOriginal) : "",
         );
@@ -173,22 +160,6 @@ export default function EditPost() {
     setImagePreview(URL.createObjectURL(file));
   }
 
-  function toggleCategory(cat: string) {
-    setErrorMsg(null);
-
-    setCategories((prev) => {
-      const exists = prev.includes(cat);
-      if (exists) {
-        return prev.filter((c) => c !== cat);
-      }
-      if (prev.length >= 3) {
-        setErrorMsg("Hægt er að velja mest 3 flokka fyrir hvert tilboð.");
-        return prev;
-      }
-      return [...prev, cat];
-    });
-  }
-
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!id) {
@@ -204,16 +175,8 @@ export default function EditPost() {
       return;
     }
 
-    if (categories.length === 0) {
-      setErrorMsg("Veldu að minnsta kosti einn flokk (allt að 3).");
-      return;
-    }
-
-    const trimmedCategories = categories.map((c) => c.trim());
-    const primaryCategory = trimmedCategories[0] ?? "";
-
-    if (!primaryCategory) {
-      setErrorMsg("Veldu giltan flokk.");
+    if (!category.trim()) {
+      setErrorMsg("Veldu flokk.");
       return;
     }
 
@@ -238,8 +201,7 @@ export default function EditPost() {
       const payload: UpdatePostPayload = {
         title: title.trim(),
         description: description.trim(),
-        category: primaryCategory,
-        categories: trimmedCategories,
+        category: category.trim(),
         priceOriginal: original,
         priceSale: sale,
         buyUrl: buyUrl.trim() || null,
@@ -326,31 +288,23 @@ export default function EditPost() {
             />
           </div>
 
-          {/* Flokkar - CHECKBOXAR (allt að 3) */}
+          {/* Flokkur - dropdown */}
           <div className="space-y-1">
-            <Label>Flokkar (allt að 3)</Label>
-            <div className="flex flex-col gap-1">
-              {CATEGORY_OPTIONS.map((opt) => {
-                const checked = categories.includes(opt);
-                const disableCheckbox = !checked && categories.length >= 3;
-
-                return (
-                  <label
-                    key={opt}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={checked}
-                      disabled={disableCheckbox}
-                      onChange={() => toggleCategory(opt)}
-                    />
-                    <span>{opt}</span>
-                  </label>
-                );
-              })}
-            </div>
+            <Label htmlFor="category">Flokkur</Label>
+            <select
+              id="category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
+              required
+            >
+              <option value="">Veldu flokk…</option>
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Verð */}

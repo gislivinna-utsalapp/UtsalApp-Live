@@ -55,7 +55,8 @@ export default function Home() {
 
       {!isLoading && !error && posts.length > 0 && (
         <section>
-          {/* Boozt-style: 2 dálkar alltaf */}
+          {/* HÉR er nýja grid-ið:
+              2 dálkar, minni gap => nettari og jafnari gluggar */}
           <div className="grid grid-cols-2 gap-3">
             {posts.map((post) => (
               <SalePostCard key={post.id} post={post} />

@@ -11,13 +11,8 @@ import fs from "fs";
 import crypto from "crypto";
 
 import { storage } from "./storage-db";
-import { BoomBox } from "lucide-react";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
-
-// ADMIN: skilgreinum admin netfang
-const ADMIN_EMAIL = "b@b.is".toLowerCase();
-
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -54,12 +49,6 @@ function auth(requiredRole?: "store" | "admin") {
         header.substring(7),
         JWT_SECRET,
       ) as AuthRequest["user"];
-
-      // ADMIN: uppfærum role í "admin" ef netfangið er ADMIN_EMAIL
-      if (decoded?.email && decoded.email.toLowerCase() === ADMIN_EMAIL) {
-        decoded.role = "admin";
-      }
-
       req.user = decoded;
 
       if (requiredRole && decoded.role !== requiredRole) {
@@ -100,14 +89,6 @@ async function requireActiveOrTrialStore(
     let store = await storage.getStoreById(req.user.storeId);
     if (!store) {
       return res.status(404).json({ message: "Verslun fannst ekki" });
-    }
-
-    // Ef verslun er bönnuð af admin → leyfum EKKI að búa til eða breyta tilboðum
-    if ((store as any).isBanned) {
-      return res.status(403).json({
-        message:
-          "Þessi verslun hefur verið bönnuð af kerfisstjóra. Hafðu samband við ÚtsalApp ef þetta er villa.",
-      });
     }
 
     // Ef verslun hefur ekki fengið trial áður og er ekki expired → gefum 7 daga frá núna
@@ -184,14 +165,10 @@ async function mapPostToFrontend(p: any) {
       ? {
           id: store.id,
           name: store.name,
-          address: (store as any).address ?? "",
-          phone: (store as any).phone ?? "",
-          website: (store as any).website ?? "",
           plan,
           planType: plan, // fyrir eldri client
           billingStatus,
-          createdAt: (store as any).createdAt ?? null,
-          isBanned: (store as any).isBanned ?? false,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         }
       : null,
   };
@@ -269,8 +246,6 @@ export function registerRoutes(app: Express): void {
           plan: "basic",
           trialEndsAt,
           billingStatus: "trial",
-          isBanned: false,
-          categories: [], // NÝTT – engir flokka valdir við skráningu
         } as any);
 
         const user = await storage.createUser({
@@ -296,9 +271,7 @@ export function registerRoutes(app: Express): void {
             trialEndsAt: (store as any).trialEndsAt ?? null,
             billingStatus: (store as any).billingStatus ?? "trial",
             billingActive,
-            createdAt: (store as any).createdAt ?? null,
-            isBanned: (store as any).isBanned ?? false,
-            categories: (store as any).categories ?? [],
+            createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
           },
         });
       } catch (err) {
@@ -353,8 +326,6 @@ export function registerRoutes(app: Express): void {
         plan: "basic",
         trialEndsAt,
         billingStatus: "trial",
-        isBanned: false,
-        categories: [], // NÝTT
       } as any);
 
       const user = await storage.createUser({
@@ -380,9 +351,7 @@ export function registerRoutes(app: Express): void {
           trialEndsAt: (store as any).trialEndsAt ?? null,
           billingStatus: (store as any).billingStatus ?? "trial",
           billingActive,
-          createdAt: (store as any).createdAt ?? null,
-          isBanned: (store as any).isBanned ?? false,
-          categories: (store as any).categories ?? [],
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         },
       });
     } catch (err) {
@@ -414,8 +383,8 @@ export function registerRoutes(app: Express): void {
         return res.status(401).json({ message: "Rangt netfang eða lykilorð" });
       }
 
-      let store = (user as any).storeId
-        ? await storage.getStoreById((user as any).storeId)
+      let store = user.storeId
+        ? await storage.getStoreById(user.storeId)
         : null;
 
       // Ef verslun er til og hefur ekki trialEndsAt og er ekki expired → gefum 7 daga frá login
@@ -434,16 +403,11 @@ export function registerRoutes(app: Express): void {
         }
       }
 
-      // ADMIN: ef þetta netfang er ADMIN_EMAIL → setjum role = "admin" í token og svari
-      const baseRole = (user as any).role as "user" | "store" | "admin";
-      const effectiveRole: "user" | "store" | "admin" =
-        email === ADMIN_EMAIL ? "admin" : baseRole;
-
       const token = jwt.sign(
         {
-          id: (user as any).id,
+          id: user.id,
           email,
-          role: effectiveRole,
+          role: user.role,
           storeId: (user as any).storeId,
         },
         JWT_SECRET,
@@ -472,14 +436,12 @@ export function registerRoutes(app: Express): void {
           trialEndsAt: (store as any).trialEndsAt ?? null,
           billingStatus,
           billingActive,
-          createdAt: (store as any).createdAt ?? null,
-          isBanned: (store as any).isBanned ?? false,
-          categories: (store as any).categories ?? [],
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         };
       }
 
       return res.json({
-        user: { id: (user as any).id, email, role: effectiveRole },
+        user: { id: user.id, email, role: user.role },
         store: storePayload,
         token,
       });
@@ -542,9 +504,7 @@ export function registerRoutes(app: Express): void {
             trialEndsAt: (store as any).trialEndsAt ?? null,
             billingStatus,
             billingActive,
-            createdAt: (store as any).createdAt ?? null,
-            isBanned: (store as any).isBanned ?? false,
-            categories: (store as any).categories ?? [],
+            createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
           };
         }
 
@@ -558,64 +518,6 @@ export function registerRoutes(app: Express): void {
         });
       } catch (err) {
         console.error("auth/me error", err);
-        res.status(500).json({ message: "Villa kom upp" });
-      }
-    },
-  );
-
-  // ------------------ AUTH: CHANGE PASSWORD ------------------
-  app.post(
-    "/api/v1/auth/change-password",
-    auth(),
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ message: "Ekki innskráður" });
-        }
-
-        const { currentPassword, newPassword } = req.body as {
-          currentPassword?: string;
-          newPassword?: string;
-        };
-
-        if (!currentPassword || !newPassword) {
-          return res
-            .status(400)
-            .json({ message: "Vantar núverandi og nýtt lykilorð" });
-        }
-
-        if (newPassword.trim().length < 6) {
-          return res.status(400).json({
-            message: "Nýtt lykilorð þarf að vera að minnsta kosti 6 stafir.",
-          });
-        }
-
-        const user = await storage.findUserById(req.user.id);
-        if (!user) {
-          return res.status(404).json({ message: "Notandi fannst ekki" });
-        }
-
-        const ok = await bcrypt.compare(currentPassword, user.passwordHash);
-        if (!ok) {
-          return res
-            .status(400)
-            .json({ message: "Gamla lykilorðið stemmir ekki" });
-        }
-
-        const passwordHash = await bcrypt.hash(newPassword.trim(), 10);
-        const updated = await storage.updateUser(user.id, {
-          passwordHash,
-        } as any);
-
-        if (!updated) {
-          return res
-            .status(500)
-            .json({ message: "Tókst ekki að uppfæra lykilorð" });
-        }
-
-        return res.json({ success: true });
-      } catch (err) {
-        console.error("change-password error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     },
@@ -660,112 +562,10 @@ export function registerRoutes(app: Express): void {
           billingStatus,
           trialExpired: isTrialExpired(store),
           daysLeft,
-          createdAt: (store as any).createdAt ?? null,
-          isBanned: (store as any).isBanned ?? false,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
         });
       } catch (err) {
         console.error("stores/me/billing error", err);
-        res.status(500).json({ message: "Villa kom upp" });
-      }
-    },
-  );
-
-  // ------------------ STORES: UPDATE OWN STORE INFO ------------------
-  app.put(
-    "/api/v1/stores/me",
-    auth("store"),
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user?.storeId) {
-          return res
-            .status(400)
-            .json({ message: "Engin tengd verslun fannst" });
-        }
-
-        const store = await storage.getStoreById(req.user.storeId);
-        if (!store) {
-          return res.status(404).json({ message: "Verslun fannst ekki" });
-        }
-
-        const { name, address, phone, website, categories } = req.body as {
-          name?: string;
-          address?: string | null;
-          phone?: string | null;
-          website?: string | null;
-          categories?: string[];
-        };
-
-        const updates: any = {};
-
-        if (name !== undefined) {
-          const trimmed = name.trim();
-          if (!trimmed) {
-            return res
-              .status(400)
-              .json({ message: "Nafn verslunar má ekki vera tómt" });
-          }
-          updates.name = trimmed;
-        }
-
-        if (address !== undefined) {
-          updates.address = address ? address.trim() : null;
-        }
-
-        if (phone !== undefined) {
-          updates.phone = phone ? phone.trim() : null;
-        }
-
-        if (website !== undefined) {
-          updates.website = website ? website.trim() : null;
-        }
-
-        // NÝTT: uppfæra flokka verslunar – tryggjum fylki og max 3
-        if (categories !== undefined) {
-          if (!Array.isArray(categories)) {
-            return res
-              .status(400)
-              .json({ message: "Flokkar þurfa að vera fylki af strengjum" });
-          }
-
-          const cleaned = categories
-            .map((c) => String(c).trim())
-            .filter(Boolean);
-
-          updates.categories = cleaned.slice(0, 3);
-        }
-
-        const updated = await storage.updateStore(store.id, updates);
-        if (!updated) {
-          return res
-            .status(500)
-            .json({ message: "Tókst ekki að uppfæra verslun" });
-        }
-
-        const plan =
-          (updated as any).plan ?? (updated as any).planType ?? "basic";
-        const billingStatus =
-          (updated as any).billingStatus ??
-          ((updated as any).billingActive ? "active" : "trial");
-        const billingActive =
-          billingStatus === "active" || billingStatus === "trial";
-
-        return res.json({
-          id: updated.id,
-          name: updated.name,
-          address: (updated as any).address ?? "",
-          phone: (updated as any).phone ?? "",
-          website: (updated as any).website ?? "",
-          plan,
-          planType: plan,
-          trialEndsAt: (updated as any).trialEndsAt ?? null,
-          billingStatus,
-          billingActive,
-          createdAt: (updated as any).createdAt ?? null,
-          isBanned: (updated as any).isBanned ?? false,
-          categories: (updated as any).categories ?? [],
-        });
-      } catch (err) {
-        console.error("stores/me update error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     },
@@ -841,9 +641,7 @@ export function registerRoutes(app: Express): void {
           trialEndsAt: (updated as any).trialEndsAt ?? null,
           billingStatus,
           billingActive,
-          createdAt: (updated as any).createdAt ?? null,
-          isBanned: (updated as any).isBanned ?? false,
-          categories: (updated as any).categories ?? [],
+          createdAt: (updated as any).createdAt ?? null, // BÆTT VIÐ
         });
       } catch (err) {
         console.error("activate-plan error:", err);
@@ -893,16 +691,9 @@ export function registerRoutes(app: Express): void {
       }
 
       // Filter eftir leitarstreng ef til
-      const filteredByQuery = q
+      const filtered = q
         ? posts.filter((p: any) => (p.title || "").toLowerCase().includes(q))
         : posts;
-
-      // Fjarlægjum tilboð frá bönnuðum verslunum úr public view
-      const filtered = filteredByQuery.filter((p: any) => {
-        const store = p.storeId ? storesById[p.storeId] : null;
-        if (store && store.isBanned) return false;
-        return true;
-      });
 
       // RÖÐUN:
       // 1) plan: premium > pro > basic
@@ -935,14 +726,6 @@ export function registerRoutes(app: Express): void {
       const all = await storage.listPosts();
       const post = all.find((p: any) => p.id === req.params.id);
       if (!post) {
-        return res.status(404).json({ message: "Tilboð fannst ekki" });
-      }
-
-      // Ef verslun er bönnuð → ekki sýna tilboð
-      const storeForPost = post.storeId
-        ? await storage.getStoreById(post.storeId)
-        : null;
-      if (storeForPost && (storeForPost as any).isBanned) {
         return res.status(404).json({ message: "Tilboð fannst ekki" });
       }
 
@@ -1114,90 +897,6 @@ export function registerRoutes(app: Express): void {
     },
   );
 
-  // ------------------ POSTS: DELETE (ADMIN – GETUR DREPIÐ ALLT) ------------------
-  app.delete(
-    "/api/v1/admin/posts/:id",
-    auth(),
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user || req.user.role !== "admin") {
-          return res.status(403).json({ message: "Ekki heimild" });
-        }
-
-        const postId = req.params.id;
-        const all = await storage.listPosts();
-        const target = all.find((p: any) => p.id === postId);
-
-        if (!target) {
-          return res.status(404).json({ message: "Færsla fannst ekki" });
-        }
-
-        const deleted = await storage.deletePost(postId);
-        res.json({ success: deleted });
-      } catch (err) {
-        console.error("admin delete post error", err);
-        res.status(500).json({ message: "Villa kom upp" });
-      }
-    },
-  );
-
-  // ------------------ STORES: DELETE (ADMIN – EYÐA VERSLUN + TILBOÐUM) ------------------
-  app.delete(
-    "/api/v1/admin/stores/:id",
-    auth(),
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user || req.user.role !== "admin") {
-          return res.status(403).json({ message: "Ekki heimild" });
-        }
-
-        const storeId = req.params.id;
-        const deleted = await storage.deleteStore(storeId);
-
-        if (!deleted) {
-          return res.status(404).json({ message: "Verslun fannst ekki" });
-        }
-
-        return res.json({ success: true });
-      } catch (err) {
-        console.error("admin delete store error", err);
-        res.status(500).json({ message: "Villa kom upp" });
-      }
-    },
-  );
-
-  // ------------------ STORES: BAN / UNBAN (ADMIN) ------------------
-  app.post(
-    "/api/v1/admin/stores/:id/ban",
-    auth(),
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user || req.user.role !== "admin") {
-          return res.status(403).json({ message: "Ekki heimild" });
-        }
-
-        const storeId = req.params.id;
-        const { isBanned } = req.body as { isBanned?: boolean };
-
-        const updated = await storage.updateStore(storeId, {
-          isBanned: !!isBanned,
-        } as any);
-
-        if (!updated) {
-          return res.status(404).json({ message: "Verslun fannst ekki" });
-        }
-
-        return res.json({
-          id: updated.id,
-          isBanned: (updated as any).isBanned ?? false,
-        });
-      } catch (err) {
-        console.error("admin ban store error", err);
-        res.status(500).json({ message: "Villa kom upp" });
-      }
-    },
-  );
-
   // ------------------ IMAGE UPLOAD ------------------
   app.post(
     "/api/v1/uploads",
@@ -1230,6 +929,7 @@ export function registerRoutes(app: Express): void {
 
   // ------------------ STATIC FILES & SPA FALLBACK (AÐEINS Í PRODUCTION) ------------------
   if (process.env.NODE_ENV === "production") {
+    // HÉR ER LAGFÆRINGIN: byggið er undir client/dist
     const clientDistPath = path.join(process.cwd(), "client", "dist");
 
     app.use(express.static(clientDistPath));

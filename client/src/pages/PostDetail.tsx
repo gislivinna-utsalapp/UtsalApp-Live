@@ -150,17 +150,8 @@ export default function PostDetail() {
 
       <main className="px-4 py-4 space-y-4">
         <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
-          {/* NAFN FYRIRTÆKIS EFST Í AUKSLÝSINGABOXINU */}
-          {post.store && post.store.name && (
-            <div className="px-4 pt-4 pb-2 border-b border-neutral-100">
-              <p className="text-xs font-semibold text-neutral-700">
-                {post.store.name}
-              </p>
-            </div>
-          )}
-
           {mainImage && (
-            <div className="aspect-[3/4] w-full bg-neutral-100 overflow-hidden">
+            <div className="aspect-[4/3] w-full bg-neutral-100 overflow-hidden">
               <img
                 src={mainImage}
                 alt={post.title}
@@ -177,11 +168,10 @@ export default function PostDetail() {
               </h2>
               {post.store && (
                 <p className="text-sm text-neutral-600">
-                  {post.store.name}
-                  {" · "}
-                  {post.store.address && post.store.address.trim().length > 0
-                    ? post.store.address
-                    : "Staðsetning vantar"}
+                  {post.store.name} ·{" "}
+                  {(post.store as any).location ||
+                    (post.store as any).address ||
+                    "Staðsetning vantar"}
                 </p>
               )}
             </div>

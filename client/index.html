@@ -16,32 +16,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="ÚtsalApp" />
-
-    <!-- GA4 Tracking for UtsalApp -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-79TVEGBEBZ"
-    ></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      window.gtag = gtag;
-
-      gtag("js", new Date());
-      gtag("config", "G-79TVEGBEBZ", {
-        send_page_view: true,
-      });
-
-      // Event: PWA install tracking
-      window.addEventListener("appinstalled", function () {
-        gtag("event", "pwa_install", {
-          event_category: "pwa",
-          event_label: "homescreen_install",
-        });
-      });
-    </script>
   </head>
   <body>
     <div id="root"></div>

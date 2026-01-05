@@ -1,3 +1,4 @@
+// client/src/pages/Profile.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,9 +20,8 @@ type StoreInfo = {
   trialEndsAt?: string | null;
   billingStatus?: string;
   billingActive?: boolean;
-  createdAt?: string | null;
-  categories?: string[];
-  subcategories?: string[];
+  createdAt?: string | null; // BÆTT VIÐ
+  categories?: string[]; // BÆTT VIÐ – flokkar verslunar
 };
 
 type BillingInfo = {
@@ -30,7 +30,7 @@ type BillingInfo = {
   billingStatus: string;
   trialExpired: boolean;
   daysLeft: number | null;
-  createdAt?: string | null;
+  createdAt?: string | null; // BÆTT VIÐ – kemur frá /stores/me/billing
 };
 
 type StorePost = {
@@ -43,7 +43,7 @@ type StorePost = {
   buyUrl?: string | null;
   images?: { url: string; alt?: string }[];
   viewCount?: number;
-  endsAt?: string | null;
+  endsAt?: string | null; // BÆTT VIÐ – lokadagsetning tilboðs
 };
 
 // --- NÝTT: skilgreinum mega-flokka og undirflokka fyrir snyrtilegt "Flokkur" label ---
@@ -119,11 +119,13 @@ function getCategoryDisplayLabel(category?: string | null): string {
     for (const sub of mega.subcategories) {
       const subNorm = normalizeCategory(sub.value);
       if (subNorm && subNorm === normalized) {
+        // Dæmi: "Veitingar & Matur · Happy Hour"
         return `${mega.name} · ${sub.label}`;
       }
     }
   }
 
+  // Ef við finnum hann ekki í skilgreiningunum, sýnum bara upprunalegt gildi
   return category;
 }
 
@@ -131,42 +133,12 @@ function getCategoryDisplayLabel(category?: string | null): string {
 
 // NÝTT: valkostir fyrir flokka verslunar (top-level) – allt að 3 má haka við
 const STORE_CATEGORY_OPTIONS: string[] = [
-  "Viðburðir (t.d. Happy Hour)",
   "Veitingar & Matur",
   "Fatnaður & Lífstíll",
   "Heimili & Húsgögn",
   "Tækni & Rafmagn",
   "Beauty, Heilsu & Þjónusta",
 ];
-
-// NÝTT: undirflokkar fyrir hvern megaflokk verslunar
-const STORE_SUBCATEGORY_OPTIONS: Record<string, Subcategory[]> = {
-  "Viðburðir (t.d. Happy Hour)": [
-    { value: "Happy Hour", label: "Happy Hour" },
-    { value: "Viðburðir", label: "Viðburðir" },
-  ],
-  "Veitingar & Matur": [
-    { value: "Matur & veitingar", label: "Matur & veitingar" },
-    { value: "Happy Hour", label: "Happy Hour" },
-  ],
-  "Fatnaður & Lífstíll": [
-    { value: "Fatnaður - Konur", label: "Fatnaður - Konur" },
-    { value: "Fatnaður - Karlar", label: "Fatnaður - Karlar" },
-    { value: "Fatnaður - Börn", label: "Fatnaður - Börn" },
-    { value: "Skór", label: "Skór" },
-    { value: "Íþróttavörur", label: "Íþróttavörur" },
-    { value: "Leikföng & börn", label: "Leikföng & börn" },
-  ],
-  "Heimili & Húsgögn": [
-    { value: "Heimili & húsgögn", label: "Heimili & húsgögn" },
-  ],
-  "Tækni & Rafmagn": [{ value: "Raftæki", label: "Raftæki" }],
-  "Beauty, Heilsu & Þjónusta": [
-    { value: "Snyrtivörur", label: "Snyrtivörur" },
-    { value: "Heilsuþjónusta", label: "Heilsuþjónusta" },
-    { value: "Annað", label: "Annað" },
-  ],
-};
 
 type PlanId = "basic" | "pro" | "premium";
 
@@ -211,6 +183,7 @@ function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
   const remaining = getTimeRemaining(endsAt);
 
   if (typeof remaining === "string") {
+    // ef util skilar streng, notum hann beint (t.d. "Útsölunni er lokið")
     return remaining;
   }
 
@@ -234,6 +207,7 @@ function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
       return "1 dagur eftir af tilboðinu";
     }
 
+    // Engir heilir dagar eftir en samt í gangi
     if (hours > 0) {
       return "Endar innan 24 klst";
     }
@@ -281,62 +255,43 @@ export default function Profile() {
   const { authUser, isStore, logout } = useAuth();
 
   const store: StoreInfo | null = authUser?.store ?? null;
+
+  // NÝTT: er notandinn admin út frá role?
   const isAdmin = authUser?.user?.role === "admin";
 
+  // Billing + pakki koma frá backend í stað localStorage
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
 
+  // Valinn pakki í UI (það sem user smellir á)
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
 
+  // Staðbundin skilaboð fyrir notanda
   const [planSuccessMsg, setPlanSuccessMsg] = useState<string | null>(null);
   const [planErrorMsg, setPlanErrorMsg] = useState<string | null>(null);
   const [activatingPlanId, setActivatingPlanId] = useState<PlanId | null>(null);
 
+  // Eyðing tilboða
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // NÝTT: valdir flokkar verslunar (allt að 3)
   const [selectedStoreCategories, setSelectedStoreCategories] = useState<
     string[]
   >(store?.categories ?? []);
-
-  const [selectedStoreSubcategories, setSelectedStoreSubcategories] = useState<
-    string[]
-  >(store?.subcategories ?? []);
-
   const [savingCategories, setSavingCategories] = useState(false);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
   const [categoriesSuccess, setCategoriesSuccess] = useState<string | null>(
     null,
   );
 
-  const [editName, setEditName] = useState<string>(store?.name ?? "");
-  const [editAddress, setEditAddress] = useState<string>(store?.address ?? "");
-  const [editPhone, setEditPhone] = useState<string>(store?.phone ?? "");
-  const [editWebsite, setEditWebsite] = useState<string>(store?.website ?? "");
-  const [storeSaveLoading, setStoreSaveLoading] = useState(false);
-  const [storeSaveError, setStoreSaveError] = useState<string | null>(null);
-  const [storeSaveSuccess, setStoreSaveSuccess] = useState<string | null>(null);
-
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordSaving, setPasswordSaving] = useState(false);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
-
+  // Synca local state þegar store.categories uppfærist frá backend
   useEffect(() => {
     setSelectedStoreCategories(store?.categories ?? []);
-    setSelectedStoreSubcategories(store?.subcategories ?? []);
-  }, [store?.categories, store?.subcategories]);
+  }, [store?.categories]);
 
-  useEffect(() => {
-    setEditName(store?.name ?? "");
-    setEditAddress(store?.address ?? "");
-    setEditPhone(store?.phone ?? "");
-    setEditWebsite(store?.website ?? "");
-  }, [store?.id, store?.name, store?.address, store?.phone, store?.website]);
-
+  // Tilboð verslunar
   const {
     data: storePosts = [],
     isLoading: loadingPosts,
@@ -350,11 +305,11 @@ export default function Profile() {
     },
   });
 
+  // Sækjum billing info úr backend þegar verslun er til
   useEffect(() => {
     if (!store?.id) return;
 
     let cancelled = false;
-
     async function loadBilling() {
       setBillingLoading(true);
       setBillingError(null);
@@ -363,6 +318,7 @@ export default function Profile() {
         if (!cancelled) {
           setBilling(data);
 
+          // Stillum valinn pakka út frá backend plan
           const backendPlan = (data.plan || "").toLowerCase();
           if (
             backendPlan === "basic" ||
@@ -382,7 +338,9 @@ export default function Profile() {
           );
         }
       } finally {
-        if (!cancelled) setBillingLoading(false);
+        if (!cancelled) {
+          setBillingLoading(false);
+        }
       }
     }
 
@@ -392,22 +350,15 @@ export default function Profile() {
     };
   }, [store?.id]);
 
-  const isBillingActive = billing?.billingStatus === "active";
-
   const trialActive =
-    billing !== null &&
-    billing.billingStatus === "trial" &&
-    !billing.trialExpired &&
-    !!billing.trialEndsAt;
+    billing !== null && !billing.trialExpired && !!billing.trialEndsAt;
 
   const trialLabel =
-    billing && billing.billingStatus === "trial"
-      ? billing.trialExpired
-        ? "Frí prufuvika er runnin út"
-        : billing.trialEndsAt
-          ? getTrialLabel(billing.trialEndsAt)
-          : null
-      : null;
+    billing && billing.trialExpired
+      ? "Frí prufuvika er runnin út"
+      : billing && billing.trialEndsAt && !billing.trialExpired
+        ? getTrialLabel(billing.trialEndsAt)
+        : null;
 
   const activePlan: PlanId | null =
     billing &&
@@ -426,48 +377,21 @@ export default function Profile() {
   const mainButtonDisabled =
     !selectedPlan || billingLoading || !!activatingPlanId;
 
-  let mainButtonLabel: string;
-  if (!selectedPlan) {
-    mainButtonLabel = "Veldu áskriftarleið";
-  } else if (isBillingActive) {
-    mainButtonLabel = "Uppfæra í þennan pakka";
-  } else if (trialActive) {
-    mainButtonLabel = "Uppfæra í þennan pakka";
-  } else if (billing?.trialEndsAt && billing.trialExpired) {
-    mainButtonLabel = "Virkja áskrift á þessum pakka";
-  } else {
-    mainButtonLabel = "Virkja fríviku á þessum pakka";
-  }
+  const mainButtonLabel = !selectedPlan
+    ? "Veldu áskriftarleið til að byrja fríviku"
+    : trialActive
+      ? "Uppfæra í þennan pakka"
+      : "Virkja fríviku á þessum pakka";
 
   function toggleStoreCategory(cat: string) {
     if (selectedStoreCategories.includes(cat)) {
       setSelectedStoreCategories(
         selectedStoreCategories.filter((c) => c !== cat),
       );
-      const subs = STORE_SUBCATEGORY_OPTIONS[cat] ?? [];
-      if (subs.length) {
-        const subValues = subs.map((s) => s.value);
-        setSelectedStoreSubcategories((prev) =>
-          prev.filter((v) => !subValues.includes(v)),
-        );
-      }
     } else {
       if (selectedStoreCategories.length >= 3) return;
       setSelectedStoreCategories([...selectedStoreCategories, cat]);
     }
-  }
-
-  function toggleStoreSubcategory(parentCategory: string, subValue: string) {
-    if (!selectedStoreCategories.includes(parentCategory)) {
-      if (selectedStoreCategories.length >= 3) return;
-      setSelectedStoreCategories([...selectedStoreCategories, parentCategory]);
-    }
-
-    setSelectedStoreSubcategories((prev) =>
-      prev.includes(subValue)
-        ? prev.filter((v) => v !== subValue)
-        : [...prev, subValue],
-    );
   }
 
   async function handleSaveCategories() {
@@ -480,7 +404,6 @@ export default function Profile() {
     try {
       const body = {
         categories: selectedStoreCategories,
-        subcategories: selectedStoreSubcategories,
       };
 
       const updated = await apiFetch<StoreInfo>("/api/v1/stores/me", {
@@ -489,7 +412,6 @@ export default function Profile() {
       });
 
       setSelectedStoreCategories(updated.categories ?? []);
-      setSelectedStoreSubcategories(updated.subcategories ?? []);
       setCategoriesSuccess("Flokkar verslunar hafa verið vistaðir.");
     } catch (err) {
       console.error("save categories error:", err);
@@ -501,65 +423,22 @@ export default function Profile() {
     }
   }
 
-  async function handleSaveStoreInfo() {
-    if (!store?.id) return;
-
-    setStoreSaveLoading(true);
-    setStoreSaveError(null);
-    setStoreSaveSuccess(null);
-
-    try {
-      const body = {
-        name: editName,
-        address: editAddress,
-        phone: editPhone,
-        website: editWebsite,
-      };
-
-      const updated = await apiFetch<StoreInfo>("/api/v1/stores/me", {
-        method: "PUT",
-        body: JSON.stringify(body),
-      });
-
-      setEditName(updated.name ?? "");
-      setEditAddress(updated.address ?? "");
-      setEditPhone(updated.phone ?? "");
-      setEditWebsite(updated.website ?? "");
-
-      setStoreSaveSuccess("Upplýsingar verslunar hafa verið uppfærðar.");
-    } catch (err) {
-      console.error("save store info error:", err);
-      setStoreSaveError(
-        "Tókst ekki að uppfæra upplýsingar verslunar. Reyndu aftur eða hafðu samband ef vandinn heldur áfram.",
-      );
-    } finally {
-      setStoreSaveLoading(false);
-    }
-  }
-
   async function handleActivatePlan() {
     if (!store?.id) return;
     if (!selectedPlan) return;
-
-    const wasBillingActive = billing?.billingStatus === "active";
-    const wasTrialActive =
-      billing !== null &&
-      billing.billingStatus === "trial" &&
-      !billing.trialExpired &&
-      !!billing.trialEndsAt;
-    const wasTrialExpired =
-      !!billing?.trialEndsAt && billing.trialExpired === true;
 
     setPlanErrorMsg(null);
     setPlanSuccessMsg(null);
     setActivatingPlanId(selectedPlan);
 
     try {
+      // Virkjum / uppfærum pakka í backend
       await apiFetch<StoreInfo>("/api/v1/stores/activate-plan", {
         method: "POST",
         body: JSON.stringify({ plan: selectedPlan }),
       });
 
+      // Sækjum nýjustu billing stöðu eftir breytingu
       const updatedBilling = await apiFetch<BillingInfo>(
         "/api/v1/stores/me/billing",
       );
@@ -568,17 +447,15 @@ export default function Profile() {
       const planName =
         PLANS.find((p) => p.id === selectedPlan)?.name || "pakkann";
 
-      if (wasBillingActive || wasTrialActive) {
+      if (trialActive) {
         setPlanSuccessMsg(`Pakkinn þinn hefur verið uppfærður í ${planName}.`);
-      } else if (wasTrialExpired) {
-        setPlanSuccessMsg(
-          `Áskrift þín hefur verið virkjuð í ${planName} pakka.`,
-        );
       } else {
         setPlanSuccessMsg(
           `Frívika þín hefur verið virkjuð í ${planName} pakka.`,
         );
       }
+
+      // Enginn redirect – notandi er áfram á prófílnum
     } catch (err) {
       console.error("activate-plan error:", err);
       let msg =
@@ -590,9 +467,11 @@ export default function Profile() {
       if (match) {
         try {
           const parsed = JSON.parse(match[0]);
-          if (parsed.message) msg = parsed.message;
+          if (parsed.message) {
+            msg = parsed.message;
+          }
         } catch {
-          // ignore
+          // höldum msg óbreyttri ef parse klikkar
         }
       }
 
@@ -619,6 +498,7 @@ export default function Profile() {
         method: "DELETE",
       });
 
+      // Uppfærum listann – einfaldast að láta react-query refetcha
       await queryClient.invalidateQueries({
         queryKey: ["store-posts", store?.id],
       });
@@ -632,46 +512,6 @@ export default function Profile() {
     }
   }
 
-  async function handleChangePassword() {
-    setPasswordSaving(true);
-    setPasswordError(null);
-    setPasswordSuccess(null);
-
-    try {
-      if (!currentPassword || !newPassword) {
-        setPasswordError("Vinsamlegast sláðu inn núverandi og nýtt lykilorð.");
-        setPasswordSaving(false);
-        return;
-      }
-
-      if (newPassword !== confirmPassword) {
-        setPasswordError("Nýju lykilorðin passa ekki saman.");
-        setPasswordSaving(false);
-        return;
-      }
-
-      await apiFetch("/api/v1/auth/change-password", {
-        method: "POST",
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
-      });
-
-      setPasswordSuccess("Lykilorð hefur verið uppfært.");
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (err) {
-      console.error("change password error", err);
-      setPasswordError(
-        "Tókst ekki að uppfæra lykilorð. Gakktu úr skugga um að núverandi lykilorð sé rétt og reyndu aftur.",
-      );
-    } finally {
-      setPasswordSaving(false);
-    }
-  }
-
   async function handleLogout() {
     await logout();
     navigate("/login", { replace: true });
@@ -680,13 +520,13 @@ export default function Profile() {
   if (!authUser || !isStore || !store) {
     return (
       <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
-        <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
+        <Card className="p-4 space-y-3">
+          <p className="text-sm">
             Þú þarft að vera innskráður sem verslun til að sjá prófíl.
           </p>
           <Button
             onClick={() => navigate("/login")}
-            className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm"
+            className="bg-[#FF7300] hover:bg-[#e56600] text-white text-sm"
           >
             Skrá inn
           </Button>
@@ -695,7 +535,8 @@ export default function Profile() {
     );
   }
 
-  const canCreateOffers = !!billing && (isBillingActive || trialActive);
+  const canCreateOffers =
+    billing && !billing.trialExpired && !!billing.trialEndsAt;
 
   const createdAtLabel = formatDate(
     store.createdAt ?? billing?.createdAt ?? null,
@@ -706,9 +547,7 @@ export default function Profile() {
       {/* Haus: hver er innskráður */}
       <header className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">
-            Prófíll verslunar
-          </h1>
+          <h1 className="text-lg font-semibold">Prófíll verslunar</h1>
           <p className="text-xs text-muted-foreground">
             Innskráður sem {authUser.user.email} (verslun
             {isAdmin ? " – ADMIN" : ""})
@@ -724,81 +563,44 @@ export default function Profile() {
         </Button>
       </header>
 
-      {/* Upplýsingar um verslun + editable form */}
-      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
-        <h2 className="text-sm font-semibold text-foreground">Verslun</h2>
-        <p className="text-xs text-muted-foreground">
-          Hér getur þú uppfært helstu upplýsingar verslunar eins og þær birtast
-          í ÚtsalApp.
+      {/* Upplýsingar um verslun */}
+      <Card className="p-4 space-y-2">
+        <h2 className="text-sm font-semibold mb-1">Verslun</h2>
+        <p className="text-sm">
+          <span className="font-medium">Nafn:</span> {store.name}
         </p>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
-            <label className="text-xs font-medium text-foreground">
-              Nafn verslunar
-            </label>
-            <input
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">
-              Heimilisfang
-            </label>
-            <input
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={editAddress}
-              onChange={(e) => setEditAddress(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">Sími</label>
-            <input
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={editPhone}
-              onChange={(e) => setEditPhone(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">
-              Vefsíða
-            </label>
-            <input
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={editWebsite}
-              onChange={(e) => setEditWebsite(e.target.value)}
-            />
-          </div>
-        </div>
-
+        {store.address && (
+          <p className="text-sm">
+            <span className="font-medium">Heimilisfang:</span> {store.address}
+          </p>
+        )}
+        {store.phone && (
+          <p className="text-sm">
+            <span className="font-medium">Sími:</span> {store.phone}
+          </p>
+        )}
+        {store.website && (
+          <p className="text-sm">
+            <span className="font-medium">Vefsíða:</span>{" "}
+            <a
+              href={store.website}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#FF7300] underline"
+            >
+              {store.website}
+            </a>
+          </p>
+        )}
         {createdAtLabel && (
-          <p className="text-xs text-foreground">
+          <p className="text-sm">
             <span className="font-medium">Stofnað í ÚtsalApp:</span>{" "}
             {createdAtLabel}
           </p>
         )}
 
-        {storeSaveError && (
-          <p className="text-xs text-destructive">{storeSaveError}</p>
-        )}
-        {storeSaveSuccess && (
-          <p className="text-xs text-foreground">{storeSaveSuccess}</p>
-        )}
-
-        <Button
-          size="sm"
-          className="mt-1 text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-          onClick={handleSaveStoreInfo}
-          disabled={storeSaveLoading}
-        >
-          {storeSaveLoading ? "Vista breytingar…" : "Vista breytingar"}
-        </Button>
-
-        {/* Áskriftarupplýsingar í sama korti */}
-        <div className="pt-3 border-t border-border mt-3 space-y-1 text-sm">
-          <p className="text-foreground">
+        <div className="pt-2 space-y-1 text-sm">
+          <p>
             <span className="font-medium">Valinn pakki:</span>{" "}
             {displayPlan === "basic"
               ? "Basic"
@@ -808,39 +610,27 @@ export default function Profile() {
                   ? "Premium"
                   : "Engin áskrift valin"}
           </p>
-
           {trialLabel && (
-            <p className="text-sm text-foreground">
+            <p>
               <span className="font-medium">Prufutímabil:</span> {trialLabel}
             </p>
           )}
-
-          {!trialLabel && !isBillingActive && (
+          {!trialLabel && (
             <p className="text-sm text-muted-foreground">
               Engin frívika virk. Veldu áskriftarleið og smelltu á hnappinn hér
               fyrir neðan til að byrja.
             </p>
           )}
-
-          {isBillingActive && (
-            <p className="text-sm text-foreground">
-              <span className="font-medium">Áskrift:</span> Virk
-            </p>
-          )}
-
-          <p className="text-sm text-foreground">
+          <p>
             <span className="font-medium">Greiðslustaða:</span> {billingLabel}
           </p>
         </div>
 
-        {/* Flokkar verslunar */}
-        <div className="mt-4 border-t border-border pt-3 space-y-2">
-          <h3 className="text-sm font-semibold text-foreground">
-            Flokkar verslunar
-          </h3>
+        {/* NÝTT: flokkar verslunar – allt að 3 valdir */}
+        <div className="mt-4 border-t pt-3 space-y-2">
+          <h3 className="text-sm font-semibold">Flokkar verslunar</h3>
           <p className="text-xs text-muted-foreground">
-            Merktu við allt að 3 megaflokka sem lýsa best versluninni þinni og
-            veldu síðan viðeigandi undirflokka.
+            Merktu við allt að 3 flokka sem lýsa best versluninni þinni.
           </p>
 
           <div className="flex flex-col gap-1">
@@ -852,11 +642,11 @@ export default function Profile() {
               return (
                 <label
                   key={cat}
-                  className="flex items-center gap-2 text-sm cursor-pointer text-foreground"
+                  className="flex items-center gap-2 text-sm cursor-pointer"
                 >
                   <input
                     type="checkbox"
-                    className="h-4 w-4 accent-[hsl(var(--primary))]"
+                    className="h-4 w-4"
                     checked={checked}
                     disabled={disableCheckbox}
                     onChange={() => toggleStoreCategory(cat)}
@@ -867,65 +657,17 @@ export default function Profile() {
             })}
           </div>
 
-          {/* Undirflokkar */}
-          {selectedStoreCategories.length > 0 && (
-            <div className="pt-2 space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Veldu undirflokka undir völdum megaflokkum. Þetta birtist hjá
-                prófíl verslunar.
-              </p>
-
-              <div className="space-y-2">
-                {selectedStoreCategories.map((parent) => {
-                  const subs = STORE_SUBCATEGORY_OPTIONS[parent] ?? [];
-                  if (!subs.length) return null;
-
-                  return (
-                    <div key={parent} className="space-y-1">
-                      <p className="text-xs font-semibold text-foreground">
-                        {parent}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {subs.map((sub) => {
-                          const checked = selectedStoreSubcategories.includes(
-                            sub.value,
-                          );
-                          return (
-                            <button
-                              key={sub.value}
-                              type="button"
-                              onClick={() =>
-                                toggleStoreSubcategory(parent, sub.value)
-                              }
-                              className={`px-3 py-1 rounded-full border text-xs transition-colors ${
-                                checked
-                                  ? "bg-accent text-accent-foreground border-accent"
-                                  : "bg-card text-foreground border-border hover:bg-muted"
-                              }`}
-                            >
-                              {sub.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {categoriesError && (
-            <p className="text-xs text-destructive">{categoriesError}</p>
+            <p className="text-xs text-red-600">{categoriesError}</p>
           )}
           {categoriesSuccess && (
-            <p className="text-xs text-foreground">{categoriesSuccess}</p>
+            <p className="text-xs text-green-600">{categoriesSuccess}</p>
           )}
 
           <div className="pt-1">
             <Button
               size="sm"
-              className="text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="text-xs bg-[#FF7300] hover:bg-[#e56600] text-white disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleSaveCategories}
               disabled={savingCategories}
             >
@@ -935,71 +677,46 @@ export default function Profile() {
         </div>
       </Card>
 
-      {/* Pakkar + frívika / áskrift */}
-      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
+      {/* Pakkar + frívika */}
+      <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">
-            Pakkar og frívika / áskrift
-          </h2>
+          <h2 className="text-sm font-semibold">Pakkar og frívika</h2>
         </div>
 
         {billingLoading && (
           <p className="text-xs text-muted-foreground">Sæki stöðu áskriftar…</p>
         )}
 
-        {billingError && (
-          <p className="text-xs text-destructive">{billingError}</p>
+        {billingError && <p className="text-xs text-red-600">{billingError}</p>}
+
+        {!billingLoading && !billingError && !trialActive && (
+          <p className="text-xs text-muted-foreground">
+            Veldu pakka sem hentar versluninni þinni. Smelltu svo á hnappinn hér
+            fyrir neðan til að virkja 7 daga fríviku á valda áskrift.
+          </p>
         )}
 
-        {!billingLoading && !billingError && (
-          <>
-            {isBillingActive && activePlan && (
-              <p className="text-xs text-foreground">
-                <span className="font-medium">Áskrift:</span> Virk á{" "}
-                <span className="font-medium">
-                  {activePlan === "basic"
-                    ? "Basic"
-                    : activePlan === "pro"
-                      ? "Pro"
-                      : "Premium"}
-                </span>
-                .
-              </p>
-            )}
-
-            {!isBillingActive && trialActive && activePlan && (
-              <p className="text-xs text-foreground">
-                <span className="font-medium">Frívika:</span> Virk á{" "}
-                <span className="font-medium">
-                  {activePlan === "basic"
-                    ? "Basic"
-                    : activePlan === "pro"
-                      ? "Pro"
-                      : "Premium"}
-                </span>
-                .
-              </p>
-            )}
-
-            {!isBillingActive && !trialActive && (
-              <p className="text-xs text-muted-foreground">
-                Veldu pakka sem hentar versluninni þinni. Smelltu svo á hnappinn
-                hér fyrir neðan til að{" "}
-                {billing?.trialEndsAt && billing.trialExpired
-                  ? "virkja áskrift á valda pakka."
-                  : "virkja 7 daga fríviku á valda áskrift."}
-              </p>
-            )}
-          </>
+        {!billingLoading && !billingError && trialActive && activePlan && (
+          <p className="text-xs text-[#059669]">
+            Frí prufuvika er virk á pakkann{" "}
+            <span className="font-medium">
+              {activePlan === "basic"
+                ? "Basic"
+                : activePlan === "pro"
+                  ? "Pro"
+                  : "Premium"}
+            </span>
+            .
+          </p>
         )}
 
-        {planErrorMsg && (
-          <p className="text-xs text-destructive">{planErrorMsg}</p>
-        )}
+        {planErrorMsg && <p className="text-xs text-red-600">{planErrorMsg}</p>}
+
         {planSuccessMsg && (
-          <p className="text-xs text-foreground">{planSuccessMsg}</p>
+          <p className="text-xs text-green-600">{planSuccessMsg}</p>
         )}
 
+        {/* Pakkarnir sjálfir */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {PLANS.map((plan) => {
             const isSelected = selectedPlan === plan.id;
@@ -1009,44 +726,30 @@ export default function Profile() {
             return (
               <div
                 key={plan.id}
-                className={`border rounded-lg p-3 text-xs flex flex-col gap-2 cursor-pointer transition-colors ${
+                className={`border rounded-lg p-3 text-xs flex flex-col gap-2 cursor-pointer ${
                   isSelected
-                    ? "border-primary bg-muted"
-                    : "border-border bg-card hover:bg-muted"
+                    ? "border-[#FF7300] bg-orange-50"
+                    : "border-gray-200 bg-white hover:bg-gray-50"
                 }`}
                 onClick={() => setSelectedPlan(plan.id)}
               >
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-sm font-semibold text-foreground">
-                    {plan.name}
-                  </h3>
-                  <span className="font-bold text-foreground">
-                    {plan.price}
-                  </span>
+                  <h3 className="text-sm font-semibold">{plan.name}</h3>
+                  <span className="font-bold">{plan.price}</span>
                 </div>
-
                 <p className="text-[11px] text-muted-foreground">
                   {plan.description}
                 </p>
-
                 {isSelected && (
-                  <p className="text-[11px] text-primary font-medium">
+                  <p className="text-[11px] text-[#FF7300] font-medium">
                     Valin áskriftarleið
                   </p>
                 )}
-
                 {isActive && trialActive && (
-                  <p className="text-[11px] text-foreground font-medium">
+                  <p className="text-[11px] text-[#059669] font-medium">
                     Frívika virk á þessum pakka
                   </p>
                 )}
-
-                {isActive && isBillingActive && (
-                  <p className="text-[11px] text-foreground font-medium">
-                    Áskrift virk á þessum pakka
-                  </p>
-                )}
-
                 {isActivating && (
                   <p className="text-[11px] text-muted-foreground">
                     Uppfæri pakka…
@@ -1057,9 +760,10 @@ export default function Profile() {
           })}
         </div>
 
+        {/* EINN hnappur fyrir neðan pakkana */}
         <div className="pt-2">
           <Button
-            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white text-xs disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={mainButtonDisabled}
             onClick={handleActivatePlan}
           >
@@ -1069,101 +773,34 @@ export default function Profile() {
       </Card>
 
       {/* Aðgerðir fyrir verslun */}
-      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
-        <h2 className="text-sm font-semibold text-foreground">Aðgerðir</h2>
+      <Card className="p-4 space-y-3">
+        <h2 className="text-sm font-semibold">Aðgerðir</h2>
         <div className="flex flex-wrap gap-2 items-center">
           <Button
-            className="bg-primary text-primary-foreground hover:bg-primary/90 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-[#FF7300] hover:bg-[#e56600] text-white text-xs disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => navigate("/create-post")}
             disabled={!canCreateOffers}
           >
             Búa til nýtt tilboð
           </Button>
-
           {!canCreateOffers && (
             <p className="text-[11px] text-muted-foreground">
-              Virkjaðu fríviku eða áskrift til að byrja að setja inn tilboð.
+              Virkjaðu fríviku til að byrja að setja inn tilboð.
             </p>
           )}
         </div>
       </Card>
 
-      {/* Breyta lykilorði */}
-      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
-        <h2 className="text-sm font-semibold text-foreground">
-          Breyta lykilorði
-        </h2>
-        <p className="text-xs text-muted-foreground">
-          Hér getur þú uppfært innskráningarlykilorðið fyrir þína verslun.
-        </p>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <div>
-            <label className="text-xs font-medium text-foreground">
-              Núverandi lykilorð
-            </label>
-            <input
-              type="password"
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">
-              Nýtt lykilorð
-            </label>
-            <input
-              type="password"
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-foreground">
-              Staðfesting á nýju lykilorði
-            </label>
-            <input
-              type="password"
-              className="mt-1 w-full rounded border border-border bg-card px-3 py-2 text-sm text-foreground"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {passwordError && (
-          <p className="text-xs text-destructive">{passwordError}</p>
-        )}
-        {passwordSuccess && (
-          <p className="text-xs text-foreground">{passwordSuccess}</p>
-        )}
-
-        <Button
-          size="sm"
-          className="text-xs bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed"
-          onClick={handleChangePassword}
-          disabled={passwordSaving}
-        >
-          {passwordSaving ? "Uppfæri lykilorð…" : "Uppfæra lykilorð"}
-        </Button>
-      </Card>
-
       {/* Tilboð verslunar */}
-      <Card className="p-4 space-y-3 bg-card text-card-foreground border border-border">
+      <Card className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">
-            Tilboð verslunar
-          </h2>
+          <h2 className="text-sm font-semibold">Tilboð verslunar</h2>
           <p className="text-[11px] text-muted-foreground">
             {storePosts.length} tilboð
           </p>
         </div>
 
-        {deleteError && (
-          <p className="text-xs text-destructive">{deleteError}</p>
-        )}
+        {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
 
         {loadingPosts && (
           <p className="text-xs text-muted-foreground">
@@ -1172,22 +809,22 @@ export default function Profile() {
         )}
 
         {postsError && !loadingPosts && (
-          <p className="text-xs text-destructive">
+          <p className="text-xs text-red-600">
             Tókst ekki að sækja tilboð verslunar.
           </p>
         )}
 
         {!loadingPosts && !postsError && storePosts.length === 0 && (
           <p className="text-xs text-muted-foreground">
-            Þú ert ekki enn búinn að skrá nein tilboð. Þegar frívikan eða
-            áskrift er virk, getur þú smellt á „Búa til nýtt tilboð“ til að
-            byrja.
+            Þú ert ekki enn búinn að skrá nein tilboð. Þegar frívikan er virk,
+            getur þú smellt á „Búa til nýtt tilboð“ til að byrja.
           </p>
         )}
 
         {!loadingPosts && !postsError && storePosts.length > 0 && (
           <div className="space-y-3">
             {storePosts.map((post) => {
+              // --- MYNDABREYTING: byggjum rétta slóð ---
               const rawImageUrl = post.images?.[0]?.url ?? "";
               let firstImageUrl = "";
 
@@ -1197,13 +834,17 @@ export default function Profile() {
                   rawImageUrl.startsWith("https://") ||
                   rawImageUrl.startsWith("data:")
                 ) {
+                  // Full slóð eða data-URL
                   firstImageUrl = rawImageUrl;
                 } else if (API_BASE_URL) {
+                  // Relative slóð (t.d. /uploads/xxx) → hengjum API_BASE_URL fyrir framan
                   firstImageUrl = `${API_BASE_URL}${rawImageUrl}`;
                 } else {
+                  // Dev-tilvik þar sem API_BASE_URL er tómt – höldum gamla hegðun
                   firstImageUrl = rawImageUrl;
                 }
               }
+              // --- MYNDABREYTING ENDAR HÉR ---
 
               const isDeleting = deletingPostId === post.id;
               const timeRemainingLabel = getPostTimeRemainingLabel(post.endsAt);
@@ -1211,7 +852,7 @@ export default function Profile() {
               return (
                 <div
                   key={post.id}
-                  className="border border-border rounded-md p-3 text-sm flex gap-3 cursor-pointer hover:bg-muted transition-colors"
+                  className="border border-gray-200 rounded-md p-3 text-sm flex gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => navigate(`/post/${post.id}`)}
                 >
                   {firstImageUrl && (
@@ -1225,30 +866,25 @@ export default function Profile() {
                   <div className="flex-1 min-w-0 flex flex-col gap-1">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium truncate text-foreground">
-                          {post.title}
-                        </p>
-
+                        <p className="font-medium truncate">{post.title}</p>
                         {post.category && (
                           <p className="text-[11px] text-muted-foreground truncate">
                             Flokkur: {getCategoryDisplayLabel(post.category)}
                           </p>
                         )}
-
                         {post.description && (
                           <p className="text-[11px] text-muted-foreground line-clamp-2">
                             {post.description}
                           </p>
                         )}
                       </div>
-
                       {typeof post.viewCount === "number" && (
                         <p className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
                           {post.viewCount} skoðanir
                           {timeRemainingLabel && (
                             <>
                               <br />
-                              <span className="text-[10px] text-muted-foreground">
+                              <span className="text-[10px] text-neutral-500">
                                 {timeRemainingLabel}
                               </span>
                             </>
@@ -1257,9 +893,10 @@ export default function Profile() {
                       )}
                     </div>
 
+                    {/* Ef engar skoðanir en viljum samt sýna dagafjölda */}
                     {typeof post.viewCount !== "number" &&
                       timeRemainingLabel && (
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-[11px] text-neutral-500">
                           {timeRemainingLabel}
                         </p>
                       )}
@@ -1271,7 +908,7 @@ export default function Profile() {
                         </span>
                       )}
                       {typeof post.priceSale === "number" && (
-                        <span className="font-semibold text-foreground">
+                        <span className="font-semibold">
                           {post.priceSale.toLocaleString("is-IS")} kr.
                         </span>
                       )}
@@ -1290,11 +927,10 @@ export default function Profile() {
                       >
                         Breyta tilboði
                       </Button>
-
                       <Button
                         variant="outline"
                         size="sm"
-                        className="text-xs border-destructive text-destructive hover:bg-muted w-full sm:w-auto"
+                        className="text-xs border-red-500 text-red-600 hover:bg-red-50 w-full sm:w-auto"
                         disabled={isDeleting}
                         onClick={(e) => {
                           e.stopPropagation();

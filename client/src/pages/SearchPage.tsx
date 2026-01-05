@@ -30,7 +30,7 @@ export default function SearchPage() {
 
     return posts.filter((post) => {
       const title = post.title ?? "";
-      const description = (post as any).description ?? (post as any).body ?? "";
+      const description = post.description ?? "";
       const haystack = `${title} ${description}`.toLowerCase();
       return haystack.includes(q);
     });
@@ -39,10 +39,7 @@ export default function SearchPage() {
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
       <header>
-        <h1 className="text-xl font-semibold text-foreground">Leit</h1>
-        <p className="text-sm text-muted-foreground">
-          Finndu tilboð eftir titli eða lýsingu.
-        </p>
+        <h1 className="text-xl font-semibold text-white">Leit</h1>
       </header>
 
       <div>
@@ -50,31 +47,24 @@ export default function SearchPage() {
           placeholder="Sláðu inn leitarorð..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="bg-card text-foreground border border-border"
         />
       </div>
 
       {isLoading && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Er að hlaða tilboðum...
-          </p>
+        <Card className="p-4">
+          <p>Er að hlaða tilboðum...</p>
         </Card>
       )}
 
       {error && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Villa kom upp við að sækja tilboð.
-          </p>
+        <Card className="p-4">
+          <p>Villa kom upp við að sækja tilboð.</p>
         </Card>
       )}
 
       {!isLoading && !error && filteredPosts.length === 0 && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Engin tilboð fundust fyrir þessa leit.
-          </p>
+        <Card className="p-4">
+          <p>Engin tilboð fundust fyrir þessa leit.</p>
         </Card>
       )}
 

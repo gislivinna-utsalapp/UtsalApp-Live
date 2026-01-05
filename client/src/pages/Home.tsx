@@ -27,36 +27,29 @@ export default function Home() {
         <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-lg">
           <span className="text-3xl font-extrabold text-black">%</span>
         </div>
-
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-foreground">ÚtsalApp</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold text-white">ÚtsalApp</h1>
+          <p className="text-sm text-gray-200">
             Allar útsölur og bestu tilboðin nálægt þér.
           </p>
         </div>
       </header>
 
       {isLoading && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Er að hlaða tilboðum...
-          </p>
+        <Card className="p-4">
+          <p>Er að hlaða tilboðum...</p>
         </Card>
       )}
 
       {error && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Villa kom upp við að sækja tilboð.
-          </p>
+        <Card className="p-4">
+          <p>Villa kom upp við að sækja tilboð.</p>
         </Card>
       )}
 
       {!isLoading && !error && posts.length === 0 && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Engin tilboð skráð ennþá.
-          </p>
+        <Card className="p-4">
+          <p>Engin tilboð skráð ennþá.</p>
         </Card>
       )}
 

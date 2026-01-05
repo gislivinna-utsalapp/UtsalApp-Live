@@ -1,137 +1,89 @@
+// server/storage-db.ts
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { fileURLToPath } from "url";
+import type { User, Store, SalePost } from "@shared/schema";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const DB_FILE = path.join(process.cwd(), "database.json");
 
-const PROJECT_ROOT = path.resolve(__dirname, "..");
-const DB_FILE = process.env.DB_FILE ?? path.join(PROJECT_ROOT, "database.json");
-
-console.log("[db] Using database file:", DB_FILE);
-
-type DbUser = {
-  id: string;
-  email: string;
-  passwordHash: string;
-  role: "store" | "admin";
-  storeId?: string;
-};
-
-type DbStore = {
-  id: string;
-  name: string;
-  address?: string | null;
-  phone?: string | null;
-  website?: string | null;
-  logoUrl?: string;
-  ownerEmail?: string;
-
-  plan?: "basic" | "pro" | "premium";
-  trialEndsAt?: string | null;
-  billingStatus?: "trial" | "active" | "expired";
-  isBanned?: boolean;
-
-  categories?: string[];
-  subcategories?: string[];
-
-  // legacy (til að brjóta ekki eldri gögn)
-  planType?: any;
-  billingActive?: any;
-
-  createdAt?: string | null;
-};
-
-type DbPost = {
-  id: string;
-  title: string;
-  description?: string;
-  category: string;
-
-  price?: number; // new
-  oldPrice?: number; // new
-  priceSale?: number; // legacy
-  priceOriginal?: number; // legacy
-
-  imageUrl?: string;
-
-  storeId: string;
-
-  buyUrl?: string | null;
-  startsAt?: string | null;
-  endsAt?: string | null;
-
-  createdAt?: string;
-  viewCount?: number;
-};
-
-type DatabaseShape = {
-  users: DbUser[];
-  stores: DbStore[];
-  posts: DbPost[];
-};
-
-function ensureDbFileExists() {
-  const dir = path.dirname(DB_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(DB_FILE)) {
-    const initial: DatabaseShape = {
-      users: [],
-      stores: [],
-      posts: [],
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
-  }
+interface DatabaseShape {
+  users: User[];
+  stores: (Store & Record<string, any>)[];
+  posts: (SalePost & Record<string, any>)[];
 }
 
 function loadDatabase(): DatabaseShape {
-  ensureDbFileExists();
+  if (!fs.existsSync(DB_FILE)) {
+    const initial: DatabaseShape = { users: [], stores: [], posts: [] };
+    fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
+    return initial;
+  }
   const raw = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-  return {
+
+  // Tryggjum shape
+  const db: DatabaseShape = {
     users: raw.users ?? [],
     stores: raw.stores ?? [],
     posts: raw.posts ?? [],
   };
+
+  return db;
 }
 
 function saveDatabase(db: DatabaseShape) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
 }
 
-class DbStorage {
-  db: DatabaseShape;
+export class DbStorage {
+  private db: DatabaseShape;
 
   constructor() {
     this.db = loadDatabase();
 
-    // Mild migration / normalization
+    // "Migration": samræma plan / trial / billing reiti
     let changed = false;
-    for (const s of this.db.stores) {
+
+    for (const s of this.db.stores as any[]) {
+      // Gamli reiturinn: planType -> nýtt: plan
       if (s.plan === undefined) {
-        s.plan = (s.planType as any) ?? "basic";
+        if (s.planType !== undefined) {
+          s.plan = s.planType;
+        } else {
+          s.plan = "basic";
+        }
         changed = true;
       }
+
+      // trialEndsAt má vera null en ekki undefined
       if (s.trialEndsAt === undefined) {
         s.trialEndsAt = null;
         changed = true;
       }
+
+      // Gamli reiturinn: billingActive -> nýtt: billingStatus
       if (s.billingStatus === undefined) {
-        s.billingStatus = s.billingActive === true ? "active" : "trial";
+        if (s.billingActive === true) {
+          s.billingStatus = "active";
+        } else {
+          // default: verslun í trial nema annað sé skilgreint
+          s.billingStatus = "trial";
+        }
         changed = true;
       }
+
+      // NÝTT: tryggjum að categories sé til sem fylki
       if (s.categories === undefined) {
         s.categories = [];
         changed = true;
       }
+
+      // Hreinsa gamla reiti ef þeir eru til
       if (s.planType !== undefined) {
-        delete (s as any).planType;
+        delete s.planType;
         changed = true;
       }
       if (s.billingActive !== undefined) {
-        delete (s as any).billingActive;
+        delete s.billingActive;
         changed = true;
       }
     }
@@ -141,145 +93,138 @@ class DbStorage {
     }
   }
 
-  // -------------------------
   // USERS
-  // -------------------------
-  async createUser(user: Omit<DbUser, "id">): Promise<DbUser> {
-    const newUser: DbUser = {
-      ...user,
-      id: crypto.randomUUID(),
-    };
+  async createUser(user: Omit<User, "id">): Promise<User> {
+    const newUser: User = { ...user, id: crypto.randomUUID() };
     this.db.users.push(newUser);
     saveDatabase(this.db);
     return newUser;
   }
 
-  async findUserByEmail(email: string): Promise<DbUser | undefined> {
-    return this.db.users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase(),
-    );
+  async findUserByEmail(email: string): Promise<User | undefined> {
+    return this.db.users.find((u) => u.email === email);
   }
 
-  async findUserById(id: string): Promise<DbUser | undefined> {
+  async findUserById(id: string): Promise<User | undefined> {
     return this.db.users.find((u) => u.id === id);
   }
 
   async updateUser(
     userId: string,
-    updates: Partial<DbUser>,
-  ): Promise<DbUser | null> {
+    updates: Partial<User> & Record<string, any>,
+  ): Promise<User | null> {
     const index = this.db.users.findIndex((u) => u.id === userId);
     if (index === -1) return null;
-    const updated = { ...this.db.users[index], ...updates };
+
+    const existing: any = this.db.users[index];
+    const updated: any = { ...existing, ...updates };
+
     this.db.users[index] = updated;
     saveDatabase(this.db);
-    return updated;
+
+    return updated as User;
   }
 
-  // -------------------------
   // STORES
-  // -------------------------
-  async createStore(store: Omit<DbStore, "id">): Promise<DbStore> {
-    const newStore: DbStore = {
+  async createStore(
+    store: Omit<Store, "id"> & Record<string, any>,
+  ): Promise<Store & any> {
+    const newStore: any = {
       ...store,
       id: crypto.randomUUID(),
-      plan: (store.plan as any) ?? "basic",
-      trialEndsAt: store.trialEndsAt ?? null,
-      billingStatus: (store.billingStatus as any) ?? "trial",
-      categories: store.categories ?? [],
     };
+
+    // Sjálfgefin gildi fyrir plan / trial / billing
+    if (newStore.plan === undefined) newStore.plan = "basic";
+    if (newStore.trialEndsAt === undefined) newStore.trialEndsAt = null;
+    if (newStore.billingStatus === undefined) newStore.billingStatus = "trial";
+    if (newStore.categories === undefined) newStore.categories = [];
+
     this.db.stores.push(newStore);
     saveDatabase(this.db);
-    return newStore;
+    return newStore as Store & any;
   }
 
-  async getStoreById(id: string): Promise<DbStore | undefined> {
-    return this.db.stores.find((s) => s.id === id);
+  async getStoreById(id: string): Promise<(Store & any) | undefined> {
+    return this.db.stores.find((s: any) => s.id === id) as any;
   }
 
-  async listStores(): Promise<DbStore[]> {
-    return this.db.stores;
+  async listStores(): Promise<(Store & any)[]> {
+    return this.db.stores as any;
   }
 
   async updateStore(
     storeId: string,
-    updates: Partial<DbStore>,
-  ): Promise<DbStore | null> {
-    const index = this.db.stores.findIndex((s) => s.id === storeId);
+    updates: Partial<Store> & Record<string, any>,
+  ): Promise<(Store & any) | null> {
+    const index = (this.db.stores as any[]).findIndex((s) => s.id === storeId);
     if (index === -1) return null;
 
-    const updated: DbStore = { ...this.db.stores[index], ...updates };
+    const existing: any = this.db.stores[index];
+    const updated: any = { ...existing, ...updates };
 
+    // Tryggjum gildi eftir update
     if (updated.plan === undefined) updated.plan = "basic";
     if (updated.trialEndsAt === undefined) updated.trialEndsAt = null;
-    if (updated.billingStatus === undefined) updated.billingStatus = "trial";
+    if (updated.billingStatus === undefined) {
+      updated.billingStatus = "trial";
+    }
     if (updated.categories === undefined) {
-      updated.categories = this.db.stores[index].categories ?? [];
+      updated.categories = existing.categories ?? [];
     }
 
-    this.db.stores[index] = updated;
+    (this.db.stores as any[])[index] = updated;
     saveDatabase(this.db);
-    return updated;
+
+    return updated as Store & any;
   }
 
-  async deleteStore(storeId: string): Promise<boolean> {
-    const before = this.db.stores.length;
-
-    this.db.stores = this.db.stores.filter((s) => s.id !== storeId);
-    this.db.posts = this.db.posts.filter((p) => p.storeId !== storeId);
-    this.db.users = this.db.users.filter((u) => u.storeId !== storeId);
-
-    if (this.db.stores.length !== before) {
-      saveDatabase(this.db);
-      return true;
-    }
-    return false;
-  }
-
-  // -------------------------
   // POSTS
-  // -------------------------
-  async createPost(post: Omit<DbPost, "id">): Promise<DbPost> {
-    const newPost: DbPost = { ...post, id: crypto.randomUUID() };
+  async createPost(
+    post: Omit<SalePost, "id"> & Record<string, any>,
+  ): Promise<SalePost & any> {
+    const newPost: any = { ...post, id: crypto.randomUUID() };
     this.db.posts.push(newPost);
     saveDatabase(this.db);
-    return newPost;
+    return newPost as SalePost & any;
   }
 
-  async listPosts(): Promise<DbPost[]> {
-    return this.db.posts;
+  async listPosts(): Promise<(SalePost & any)[]> {
+    return this.db.posts as any;
   }
 
-  async getPostsByStore(storeId: string): Promise<DbPost[]> {
-    return this.db.posts.filter((p) => p.storeId === storeId);
+  async getPostsByStore(storeId: string): Promise<(SalePost & any)[]> {
+    return this.db.posts.filter((p: any) => p.storeId === storeId) as any;
   }
 
-  async getPostById(postId: string): Promise<DbPost | undefined> {
-    return this.db.posts.find((p) => p.id === postId);
+  async getPostById(postId: string): Promise<(SalePost & any) | undefined> {
+    return this.db.posts.find((p: any) => p.id === postId) as any;
   }
 
   async updatePost(
     postId: string,
-    updates: Partial<DbPost>,
-  ): Promise<DbPost | null> {
+    updates: Partial<SalePost> & Record<string, any>,
+  ): Promise<(SalePost & any) | null> {
     const index = this.db.posts.findIndex((p) => p.id === postId);
     if (index === -1) return null;
-    const updated = { ...this.db.posts[index], ...updates };
+
+    const existing: any = this.db.posts[index];
+    const updated: any = { ...existing, ...updates };
+
     this.db.posts[index] = updated;
     saveDatabase(this.db);
-    return updated;
+
+    return updated as SalePost & any;
   }
 
   async deletePost(postId: string): Promise<boolean> {
-    const before = this.db.posts.length;
+    const original = this.db.posts.length;
     this.db.posts = this.db.posts.filter((p) => p.id !== postId);
-    if (this.db.posts.length !== before) {
-      saveDatabase(this.db);
-      return true;
-    }
-    return false;
+    const changed = this.db.posts.length !== original;
+
+    if (changed) saveDatabase(this.db);
+    return changed;
   }
 }
 
 export const storage = new DbStorage();
-export type { DbUser, DbStore, DbPost };

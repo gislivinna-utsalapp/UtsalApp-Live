@@ -4,49 +4,27 @@
 
 @layer base {
   :root {
-    /* ===== CORE ===== */
-    --background: 0 0% 100%;
-    /* hvítur */
-    --foreground: 222 47% 11%;
-    /* nær svartur */
+    --background: 0 0% 0%;
+    /* svartur */
+    --foreground: 0 0% 100%;
+    /* hvítur texti */
 
-    /* ===== SURFACES ===== */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    /* hvít kort */
+    --card-foreground: 0 0% 0%;
+    /* svartur texti í kortum */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-
-    /* ===== BRAND ===== */
-    --primary: 330 81% 60%;
-    /* BLEIKUR */
+    --primary: 25 100% 55%;
+    /* appelsínuguli glow-liturinn */
     --primary-foreground: 0 0% 100%;
 
-    --accent: 330 81% 60%;
-    /* BLEIKUR */
-    --accent-foreground: 0 0% 100%;
-
-    /* ===== NEUTRALS ===== */
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 330 81% 60%;
-    /* BLEIKUR focus */
-
-    /* ===== STATES ===== */
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 85%;
+    /* ljósgrár rammi */
+    --muted: 0 0% 70%;
+    --muted-foreground: 0 0% 50%;
   }
 
   body {
     @apply bg-background text-foreground;
   }
-}
-
-html,
-body {
-  background: #ffffff !important;
-  color: #111111 !important;
 }

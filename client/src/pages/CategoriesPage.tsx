@@ -62,7 +62,7 @@ const MEGA_CATEGORIES: MegaCategory[] = [
   {
     id: "events",
     name: "Viðburðir (t.d. Happy Hour)",
-    subcategories: [{ value: "Happy Hour", label: "Happy Hour" }],
+    subcategories: [],
   },
   {
     id: "food",
@@ -127,6 +127,7 @@ export default function CategoriesPage() {
 
     // 1. Sía eftir megaflokki
     if (selectedMegaId === "events") {
+      // „Viðburðir“: nota EVENT_CATEGORY_VALUES
       const eventSet = new Set(
         EVENT_CATEGORY_VALUES.map((v) => normalizeCategory(v)).filter(
           (v): v is string => v !== null,
@@ -138,6 +139,7 @@ export default function CategoriesPage() {
         return cats.some((c) => eventSet.has(c));
       });
     } else if (selectedMegaId !== "all" && activeMega) {
+      // Aðrir mega-flokkar en „Allt“
       const allowed = new Set(
         activeMega.subcategories
           .map((s) => normalizeCategory(s.value))
@@ -164,22 +166,21 @@ export default function CategoriesPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
-      <header className="space-y-1">
-        <h1 className="text-xl font-semibold text-foreground">Flokkar</h1>
-        <p className="text-sm text-muted-foreground">
+      <header className="space-y-2">
+        <h1 className="text-xl font-semibold text-white">Flokkar</h1>
+        <p className="text-sm text-gray-300">
           Veldu megaflokk og undirflokk til að skoða tilboðin.
         </p>
       </header>
 
-      {/* Flokkakerfi: 1) MEGA 2) UNDIR */}
+      {/* FLokkakerfi: 1) MEGA 2) UNDIR */}
       <section className="space-y-4">
         {/* MEGA-flokkar */}
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs uppercase tracking-wide text-gray-400">
             Megaflokkar
           </p>
-
-          <div className="flex flex-nowrap gap-2 overflow-x-auto pb-2">
+          <div className="flex flex-wrap gap-2">
             {MEGA_CATEGORIES.map((mega) => (
               <Button
                 key={mega.id}
@@ -197,20 +198,19 @@ export default function CategoriesPage() {
           </div>
         </div>
 
-        {/* Undirflokkar – bara þegar mega er EKKI „Allt“ */}
+        {/* Undirflokkar – bara þegar mega er EKKI „Allt“ eða „Viðburðir“ */}
         {activeMega &&
           activeMega.id !== "all" &&
+          activeMega.id !== "events" &&
           activeMega.subcategories.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs uppercase tracking-wide text-gray-400">
                 Undirflokkar
               </p>
-
-              <div className="flex flex-nowrap gap-2 overflow-x-auto pb-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={selectedCategory === null ? "default" : "outline"}
                   size="sm"
-                  className="whitespace-nowrap"
                   onClick={() => setSelectedCategory(null)}
                 >
                   Allt í þessum flokki
@@ -223,7 +223,6 @@ export default function CategoriesPage() {
                       selectedCategory === sub.value ? "default" : "outline"
                     }
                     size="sm"
-                    className="whitespace-nowrap"
                     onClick={() => setSelectedCategory(sub.value)}
                   >
                     {sub.label}
@@ -235,26 +234,20 @@ export default function CategoriesPage() {
       </section>
 
       {isLoading && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Er að hlaða tilboðum...
-          </p>
+        <Card className="p-4">
+          <p>Er að hlaða tilboðum...</p>
         </Card>
       )}
 
       {error && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Villa kom upp við að sækja tilboð.
-          </p>
+        <Card className="p-4">
+          <p>Villa kom upp við að sækja tilboð.</p>
         </Card>
       )}
 
       {!isLoading && !error && filteredPosts.length === 0 && (
-        <Card className="p-4 bg-card text-card-foreground border border-border">
-          <p className="text-sm text-muted-foreground">
-            Engin tilboð passa þessa flokka eins og er.
-          </p>
+        <Card className="p-4">
+          <p>Engin tilboð passa þessa flokka eins og er.</p>
         </Card>
       )}
 

@@ -181,6 +181,13 @@
       "role": "store",
       "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
       "id": "6550dbd3-f0a6-41e1-a1db-e176bf0944a0"
+    },
+    {
+      "email": "2026@2026.is",
+      "passwordHash": "$2b$10$A8AcCh6MDJr38hHejB2OquoDhJGclOKlp21IMrPj80BxauntEY0qW",
+      "role": "store",
+      "storeId": "e424feaa-5711-4cf7-b687-0442a60a734e",
+      "id": "58a85849-f0e1-49cb-8987-d9de878fe374"
     }
   ],
   "stores": [
@@ -503,6 +510,20 @@
         "Fatnaður & Lífstíll",
         "Heimili & Húsgögn"
       ]
+    },
+    {
+      "name": "2026",
+      "address": "",
+      "phone": "",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "2026@2026.is",
+      "plan": "premium",
+      "trialEndsAt": "2026-01-12T21:52:39.742Z",
+      "billingStatus": "trial",
+      "isBanned": false,
+      "categories": [],
+      "id": "e424feaa-5711-4cf7-b687-0442a60a734e"
     }
   ],
   "posts": [
@@ -653,7 +674,7 @@
       "startsAt": "2025-12-05",
       "endsAt": "2025-12-12",
       "createdAt": "2025-12-05T11:04:22.921Z",
-      "viewCount": 4,
+      "viewCount": 6,
       "id": "3ca4bc21-11ee-4d32-b47d-59d5e769a566"
     },
     {

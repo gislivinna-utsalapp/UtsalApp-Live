@@ -1,19 +1,37 @@
+// server/index.ts
 import express from "express";
 import { createServer } from "http";
+import cors from "cors";
+import path from "path";
 import { registerRoutes } from "./routes";
 
-const PORT = Number(process.env.PORT) || 5000;
+const app = express();
+const httpServer = createServer(app);
 
-function main() {
-  const app = express();
-  registerRoutes(app);
+// 1) Leyfa CORS
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-  const server = createServer(app);
+// 2) API routes
+registerRoutes(app);
 
-  server.listen(PORT, "0.0.0.0", () => {
-    // ✅ LAGFÆRT: template-string
-    console.log(`[express] serving on port ${PORT}`);
-  });
-}
+// 3) Heimasíða route
+app.get("/", (req, res) => {
+  res.send("✅ ÚtsalApp backend keyrir!");
+});
 
-main();
+// 4) Serve frontend (ef build til er)
+const clientDist = path.join(process.cwd(), "client", "dist");
+app.use(express.static(clientDist));
+
+// 5) Allt annað sendum við index.html (SPA routing)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(clientDist, "index.html"));
+});
+
+// 6) Starta server
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server keyrir á port ${PORT}`);
+});

@@ -14,10 +14,17 @@ build = ["npm", "run", "build"]
 run = ["sh", "-c", "npm start"]
 
 [[ports]]
+localPort = 3000
+externalPort = 3003
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 
-# Höldum þessum fyrir mögulega Vite-dev síðar, skaðar ekki þó enginn hlusti á þá núna
+[[ports]]
+localPort = 5001
+externalPort = 3002
+
 [[ports]]
 localPort = 5173
 externalPort = 3000

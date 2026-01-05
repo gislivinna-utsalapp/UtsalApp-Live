@@ -4,24 +4,32 @@
 export const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "";
 
+// Samræmdir token-lyklar
+const TOKEN_KEY = "utsalapp_token";
+const LEGACY_TOKEN_KEY = "token";
+
 // Býr til fulla URL út frá relative path + mögulegri base-url
 function buildUrl(path: string): string {
   // Ef path er þegar absolute (http/https)
   if (/^https?:\/\//i.test(path)) return path;
 
-  // Engin skilgreind base-url: notum relative slóð (virkar í Replit þegar FE+BE eru á sama origin)
+  // Engin skilgreind base-url: notum relative slóð (virkar þegar FE+BE eru á sama origin)
   if (!API_BASE_URL) return path;
 
   const base = API_BASE_URL.endsWith("/")
     ? API_BASE_URL.slice(0, -1)
     : API_BASE_URL;
+
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${base}${p}`;
 }
 
 function readToken(): string | null {
   try {
-    return localStorage.getItem("token");
+    // Prefer “new” key, fall back to legacy
+    return (
+      localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY)
+    );
   } catch {
     return null;
   }
@@ -42,7 +50,6 @@ function withAuthHeaders(
 
 /**
  * Debug helper: keyrðu þetta í console eða sýndu í UI ef þarf
- * til að staðfesta hvort token er til.
  */
 export function getAuthDebug() {
   const token = readToken();
@@ -50,6 +57,11 @@ export function getAuthDebug() {
     apiBaseUrl: API_BASE_URL || "(empty → relative /api calls)",
     hasToken: Boolean(token),
     tokenPreview: token ? `${token.slice(0, 12)}…${token.slice(-8)}` : null,
+    tokenKeyUsed: token
+      ? localStorage.getItem(TOKEN_KEY)
+        ? TOKEN_KEY
+        : LEGACY_TOKEN_KEY
+      : null,
   };
 }
 
@@ -138,7 +150,6 @@ export async function apiUpload<T = unknown>(
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  // Auth (token) ef til
   withAuthHeaders(headers);
 
   const res = await fetch(url, {
@@ -154,6 +165,7 @@ export async function apiUpload<T = unknown>(
 
   if (!res.ok) {
     let msg = `API error ${res.status} ${res.statusText}`;
+
     if (rawText) {
       if (contentType.includes("application/json")) {
         try {
@@ -167,6 +179,7 @@ export async function apiUpload<T = unknown>(
         msg += ` – ${rawText}`;
       }
     }
+
     throw new Error(msg);
   }
 

@@ -3,15 +3,15 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 
 export default defineConfig({
-  root: ".", // 👉 segir Vite að "index.html" sé í client/
+  root: path.resolve(__dirname), // segir Vite að rót sé þar sem þessi skrá er
+  plugins: [react()],
   build: {
-    outDir: "dist", // 👉 útmöppan fyrir byggt frontend
+    outDir: "dist",
     emptyOutDir: true,
   },
-  plugins: [react()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "src"),
     },
   },
 });

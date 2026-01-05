@@ -27,6 +27,20 @@
       "role": "store",
       "storeId": "77ed426b-a5f0-428c-8f7f-cdc598bc1051",
       "id": "e0603749-5e4d-4dd0-8c1e-78f2fb1340f9"
+    },
+    {
+      "email": "2026@2026.is",
+      "passwordHash": "$2b$10$FxXJuL23saQEw9TOJSwaQO4ziJZGzDkrq7CJ8Y5KQrcOXCpKARI1a",
+      "role": "store",
+      "storeId": "4a0275ea-1cbd-4ad6-a293-ea49874db9ca",
+      "id": "886530b1-afa4-4465-a76d-915bbb151af6"
+    },
+    {
+      "email": "ny@ny.is",
+      "passwordHash": "$2b$10$mS1q8yQULNAaPwzcU5AiC.HZXGxg.7cWHAqfTzk3dAF8CoJ/Mf5kS",
+      "role": "store",
+      "storeId": "1d36c4ec-255c-46b3-b5f8-2129369933bf",
+      "id": "53451521-e908-47dd-9089-e3528cd74c60"
     }
   ],
   "stores": [
@@ -88,6 +102,36 @@
       "categories": [],
       "subcategories": [],
       "id": "77ed426b-a5f0-428c-8f7f-cdc598bc1051"
+    },
+    {
+      "name": "2026",
+      "address": "Ísland",
+      "phone": "7891809",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "2026@2026.is",
+      "plan": "basic",
+      "trialEndsAt": "2026-01-12T21:03:14.657Z",
+      "billingStatus": "trial",
+      "isBanned": false,
+      "categories": [],
+      "subcategories": [],
+      "id": "4a0275ea-1cbd-4ad6-a293-ea49874db9ca"
+    },
+    {
+      "name": "Ný búð",
+      "address": "Ísland",
+      "phone": "",
+      "website": "",
+      "logoUrl": "",
+      "ownerEmail": "ny@ny.is",
+      "plan": "basic",
+      "trialEndsAt": "2026-01-12T21:16:23.521Z",
+      "billingStatus": "trial",
+      "isBanned": false,
+      "categories": [],
+      "subcategories": [],
+      "id": "1d36c4ec-255c-46b3-b5f8-2129369933bf"
     }
   ],
   "posts": [
@@ -118,7 +162,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:26:31.075Z",
-      "viewCount": 5,
+      "viewCount": 6,
       "id": "1665324f-9135-42dc-a38e-95b06d20f9e1"
     },
     {
@@ -133,7 +177,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T10:30:41.119Z",
-      "viewCount": 2,
+      "viewCount": 6,
       "id": "687234bd-c581-4823-9314-f5d44370eb17"
     },
     {
@@ -148,7 +192,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-12-10T15:50:17.675Z",
-      "viewCount": 3,
+      "viewCount": 4,
       "id": "e7091793-f8da-495d-aff8-9d6c07039ac1"
     },
     {
@@ -163,7 +207,7 @@
       "startsAt": "2025-12-28",
       "endsAt": "2026-02-06",
       "createdAt": "2025-12-28T14:26:31.156Z",
-      "viewCount": 6,
+      "viewCount": 7,
       "id": "446dd4d8-8460-48b0-974f-a3b22fb325af"
     }
   ]

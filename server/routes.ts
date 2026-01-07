@@ -191,98 +191,97 @@ function getPlanRankForPost(
 // ------------------------- ROUTES START -------------------------
 
 export function registerRoutes(app: Express): void {
+  const router = express.Router();
+
   // Grunn middleware
-  app.use(cors());
-  app.use(express.json());
+  router.use(cors());
+  router.use(express.json());
 
   // Static fyrir uploads
-  app.use("/uploads", express.static(UPLOAD_DIR));
+  router.use("/uploads", express.static(UPLOAD_DIR));
 
   // ------------------ AUTH: REGISTER STORE ------------------
-  app.post(
-    "/api/v1/auth/register-store",
-    async (req: Request, res: Response) => {
-      try {
-        const {
-          storeName,
-          email: rawEmail,
-          password: rawPassword,
-          address,
-          phone,
-          website,
-        } = req.body as {
-          storeName?: string;
-          email?: string;
-          password?: string;
-          address?: string;
-          phone?: string;
-          website?: string;
-        };
+  router.post("/auth/register-store", async (req: Request, res: Response) => {
+    try {
+      const {
+        storeName,
+        email: rawEmail,
+        password: rawPassword,
+        address,
+        phone,
+        website,
+      } = req.body as {
+        storeName?: string;
+        email?: string;
+        password?: string;
+        address?: string;
+        phone?: string;
+        website?: string;
+      };
 
-        const email = (rawEmail ?? "").trim().toLowerCase();
-        const password = (rawPassword ?? "").trim();
+      const email = (rawEmail ?? "").trim().toLowerCase();
+      const password = (rawPassword ?? "").trim();
 
-        if (!storeName || !email || !password) {
-          return res.status(400).json({ message: "Vantar upplýsingar" });
-        }
-
-        const existing = await storage.findUserByEmail(email);
-        if (existing) {
-          return res.status(400).json({ message: "Netfang er þegar í notkun" });
-        }
-
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        // Ný verslun fær strax 7 daga fríviku
-        const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-
-        const store = await storage.createStore({
-          name: storeName,
-          address: (address ?? "").trim(),
-          phone: (phone ?? "").trim(),
-          website: (website ?? "").trim(),
-          logoUrl: "",
-          ownerEmail: email,
-          plan: "basic",
-          trialEndsAt,
-          billingStatus: "trial",
-        } as any);
-
-        const user = await storage.createUser({
-          email,
-          passwordHash,
-          role: "store",
-          storeId: store.id,
-        } as any);
-
-        const billingActive = true; // trial er virkt
-
-        return res.json({
-          message: "Verslun skráð",
-          user: { id: user.id, email: user.email, role: user.role },
-          store: {
-            id: store.id,
-            name: store.name,
-            address: (store as any).address ?? "",
-            phone: (store as any).phone ?? "",
-            website: (store as any).website ?? "",
-            plan: (store as any).plan ?? "basic",
-            planType: (store as any).plan ?? "basic",
-            trialEndsAt: (store as any).trialEndsAt ?? null,
-            billingStatus: (store as any).billingStatus ?? "trial",
-            billingActive,
-            createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
-          },
-        });
-      } catch (err) {
-        console.error("register-store error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+      if (!storeName || !email || !password) {
+        return res.status(400).json({ message: "Vantar upplýsingar" });
       }
-    },
-  );
+
+      const existing = await storage.findUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: "Netfang er þegar í notkun" });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // Ný verslun fær strax 7 daga fríviku
+      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+
+      const store = await storage.createStore({
+        name: storeName,
+        address: (address ?? "").trim(),
+        phone: (phone ?? "").trim(),
+        website: (website ?? "").trim(),
+        logoUrl: "",
+        ownerEmail: email,
+        plan: "basic",
+        trialEndsAt,
+        billingStatus: "trial",
+      } as any);
+
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        role: "store",
+        storeId: store.id,
+      } as any);
+
+      const billingActive = true; // trial er virkt
+
+      return res.json({
+        message: "Verslun skráð",
+        user: { id: user.id, email: user.email, role: user.role },
+        store: {
+          id: store.id,
+          name: store.name,
+          address: (store as any).address ?? "",
+          phone: (store as any).phone ?? "",
+          website: (store as any).website ?? "",
+          plan: (store as any).plan ?? "basic",
+          planType: (store as any).plan ?? "basic",
+          trialEndsAt: (store as any).trialEndsAt ?? null,
+          billingStatus: (store as any).billingStatus ?? "trial",
+          billingActive,
+          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+        },
+      });
+    } catch (err) {
+      console.error("register-store error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
 
   // ------------------ AUTH: REGISTER STORE (LEGACY ALIAS) ------------------
-  app.post("/api/v1/stores/register", async (req: Request, res: Response) => {
+  router.post("/stores/register", async (req, res) => {
     try {
       const {
         storeName,
@@ -361,7 +360,7 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ AUTH: LOGIN ------------------
-  app.post("/api/v1/auth/login", async (req: Request, res: Response) => {
+  router.post("/auth/login", async (req: Request, res: Response) => {
     try {
       const rawEmail = (req.body?.email ?? "") as string;
       const rawPassword = (req.body?.password ?? "") as string;
@@ -458,46 +457,42 @@ export function registerRoutes(app: Express): void {
 
   // ------------------ AUTH: ME ------------------
   // ------------------ AUTH: ME ------------------
-  app.get(
-    "/api/v1/auth/me",
-    auth(),
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ message: "Ekki innskráður" });
-        }
-
-        let store = req.user.storeId
-          ? await storage.getStoreById(req.user.storeId)
-          : null;
-
-        let storePayload: any = null;
-
-        if (store) {
-          storePayload = {
-            id: store.id,
-            name: store.name,
-            plan: (store as any).plan ?? "basic",
-            trialEndsAt: (store as any).trialEndsAt ?? null,
-            billingStatus: (store as any).billingStatus ?? "trial",
-          };
-        }
-
-        return res.json({
-          user: {
-            id: req.user.id,
-            email: req.user.email,
-            role: req.user.role,
-            isAdmin: (req.user as any).isAdmin === true,
-          },
-          store: storePayload,
-        });
-      } catch (err) {
-        console.error("auth/me error", err);
-        return res.status(500).json({ message: "Villa kom upp" });
+  router.get("/auth/me", auth(), async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Ekki innskráður" });
       }
-    },
-  );
+
+      let store = req.user.storeId
+        ? await storage.getStoreById(req.user.storeId)
+        : null;
+
+      let storePayload: any = null;
+
+      if (store) {
+        storePayload = {
+          id: store.id,
+          name: store.name,
+          plan: (store as any).plan ?? "basic",
+          trialEndsAt: (store as any).trialEndsAt ?? null,
+          billingStatus: (store as any).billingStatus ?? "trial",
+        };
+      }
+
+      return res.json({
+        user: {
+          id: req.user.id,
+          email: req.user.email,
+          role: req.user.role,
+          isAdmin: (req.user as any).isAdmin === true,
+        },
+        store: storePayload,
+      });
+    } catch (err) {
+      console.error("auth/me error", err);
+      return res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
 
   // ------------------ STORES: BILLING INFO FYRIR VERSLUN ------------------
   app.get(
@@ -548,8 +543,8 @@ export function registerRoutes(app: Express): void {
   );
 
   // ------------------ STORES: ACTIVATE PLAN / FRÍVIKA ------------------
-  app.post(
-    "/api/v1/stores/activate-plan",
+  router.post(
+    "/stores/activate-plan",
     auth("store"),
     async (req: AuthRequest, res: Response) => {
       try {
@@ -737,8 +732,8 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ POSTS: CREATE ------------------
-  app.post(
-    "/api/v1/posts",
+  router.post(
+    "/posts",
     auth("store"),
     requireActiveOrTrialStore,
     async (req: AuthRequest, res) => {
@@ -874,8 +869,8 @@ export function registerRoutes(app: Express): void {
   );
 
   // ------------------ IMAGE UPLOAD ------------------
-  app.post(
-    "/api/v1/uploads",
+  router.post(
+    "/uploads",
     auth("store"),
     upload.single("image"),
     async (req: AuthRequest, res: Response) => {
@@ -895,13 +890,16 @@ export function registerRoutes(app: Express): void {
           .jpeg({ quality: 80 })
           .toFile(filepath);
 
-        res.json({ url: `/uploads/${filename}` });
+        res.json({ url: `/api/v1/uploads/${filename}` });
       } catch (err) {
         console.error("upload error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     },
   );
+
+  // ⬅️ MOUNT API ROUTER (EINU SINNI)
+  app.use("/api/v1", router);
 
   // ------------------ STATIC FILES & SPA FALLBACK (AÐEINS Í PRODUCTION) ------------------
   if (process.env.NODE_ENV === "production") {

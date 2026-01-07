@@ -213,7 +213,7 @@
       "ownerEmail": "b@b.is",
       "id": "eed1989a-02bd-465f-ab65-eea215daeaaa",
       "trialEndsAt": "2025-12-02T12:55:45.524Z",
-      "plan": "pro",
+      "plan": "premium",
       "billingStatus": "active"
     },
     {
@@ -533,9 +533,24 @@
   ],
   "posts": [
     {
+      "title": "test",
+      "description": "",
+      "category": "Fatnaður - Börn",
+      "price": 1000,
+      "oldPrice": 2000,
+      "imageUrl": "/uploads/0afd4ba5-eafc-4ff8-b20e-7a5aa3091919.jpg",
+      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
+      "buyUrl": null,
+      "startsAt": "2026-01-07",
+      "endsAt": "2026-01-14",
+      "createdAt": "2026-01-07T20:01:37.327Z",
+      "viewCount": 1,
+      "id": "234a36cc-ea50-4636-94b1-8685ad86aacd"
+    },
+    {
       "title": "Gítar á afslætti",
-      "description": "Noir gitar sem þarfnast lagfæringa. Keyptur á 50.000 fæst á 15.000",
-      "category": "Raftæki",
+      "description": "Noir gítar sem þarfnast lagfæringa. Keyptur á 50.000 fæst á 15.000",
+      "category": "Rafmagnstæki",
       "price": 15000,
       "oldPrice": 50000,
       "imageUrl": "/uploads/9dbe46ee-83a0-40c5-9ad5-d960f7c839c6.jpg",
@@ -544,7 +559,7 @@
       "startsAt": "2026-01-07",
       "endsAt": "2026-01-31",
       "createdAt": "2026-01-07T17:54:55.276Z",
-      "viewCount": 3,
+      "viewCount": 7,
       "id": "43786de9-cbf1-48ed-8d24-206b972d0f01"
     },
     {
@@ -574,7 +589,7 @@
       "startsAt": "2026-01-05",
       "endsAt": "2026-01-29",
       "createdAt": "2026-01-05T22:15:06.477Z",
-      "viewCount": 13,
+      "viewCount": 14,
       "id": "a302f01b-9308-4863-b8d3-66fbe800b1c5"
     },
     {
@@ -606,6 +621,21 @@
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
       "viewCount": 7
+    },
+    {
+      "title": "test 2",
+      "description": "trest",
+      "category": "Heimili & húsgögn",
+      "price": 200,
+      "oldPrice": 1000,
+      "imageUrl": "/api/v1/uploads/6599f5b5-382a-49dc-81e6-6aca3b25603c.jpg",
+      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
+      "buyUrl": null,
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2026-01-07T20:06:44.607Z",
+      "viewCount": 0,
+      "id": "7776539e-d249-451c-9731-8cab5a9958d0"
     }
   ]
 }

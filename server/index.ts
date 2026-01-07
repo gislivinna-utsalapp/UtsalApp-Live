@@ -45,7 +45,7 @@ function main() {
   });
 
   // 4) Register all routes
-  registerRoutes(app);
+  registerRoutes(app, "/api");
 
   // 5) Global error handler: þetta er “lykilinn” til að sjá rótina
   //    (þetta mun logga stack trace í Replit console)

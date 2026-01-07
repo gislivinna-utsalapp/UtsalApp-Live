@@ -136,7 +136,7 @@ export default function PostDetail() {
 
   return (
     <div className="max-w-3xl mx-auto pb-24">
-      <header className="sticky top-0 z-10 bg-black/95 backdrop-blur border-b border-neutral-800 px-4 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-10 bg-background backdrop-blur border-b border-border px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => navigate(-1)}
           className="text-sm text-neutral-300 hover:text-white"
@@ -179,11 +179,10 @@ export default function PostDetail() {
             {/* Afsláttur + verð */}
             <div className="space-y-2">
               {discount && (
-                <div className="inline-flex items-baseline gap-2 rounded-full bg-black text-white px-3 py-1 border border-black">
-                  <span className="text-xs font-semibold uppercase tracking-wide">
-                    Afsláttur
+                <div className="inline-flex items-center gap-2 rounded-full bg-pink-100 text-pink-700 px-3 py-1">
+                  <span className="text-xs font-medium">
+                    Afsláttur -{discount}%
                   </span>
-                  <span className="text-sm font-bold">-{discount}%</span>
                 </div>
               )}
 

@@ -387,7 +387,6 @@ export function registerRoutes(app: Express): void {
         ? await storage.getStoreById(user.storeId)
         : null;
 
-      // Ef verslun er til og hefur ekki trialEndsAt og er ekki expired → gefum 7 daga frá login
       if (
         store &&
         !(store as any).trialEndsAt &&
@@ -398,17 +397,18 @@ export function registerRoutes(app: Express): void {
           trialEndsAt,
           billingStatus: (store as any).billingStatus ?? "trial",
         } as any);
-        if (updated) {
-          store = updated;
-        }
+        if (updated) store = updated;
       }
+
+      const isAdmin = (user as any).isAdmin === true;
 
       const token = jwt.sign(
         {
           id: user.id,
           email,
           role: user.role,
-          storeId: (user as any).storeId,
+          storeId: user.storeId,
+          isAdmin,
         },
         JWT_SECRET,
         { expiresIn: "7d" },
@@ -417,7 +417,7 @@ export function registerRoutes(app: Express): void {
       let storePayload: any = null;
 
       if (store) {
-        const plan = (store as any).plan ?? (store as any).planType ?? "basic";
+        const plan = (store as any).plan ?? "basic";
         const billingStatus =
           (store as any).billingStatus ??
           ((store as any).billingActive ? "active" : "trial");
@@ -436,21 +436,27 @@ export function registerRoutes(app: Express): void {
           trialEndsAt: (store as any).trialEndsAt ?? null,
           billingStatus,
           billingActive,
-          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+          createdAt: (store as any).createdAt ?? null,
         };
       }
 
       return res.json({
-        user: { id: user.id, email, role: user.role },
+        user: {
+          id: user.id,
+          email,
+          role: user.role,
+          isAdmin,
+        },
         store: storePayload,
         token,
       });
     } catch (err) {
       console.error("login error:", err);
-      res.status(500).json({ message: "Villa kom upp" });
+      return res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
+  // ------------------ AUTH: ME ------------------
   // ------------------ AUTH: ME ------------------
   app.get(
     "/api/v1/auth/me",
@@ -465,46 +471,15 @@ export function registerRoutes(app: Express): void {
           ? await storage.getStoreById(req.user.storeId)
           : null;
 
-        // Sama trial-start lógík og í login
-        if (
-          store &&
-          !(store as any).trialEndsAt &&
-          (store as any).billingStatus !== "expired"
-        ) {
-          const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-          const updated = await storage.updateStore(store.id, {
-            trialEndsAt,
-            billingStatus: (store as any).billingStatus ?? "trial",
-          } as any);
-          if (updated) {
-            store = updated;
-          }
-        }
-
         let storePayload: any = null;
 
         if (store) {
-          const plan =
-            (store as any).plan ?? (store as any).planType ?? "basic";
-          const billingStatus =
-            (store as any).billingStatus ??
-            ((store as any).billingActive ? "active" : "trial");
-
-          const billingActive =
-            billingStatus === "active" || billingStatus === "trial";
-
           storePayload = {
             id: store.id,
             name: store.name,
-            address: (store as any).address ?? "",
-            phone: (store as any).phone ?? "",
-            website: (store as any).website ?? "",
-            plan,
-            planType: plan,
+            plan: (store as any).plan ?? "basic",
             trialEndsAt: (store as any).trialEndsAt ?? null,
-            billingStatus,
-            billingActive,
-            createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+            billingStatus: (store as any).billingStatus ?? "trial",
           };
         }
 
@@ -513,12 +488,13 @@ export function registerRoutes(app: Express): void {
             id: req.user.id,
             email: req.user.email,
             role: req.user.role,
+            isAdmin: (req.user as any).isAdmin === true,
           },
           store: storePayload,
         });
       } catch (err) {
         console.error("auth/me error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+        return res.status(500).json({ message: "Villa kom upp" });
       }
     },
   );

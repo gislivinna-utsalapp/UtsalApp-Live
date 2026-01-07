@@ -42,7 +42,7 @@ export function SalePostCard({ post }: Props) {
   return (
     <Link
       to={`/post/${post.id}`}
-      className="block rounded-2xl overflow-hidden shadow-md bg-white/95 border border-orange-900/30 hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
+      className="block rounded-2xl overflow-hidden shadow-md bg-card border border-border hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
     >
       <div className="relative h-36 w-full overflow-hidden bg-neutral-900">
         {imageUrl ? (
@@ -59,7 +59,7 @@ export function SalePostCard({ post }: Props) {
         )}
 
         {discountPercent !== null && (
-          <div className="absolute top-2 right-2 bg-[#FF7A00] text-white text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md">
+          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md">
             -{discountPercent}%
           </div>
         )}
@@ -82,7 +82,7 @@ export function SalePostCard({ post }: Props) {
 
         <div className="pt-1.5 flex items-baseline gap-1.5">
           {post.priceSale != null && (
-            <span className="text-sm font-bold text-[#FF7A00]">
+            <span className="text-sm font-bold text-primary">
               ISK {post.priceSale.toLocaleString("is-IS")}
             </span>
           )}

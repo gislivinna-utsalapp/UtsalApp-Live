@@ -18,16 +18,14 @@ function loadDatabase(): DatabaseShape {
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
     return initial;
   }
+
   const raw = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
 
-  // Tryggjum shape
-  const db: DatabaseShape = {
+  return {
     users: raw.users ?? [],
     stores: raw.stores ?? [],
     posts: raw.posts ?? [],
   };
-
-  return db;
 }
 
 function saveDatabase(db: DatabaseShape) {
@@ -40,44 +38,50 @@ export class DbStorage {
   constructor() {
     this.db = loadDatabase();
 
-    // "Migration": samræma plan / trial / billing reiti
     let changed = false;
 
+    // --- STORE MIGRATIONS ---
     for (const s of this.db.stores as any[]) {
-      // Gamli reiturinn: planType -> nýtt: plan
       if (s.plan === undefined) {
-        if (s.planType !== undefined) {
-          s.plan = s.planType;
-        } else {
-          s.plan = "basic";
-        }
+        s.plan = s.planType ?? "basic";
         changed = true;
       }
 
-      // trialEndsAt má vera null en ekki undefined
       if (s.trialEndsAt === undefined) {
         s.trialEndsAt = null;
         changed = true;
       }
 
-      // Gamli reiturinn: billingActive -> nýtt: billingStatus
       if (s.billingStatus === undefined) {
-        if (s.billingActive === true) {
-          s.billingStatus = "active";
-        } else {
-          // default: verslun í trial nema annað sé skilgreint
-          s.billingStatus = "trial";
-        }
+        s.billingStatus = s.billingActive === true ? "active" : "trial";
         changed = true;
       }
 
-      // Hreinsa gamla reiti ef þeir eru til
       if (s.planType !== undefined) {
         delete s.planType;
         changed = true;
       }
+
       if (s.billingActive !== undefined) {
         delete s.billingActive;
+        changed = true;
+      }
+    }
+
+    // --- USER MIGRATIONS (CRITICAL) ---
+    for (const u of this.db.users as any[]) {
+      // tryggjum normalíserað email
+      if (typeof u.email === "string") {
+        const normalized = u.email.trim().toLowerCase();
+        if (u.email !== normalized) {
+          u.email = normalized;
+          changed = true;
+        }
+      }
+
+      // fjarlægjum legacy plain password ef það er til
+      if ((u as any).password !== undefined) {
+        delete (u as any).password;
         changed = true;
       }
     }
@@ -87,43 +91,51 @@ export class DbStorage {
     }
   }
 
-  // USERS
+  // ---------------- USERS ----------------
+
   async createUser(user: Omit<User, "id">): Promise<User> {
-    const newUser: User = { ...user, id: crypto.randomUUID() };
+    const newUser: User = {
+      ...user,
+      email: user.email.trim().toLowerCase(),
+      id: crypto.randomUUID(),
+    };
+
     this.db.users.push(newUser);
     saveDatabase(this.db);
     return newUser;
   }
 
   async findUserByEmail(email: string): Promise<User | undefined> {
-    return this.db.users.find((u) => u.email === email);
+    const normalized = email.trim().toLowerCase();
+    return this.db.users.find(
+      (u) => u.email.trim().toLowerCase() === normalized,
+    );
   }
 
   async findUserById(id: string): Promise<User | undefined> {
     return this.db.users.find((u) => u.id === id);
   }
 
-  // STORES
+  // ---------------- STORES ----------------
+
   async createStore(
     store: Omit<Store, "id"> & Record<string, any>,
   ): Promise<Store & any> {
     const newStore: any = {
       ...store,
       id: crypto.randomUUID(),
+      plan: store.plan ?? "basic",
+      trialEndsAt: store.trialEndsAt ?? null,
+      billingStatus: store.billingStatus ?? "trial",
     };
-
-    // Sjálfgefin gildi fyrir plan / trial / billing
-    if (newStore.plan === undefined) newStore.plan = "basic";
-    if (newStore.trialEndsAt === undefined) newStore.trialEndsAt = null;
-    if (newStore.billingStatus === undefined) newStore.billingStatus = "trial";
 
     this.db.stores.push(newStore);
     saveDatabase(this.db);
-    return newStore as Store & any;
+    return newStore;
   }
 
   async getStoreById(id: string): Promise<(Store & any) | undefined> {
-    return this.db.stores.find((s: any) => s.id === id) as any;
+    return this.db.stores.find((s: any) => s.id === id);
   }
 
   async listStores(): Promise<(Store & any)[]> {
@@ -138,29 +150,29 @@ export class DbStorage {
     if (index === -1) return null;
 
     const existing: any = this.db.stores[index];
-    const updated: any = { ...existing, ...updates };
+    const updated: any = {
+      ...existing,
+      ...updates,
+    };
 
-    // Tryggjum gildi eftir update
     if (updated.plan === undefined) updated.plan = "basic";
     if (updated.trialEndsAt === undefined) updated.trialEndsAt = null;
-    if (updated.billingStatus === undefined) {
-      updated.billingStatus = "trial";
-    }
+    if (updated.billingStatus === undefined) updated.billingStatus = "trial";
 
-    (this.db.stores as any[])[index] = updated;
+    this.db.stores[index] = updated;
     saveDatabase(this.db);
-
-    return updated as Store & any;
+    return updated;
   }
 
-  // POSTS
+  // ---------------- POSTS ----------------
+
   async createPost(
     post: Omit<SalePost, "id"> & Record<string, any>,
   ): Promise<SalePost & any> {
     const newPost: any = { ...post, id: crypto.randomUUID() };
     this.db.posts.push(newPost);
     saveDatabase(this.db);
-    return newPost as SalePost & any;
+    return newPost;
   }
 
   async listPosts(): Promise<(SalePost & any)[]> {
@@ -168,11 +180,11 @@ export class DbStorage {
   }
 
   async getPostsByStore(storeId: string): Promise<(SalePost & any)[]> {
-    return this.db.posts.filter((p: any) => p.storeId === storeId) as any;
+    return this.db.posts.filter((p: any) => p.storeId === storeId);
   }
 
   async getPostById(postId: string): Promise<(SalePost & any) | undefined> {
-    return this.db.posts.find((p: any) => p.id === postId) as any;
+    return this.db.posts.find((p: any) => p.id === postId);
   }
 
   async updatePost(
@@ -187,8 +199,7 @@ export class DbStorage {
 
     this.db.posts[index] = updated;
     saveDatabase(this.db);
-
-    return updated as SalePost & any;
+    return updated;
   }
 
   async deletePost(postId: string): Promise<boolean> {

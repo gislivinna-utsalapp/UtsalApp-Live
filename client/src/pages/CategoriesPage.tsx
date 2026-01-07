@@ -29,49 +29,22 @@ const BASE_CATEGORIES = [
   "Annað",
 ];
 
-// Normalizer til að mappa gömul og vitlaus heiti yfir í ný, rétt heiti
+// Normalizer
 function normalizeCategory(raw: string | null | undefined): string {
   const c = (raw || "").trim();
   if (!c) return "";
 
   const lower = c.toLowerCase();
 
-  // Allt sem byrjar á "rafmagn" => Raftæki
-  if (lower.startsWith("rafmagn")) {
-    return "Raftæki";
-  }
+  if (lower.startsWith("rafmagn")) return "Raftæki";
+  if (lower === "veitingar") return "Matur & veitingar";
+  if (lower === "matur og veitingar") return "Matur & veitingar";
+  if (lower === "snyrtivorur") return "Snyrtivörur";
+  if (lower === "annad") return "Annað";
+  if (lower === "heimili") return "Heimili & húsgögn";
 
-  // "veitingar" => Matur & veitingar
-  if (lower === "veitingar") {
-    return "Matur & veitingar";
-  }
+  if (BASE_CATEGORIES.includes(c)) return c;
 
-  // Möguleg afbrigði af mat/veitingum sem gætu hafa slæðst inn
-  if (lower === "matur og veitingar") {
-    return "Matur & veitingar";
-  }
-
-  // Vitlaust skrifaðar snyrtivörur => Snyrtivörur
-  if (lower === "snyrtivorur") {
-    return "Snyrtivörur";
-  }
-
-  // Vitlaust skrifað "annad" => Annað
-  if (lower === "annad") {
-    return "Annað";
-  }
-
-  // "heimili" => Heimili & húsgögn
-  if (lower === "heimili") {
-    return "Heimili & húsgögn";
-  }
-
-  // Ef þetta er eitt af okkar kanónísku heitum, skilum því beint
-  if (BASE_CATEGORIES.includes(c)) {
-    return c;
-  }
-
-  // Default: tryggjum að strengurinn byrji á stórum staf
   return c.charAt(0).toUpperCase() + c.slice(1);
 }
 
@@ -85,13 +58,11 @@ export default function CategoriesPage() {
     queryFn: fetchPosts,
   });
 
-  // Normaliserum flokka fyrir öll tilboð
   const normalizedPosts = posts.map((p) => ({
     ...p,
     _normCategory: normalizeCategory(p.category),
   }));
 
-  // Flokkar byggðir bæði á grunnlista + raunverulegum gögnum
   const categories = Array.from(
     new Set([
       ...BASE_CATEGORIES,
@@ -110,13 +81,11 @@ export default function CategoriesPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold text-white">Flokkar</h1>
-          <p className="text-xs text-neutral-400">
-            Veldu flokk til að sjá útsölutilboð í þeim flokki.
-          </p>
-        </div>
+      <header>
+        <h1 className="text-lg font-semibold text-white">Flokkar</h1>
+        <p className="text-xs text-neutral-400">
+          Veldu flokk til að sjá útsölutilboð í þeim flokki.
+        </p>
       </header>
 
       {isLoading && (
@@ -131,7 +100,7 @@ export default function CategoriesPage() {
 
       {!isLoading && !error && (
         <>
-          {/* Flokkar */}
+          {/* FLOKKASLEÐI */}
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-white">Flokkar</h2>
 
@@ -142,42 +111,42 @@ export default function CategoriesPage() {
             )}
 
             {categories.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className={
-                    selectedCategory === null
-                      ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
-                      : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                  }
-                  onClick={() => setSelectedCategory(null)}
-                >
-                  Allt
-                </Button>
-
-                {categories.map((cat) => (
+              <div className="-mx-3 px-3 overflow-x-auto">
+                <div className="flex gap-2 flex-nowrap whitespace-nowrap py-2">
                   <Button
-                    key={cat}
                     size="sm"
                     variant="outline"
                     className={
-                      selectedCategory === cat
-                        ? "bg-white text-black text-xs border border-white hover:bg-neutral-200"
+                      selectedCategory === null
+                        ? "bg-white text-black text-xs border border-white"
                         : "text-xs border border-white text-white hover:bg-white hover:text-black"
                     }
-                    onClick={() =>
-                      setSelectedCategory(selectedCategory === cat ? null : cat)
-                    }
+                    onClick={() => setSelectedCategory(null)}
                   >
-                    {cat}
+                    Allt
                   </Button>
-                ))}
+
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat}
+                      size="sm"
+                      variant="outline"
+                      className={
+                        selectedCategory === cat
+                          ? "bg-white text-black text-xs border border-white"
+                          : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                      }
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
           </section>
 
-          {/* Tilboð í völdum flokki */}
+          {/* TILBOÐ */}
           <section className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">

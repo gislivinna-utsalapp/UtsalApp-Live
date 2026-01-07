@@ -1,30 +1,19 @@
-// client/src/App.tsx
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../lib/auth";
 
-import { Routes, Route, Link, useLocation } from "react-router-dom";
-
-import Home from "./pages/Home";
-import SearchPage from "./pages/SearchPage";
-import CategoriesPage from "./pages/CategoriesPage";
-import Login from "./pages/Login";
-import RegisterStore from "./pages/RegisterStore";
-import CreatePost from "./pages/CreatePost";
-import EditPost from "./pages/EditPost";
-import PostDetail from "./pages/PostDetail";
-import Profile from "./pages/Profile";
-import About from "./pages/About";
-import NotFound from "./pages/not-found";
-
-function BottomNav() {
+export default function BottomNav() {
   const location = useLocation();
   const tab = location.pathname;
 
+  const { isAdmin, loading } = useAuth();
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-[#fc7102] text-white z-20 shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground z-20 shadow-lg">
       <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
         <Link
           to="/"
-          className={`flex-1 text-center ${
-            tab === "/" ? "opacity-100 font-semibold" : "opacity-80"
+          className={`flex-1 text-center transition-opacity ${
+            tab === "/" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
           Heim
@@ -32,8 +21,8 @@ function BottomNav() {
 
         <Link
           to="/search"
-          className={`flex-1 text-center ${
-            tab === "/search" ? "opacity-100 font-semibold" : "opacity-80"
+          className={`flex-1 text-center transition-opacity ${
+            tab === "/search" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
           Leita
@@ -41,8 +30,8 @@ function BottomNav() {
 
         <Link
           to="/categories"
-          className={`flex-1 text-center ${
-            tab === "/categories" ? "opacity-100 font-semibold" : "opacity-80"
+          className={`flex-1 text-center transition-opacity ${
+            tab === "/categories" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
           Flokkar
@@ -50,42 +39,26 @@ function BottomNav() {
 
         <Link
           to="/profile"
-          className={`flex-1 text-center ${
-            tab === "/profile" ? "opacity-100 font-semibold" : "opacity-80"
+          className={`flex-1 text-center transition-opacity ${
+            tab === "/profile" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
           Prófíll
         </Link>
+
+        {!loading && isAdmin && (
+          <Link
+            to="/admin"
+            className={`px-2 text-center transition-opacity ${
+              tab === "/admin"
+                ? "opacity-100 font-semibold underline"
+                : "opacity-70"
+            }`}
+          >
+            Admin
+          </Link>
+        )}
       </div>
     </nav>
-  );
-}
-
-export default function App() {
-  return (
-    <div className="min-h-screen pb-20 bg-background">
-      <Routes>
-        {/* Opin svæði */}
-        <Route path="/" element={<Home />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/categories" element={<CategoriesPage />} />
-        <Route path="/post/:id" element={<PostDetail />} />
-        <Route path="/about" element={<About />} />
-
-        {/* Auth */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register-store" element={<RegisterStore />} />
-
-        {/* Prófíll & tilboð (auth check gerum við inni á síðum) */}
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/create" element={<CreatePost />} />
-        <Route path="/edit/:id" element={<EditPost />} />
-
-        {/* 404 */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-
-      <BottomNav />
-    </div>
   );
 }

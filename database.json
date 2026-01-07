@@ -181,6 +181,28 @@
       "role": "store",
       "storeId": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174",
       "id": "6550dbd3-f0a6-41e1-a1db-e176bf0944a0"
+    },
+    {
+      "email": "2026@2026.is",
+      "passwordHash": "$2b$10$YNElGYaPx4nW2sZwSUPKVuVU0CvbOoGwr1dzhf8BprAK4sns2qIHu",
+      "role": "store",
+      "storeId": "76f19839-1ee6-4b1c-88fb-2120e649a380",
+      "id": "dd5e6f89-a0d4-43db-b32d-832eed744d14"
+    },
+    {
+      "email": "gisli@utsalapp.is",
+      "passwordHash": "$2b$10$OdTmuM6o24ZzMLCneRmiK.F68d/Imq6a1pB2XP4MO1LLEH/5ySnB6",
+      "role": "store",
+      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
+      "id": "86a3d0e6-8b4e-4bf6-93ac-e40b75575af3",
+      "isAdmin": true
+    },
+    {
+      "email": "utsalapp@utsalapp.is",
+      "passwordHash": "$2b$10$gYTlKDCWGrJiCnp.l3sbUe2zgv1IHuWxbLDtsEpXY34BfxoGo15aO",
+      "role": "store",
+      "storeId": "e7d98c85-c2bf-40b5-bd6b-774c606d1b87",
+      "id": "17b312df-5e62-490b-bc53-5bd7626d8c68"
     }
   ],
   "stores": [
@@ -347,7 +369,7 @@
       "website": "",
       "logoUrl": "",
       "ownerEmail": "lo@lo.is",
-      "plan": "basic",
+      "plan": "premium",
       "trialEndsAt": "2025-12-06T18:23:33.578Z",
       "billingStatus": "trial",
       "id": "72dd703f-4044-422e-9ff0-d1cec1c83f34"
@@ -471,23 +493,104 @@
       "trialEndsAt": "2025-12-06T21:26:22.435Z",
       "billingStatus": "trial",
       "id": "dcd6c3bd-fd3c-4b07-b658-5df5769e3174"
+    },
+    {
+      "name": "2026",
+      "address": "",
+      "phone": "",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "2026@2026.is",
+      "plan": "premium",
+      "trialEndsAt": "2026-01-12T21:58:23.613Z",
+      "billingStatus": "trial",
+      "id": "76f19839-1ee6-4b1c-88fb-2120e649a380"
+    },
+    {
+      "name": "Admin",
+      "address": "Ísland",
+      "phone": "7891809",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "gisli@utsalapp.is",
+      "plan": "premium",
+      "trialEndsAt": "2026-01-13T12:00:06.364Z",
+      "billingStatus": "trial",
+      "id": "632f2590-bdb5-4bc4-8313-be61dc2ccc85"
+    },
+    {
+      "name": "Útsalapp",
+      "address": "Ísland",
+      "phone": "7891809",
+      "website": "https://utsalapp.is/",
+      "logoUrl": "",
+      "ownerEmail": "utsalapp@utsalapp.is",
+      "plan": "premium",
+      "trialEndsAt": "2026-01-14T16:41:40.476Z",
+      "billingStatus": "trial",
+      "id": "e7d98c85-c2bf-40b5-bd6b-774c606d1b87"
     }
   ],
   "posts": [
     {
-      "title": "Happy hour á english pub",
-      "description": "Já",
-      "category": "Happy Hour",
-      "price": 1000,
-      "oldPrice": 1400,
-      "imageUrl": "/uploads/cef73730-3f1f-495a-86a2-89a2ae632a5c.jpg",
-      "storeId": "fd1f235a-7ba8-4279-bbe6-55f918186987",
+      "title": "Gítar á afslætti",
+      "description": "Noir gitar sem þarfnast lagfæringa. Keyptur á 50.000 fæst á 15.000",
+      "category": "Raftæki",
+      "price": 15000,
+      "oldPrice": 50000,
+      "imageUrl": "/uploads/9dbe46ee-83a0-40c5-9ad5-d960f7c839c6.jpg",
+      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
       "buyUrl": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2025-12-01T11:34:58.994Z",
-      "viewCount": 2,
-      "id": "ed4301cb-eaab-4515-9ee1-539868171f55"
+      "startsAt": "2026-01-07",
+      "endsAt": "2026-01-31",
+      "createdAt": "2026-01-07T17:54:55.276Z",
+      "viewCount": 3,
+      "id": "43786de9-cbf1-48ed-8d24-206b972d0f01"
+    },
+    {
+      "title": "Gleðilegt nýtt ár 🥳",
+      "description": "Gleðilegt nýtt ár 2026 \nGæfa og hamingja fylgi ykkur öllum 🥰",
+      "category": "Annað",
+      "price": 0,
+      "oldPrice": 100,
+      "imageUrl": "/uploads/fddff66e-2c79-419e-8320-89612278d536.jpg",
+      "storeId": "e7d98c85-c2bf-40b5-bd6b-774c606d1b87",
+      "buyUrl": "https://utsalapp.is/",
+      "startsAt": "2026-01-07",
+      "endsAt": "2026-12-31",
+      "createdAt": "2026-01-07T16:49:51.181Z",
+      "viewCount": 9,
+      "id": "13bc43ca-f0ef-4e28-a52a-30ceebf4ab23"
+    },
+    {
+      "title": "Jeii",
+      "description": "",
+      "category": "Annað",
+      "price": 20,
+      "oldPrice": 20000,
+      "imageUrl": "/uploads/6e5a064c-2c32-44f2-86a0-568de10601d1.jpg",
+      "storeId": "76f19839-1ee6-4b1c-88fb-2120e649a380",
+      "buyUrl": null,
+      "startsAt": "2026-01-05",
+      "endsAt": "2026-01-29",
+      "createdAt": "2026-01-05T22:15:06.477Z",
+      "viewCount": 13,
+      "id": "a302f01b-9308-4863-b8d3-66fbe800b1c5"
+    },
+    {
+      "title": "Gleðilegt nýtt ár",
+      "description": "2026",
+      "category": "Annað",
+      "price": 100,
+      "oldPrice": 10000,
+      "imageUrl": "/uploads/e618c244-3483-44b5-bfb4-d9a271d46fcc.jpg",
+      "storeId": "76f19839-1ee6-4b1c-88fb-2120e649a380",
+      "buyUrl": null,
+      "startsAt": "2026-01-05",
+      "endsAt": "2026-01-08",
+      "createdAt": "2026-01-05T22:11:55.395Z",
+      "viewCount": 5,
+      "id": "af4783d3-5d81-44d3-b0c8-147acbd3d349"
     },
     {
       "title": "Hlemmur til sölu",
@@ -503,36 +606,6 @@
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
       "viewCount": 7
-    },
-    {
-      "title": "Hálf pulsa",
-      "description": "Ca 9 daga gomul en lyktar ekkert illa",
-      "category": "veitingar",
-      "price": 79000,
-      "oldPrice": 89000,
-      "imageUrl": "/uploads/c69fde10-8a81-4186-b263-f4f1abf96d70.jpg",
-      "storeId": "da74b728-eea0-4ad4-bdf6-0a8f8024306b",
-      "buyUrl": null,
-      "startsAt": "2025-11-25",
-      "endsAt": "2025-12-02",
-      "createdAt": "2025-11-25T14:09:08.040Z",
-      "id": "3da8fc74-65a0-4e1e-817a-218086907927",
-      "viewCount": 5
-    },
-    {
-      "title": "Kópavogur",
-      "description": "Kópavogur á góðu verði",
-      "category": "Íþróttavörur",
-      "price": 24000,
-      "oldPrice": 60000,
-      "imageUrl": "/uploads/921ded5f-a35a-49c6-aeaf-8c26e3ccb026.jpg",
-      "storeId": "9352b076-472f-4354-9f54-2dac2c95a85d",
-      "buyUrl": "https://www.kopavogur.is/",
-      "startsAt": "2025-11-29",
-      "endsAt": "2025-12-06",
-      "createdAt": "2025-11-29T21:05:44.687Z",
-      "viewCount": 5,
-      "id": "5bc112e6-1ea0-4c72-b7a4-58ab21882cf9"
     }
   ]
 }

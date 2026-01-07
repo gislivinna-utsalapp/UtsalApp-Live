@@ -25,12 +25,11 @@ function loadDatabase() {
     return initial;
   }
   const raw = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-  const db = {
+  return {
     users: raw.users ?? [],
     stores: raw.stores ?? [],
     posts: raw.posts ?? []
   };
-  return db;
 }
 function saveDatabase(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
@@ -42,11 +41,7 @@ var DbStorage = class {
     let changed = false;
     for (const s of this.db.stores) {
       if (s.plan === void 0) {
-        if (s.planType !== void 0) {
-          s.plan = s.planType;
-        } else {
-          s.plan = "basic";
-        }
+        s.plan = s.planType ?? "basic";
         changed = true;
       }
       if (s.trialEndsAt === void 0) {
@@ -54,11 +49,7 @@ var DbStorage = class {
         changed = true;
       }
       if (s.billingStatus === void 0) {
-        if (s.billingActive === true) {
-          s.billingStatus = "active";
-        } else {
-          s.billingStatus = "trial";
-        }
+        s.billingStatus = s.billingActive === true ? "active" : "trial";
         changed = true;
       }
       if (s.planType !== void 0) {
@@ -70,32 +61,52 @@ var DbStorage = class {
         changed = true;
       }
     }
+    for (const u of this.db.users) {
+      if (typeof u.email === "string") {
+        const normalized = u.email.trim().toLowerCase();
+        if (u.email !== normalized) {
+          u.email = normalized;
+          changed = true;
+        }
+      }
+      if (u.password !== void 0) {
+        delete u.password;
+        changed = true;
+      }
+    }
     if (changed) {
       saveDatabase(this.db);
     }
   }
-  // USERS
+  // ---------------- USERS ----------------
   async createUser(user) {
-    const newUser = { ...user, id: crypto.randomUUID() };
+    const newUser = {
+      ...user,
+      email: user.email.trim().toLowerCase(),
+      id: crypto.randomUUID()
+    };
     this.db.users.push(newUser);
     saveDatabase(this.db);
     return newUser;
   }
   async findUserByEmail(email) {
-    return this.db.users.find((u) => u.email === email);
+    const normalized = email.trim().toLowerCase();
+    return this.db.users.find(
+      (u) => u.email.trim().toLowerCase() === normalized
+    );
   }
   async findUserById(id) {
     return this.db.users.find((u) => u.id === id);
   }
-  // STORES
+  // ---------------- STORES ----------------
   async createStore(store) {
     const newStore = {
       ...store,
-      id: crypto.randomUUID()
+      id: crypto.randomUUID(),
+      plan: store.plan ?? "basic",
+      trialEndsAt: store.trialEndsAt ?? null,
+      billingStatus: store.billingStatus ?? "trial"
     };
-    if (newStore.plan === void 0) newStore.plan = "basic";
-    if (newStore.trialEndsAt === void 0) newStore.trialEndsAt = null;
-    if (newStore.billingStatus === void 0) newStore.billingStatus = "trial";
     this.db.stores.push(newStore);
     saveDatabase(this.db);
     return newStore;
@@ -110,17 +121,18 @@ var DbStorage = class {
     const index = this.db.stores.findIndex((s) => s.id === storeId);
     if (index === -1) return null;
     const existing = this.db.stores[index];
-    const updated = { ...existing, ...updates };
+    const updated = {
+      ...existing,
+      ...updates
+    };
     if (updated.plan === void 0) updated.plan = "basic";
     if (updated.trialEndsAt === void 0) updated.trialEndsAt = null;
-    if (updated.billingStatus === void 0) {
-      updated.billingStatus = "trial";
-    }
+    if (updated.billingStatus === void 0) updated.billingStatus = "trial";
     this.db.stores[index] = updated;
     saveDatabase(this.db);
     return updated;
   }
-  // POSTS
+  // ---------------- POSTS ----------------
   async createPost(post) {
     const newPost = { ...post, id: crypto.randomUUID() };
     this.db.posts.push(newPost);
@@ -423,23 +435,23 @@ function registerRoutes(app) {
           trialEndsAt,
           billingStatus: store.billingStatus ?? "trial"
         });
-        if (updated) {
-          store = updated;
-        }
+        if (updated) store = updated;
       }
+      const isAdmin = user.isAdmin === true;
       const token = jwt.sign(
         {
           id: user.id,
           email,
           role: user.role,
-          storeId: user.storeId
+          storeId: user.storeId,
+          isAdmin
         },
         JWT_SECRET,
         { expiresIn: "7d" }
       );
       let storePayload = null;
       if (store) {
-        const plan = store.plan ?? store.planType ?? "basic";
+        const plan = store.plan ?? "basic";
         const billingStatus = store.billingStatus ?? (store.billingActive ? "active" : "trial");
         const billingActive = billingStatus === "active" || billingStatus === "trial";
         storePayload = {
@@ -454,17 +466,21 @@ function registerRoutes(app) {
           billingStatus,
           billingActive,
           createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
         };
       }
       return res.json({
-        user: { id: user.id, email, role: user.role },
+        user: {
+          id: user.id,
+          email,
+          role: user.role,
+          isAdmin
+        },
         store: storePayload,
         token
       });
     } catch (err) {
       console.error("login error:", err);
-      res.status(500).json({ message: "Villa kom upp" });
+      return res.status(500).json({ message: "Villa kom upp" });
     }
   });
   app.get(
@@ -476,47 +492,28 @@ function registerRoutes(app) {
           return res.status(401).json({ message: "Ekki innskr\xE1\xF0ur" });
         }
         let store = req.user.storeId ? await storage.getStoreById(req.user.storeId) : null;
-        if (store && !store.trialEndsAt && store.billingStatus !== "expired") {
-          const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-          const updated = await storage.updateStore(store.id, {
-            trialEndsAt,
-            billingStatus: store.billingStatus ?? "trial"
-          });
-          if (updated) {
-            store = updated;
-          }
-        }
         let storePayload = null;
         if (store) {
-          const plan = store.plan ?? store.planType ?? "basic";
-          const billingStatus = store.billingStatus ?? (store.billingActive ? "active" : "trial");
-          const billingActive = billingStatus === "active" || billingStatus === "trial";
           storePayload = {
             id: store.id,
             name: store.name,
-            address: store.address ?? "",
-            phone: store.phone ?? "",
-            website: store.website ?? "",
-            plan,
-            planType: plan,
+            plan: store.plan ?? "basic",
             trialEndsAt: store.trialEndsAt ?? null,
-            billingStatus,
-            billingActive,
-            createdAt: store.createdAt ?? null
-            // BÆTT VIÐ
+            billingStatus: store.billingStatus ?? "trial"
           };
         }
         return res.json({
           user: {
             id: req.user.id,
             email: req.user.email,
-            role: req.user.role
+            role: req.user.role,
+            isAdmin: req.user.isAdmin === true
           },
           store: storePayload
         });
       } catch (err) {
         console.error("auth/me error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+        return res.status(500).json({ message: "Villa kom upp" });
       }
     }
   );
@@ -841,12 +838,50 @@ function registerRoutes(app) {
 }
 
 // server/index.ts
+import path3 from "path";
+import fs3 from "fs";
 var PORT = Number(process.env.PORT) || 5e3;
+var UPLOAD_DIR2 = process.env.UPLOAD_DIR || path3.join(process.cwd(), "uploads");
 function main() {
+  process.on("unhandledRejection", (reason) => {
+    console.error("[unhandledRejection]", reason);
+  });
+  process.on("uncaughtException", (err) => {
+    console.error("[uncaughtException]", err);
+  });
+  try {
+    fs3.mkdirSync(UPLOAD_DIR2, { recursive: true });
+    console.log("[uploads] dir ready:", UPLOAD_DIR2);
+  } catch (err) {
+    console.error("[uploads] mkdir failed:", UPLOAD_DIR2, err);
+  }
   const app = express2();
+  app.use((req, _res, next) => {
+    if (req.method === "POST" && req.originalUrl === "/api/v1/uploads") {
+      console.log("[UPLOAD REQUEST]", {
+        url: req.originalUrl,
+        contentType: req.headers["content-type"],
+        contentLength: req.headers["content-length"]
+      });
+    }
+    next();
+  });
   registerRoutes(app);
+  app.use(
+    (err, req, res, _next) => {
+      console.error("[API ERROR]", {
+        url: req.originalUrl,
+        method: req.method,
+        message: err?.message,
+        code: err?.code,
+        name: err?.name
+      });
+      if (err?.stack) console.error(err.stack);
+      res.status(500).json({ error: "INTERNAL_SERVER_ERROR" });
+    }
+  );
   const server = createServer(app);
-  server.listen(PORT, () => {
+  server.listen(PORT, "0.0.0.0", () => {
     console.log(`[express] serving on port ${PORT}`);
   });
 }

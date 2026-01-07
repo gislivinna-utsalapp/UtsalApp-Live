@@ -1,4 +1,5 @@
 // client/src/App.tsx
+import AdminPage from "@/pages/Admin";
 import { Routes, Route, Link, useLocation } from "react-router-dom";
 
 import Home from "./pages/Home";
@@ -13,14 +14,15 @@ import Profile from "./pages/Profile";
 import About from "./pages/About";
 import NotFound from "./pages/not-found";
 
-import PrivateRoute from "./lib/PrivateRoute";
+// ❌ Enginn HashRouter hér
+// ❌ Enginn PrivateRoute í debug-mode
 
 function BottomNav() {
   const location = useLocation();
   const tab = location.pathname;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 bg-[#FF7A1A] text-white z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.6)]">
+    <nav className="fixed inset-x-0 bottom-0 bg-primary text-primary-foreground z-20 shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
       <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
         <Link
           to="/"
@@ -65,48 +67,23 @@ function BottomNav() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Aðal innihald. pb-24 til að skilja pláss fyrir BottomNav */}
-      <div className="max-w-4xl mx-auto px-4 pt-4 pb-24">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="max-w-4xl mx-auto px-4 pt-4 pb-24 text-foreground [&_*]:text-foreground">
         <Routes>
-          {/* Opnar síður */}
           <Route path="/" element={<Home />} />
           <Route path="/leit" element={<SearchPage />} />
           <Route path="/flokkar" element={<CategoriesPage />} />
           <Route path="/about" element={<About />} />
           <Route path="/post/:id" element={<PostDetail />} />
 
-          {/* Auth síður – EKKI verndaðar */}
           <Route path="/login" element={<Login />} />
           <Route path="/register-store" element={<RegisterStore />} />
 
-          {/* Verndaðar verslunarsíður */}
-          <Route
-            path="/profile"
-            element={
-              <PrivateRoute>
-                <Profile />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/create-post"
-            element={
-              <PrivateRoute>
-                <CreatePost />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/edit-post/:id"
-            element={
-              <PrivateRoute>
-                <EditPost />
-              </PrivateRoute>
-            }
-          />
+          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/create-post" element={<CreatePost />} />
+          <Route path="/edit-post/:id" element={<EditPost />} />
 
-          {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

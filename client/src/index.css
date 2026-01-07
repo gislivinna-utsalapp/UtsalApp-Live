@@ -4,27 +4,27 @@
 
 @layer base {
   :root {
-    --background: 0 0% 0%;
-    /* svartur */
-    --foreground: 0 0% 100%;
-    /* hvítur texti */
+    /* 🔹 Bakgrunnur = HVÍTT */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
 
+    /* Kort */
     --card: 0 0% 100%;
-    /* hvít kort */
-    --card-foreground: 0 0% 0%;
-    /* svartur texti í kortum */
+    --card-foreground: 222 47% 11%;
 
-    --primary: 25 100% 55%;
-    /* appelsínuguli glow-liturinn */
+    /* 🔥 Primary = BLEIKT (í stað appelsínuguls) */
+    --primary: 330 81% 60%;
     --primary-foreground: 0 0% 100%;
 
-    --border: 0 0% 85%;
-    /* ljósgrár rammi */
-    --muted: 0 0% 70%;
-    --muted-foreground: 0 0% 50%;
+    /* Borders & muted */
+    --border: 220 13% 91%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8% 46%;
   }
 
   body {
+    margin: 0;
     @apply bg-background text-foreground;
   }
+
 }

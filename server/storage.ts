@@ -88,7 +88,10 @@ function auth(requiredRole?: "store" | "admin") {
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      req.user = decoded;
+      req.user = {
+        ...decoded,
+        isAdmin: decoded.isAdmin === true,
+      };
       next();
     } catch (err) {
       return res.status(401).json({ message: "Token invalid or expired" });

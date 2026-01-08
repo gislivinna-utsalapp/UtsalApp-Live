@@ -126,21 +126,22 @@ export default function CategoriesPage() {
                     Allt
                   </Button>
 
-                  {categories.map((cat) => (
-                    <Button
-                      key={cat}
-                      size="sm"
-                      variant="outline"
-                      className={
-                        selectedCategory === cat
-                          ? "bg-white text-black text-xs border border-white"
-                          : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                      }
-                      onClick={() => setSelectedCategory(cat)}
-                    >
-                      {cat}
-                    </Button>
-                  ))}
+                  {Array.isArray(categories) &&
+                    categories.map((cat) => (
+                      <Button
+                        key={cat}
+                        size="sm"
+                        variant="outline"
+                        className={
+                          selectedCategory === cat
+                            ? "bg-white text-black text-xs border border-white"
+                            : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                        }
+                        onClick={() => setSelectedCategory(cat)}
+                      >
+                        {cat}
+                      </Button>
+                    ))}
                 </div>
               </div>
             )}

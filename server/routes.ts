@@ -158,7 +158,7 @@ async function mapPostToFrontend(p: any) {
           {
             url: p.imageUrl.startsWith("http")
               ? p.imageUrl
-              : `${process.env.PUBLIC_BASE_URL}${p.imageUrl}`,
+              : `https://utsalapp-live.onrender.com${p.imageUrl}`,
             alt: p.title,
           },
         ]

@@ -533,6 +533,21 @@
   ],
   "posts": [
     {
+      "title": "test 2",
+      "description": "trest",
+      "category": "Heimili & húsgögn",
+      "price": 200,
+      "oldPrice": 1000,
+      "imageUrl": "/api/v1/uploads/6599f5b5-382a-49dc-81e6-6aca3b25603c.jpg",
+      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
+      "buyUrl": null,
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2026-01-07T20:06:44.607Z",
+      "viewCount": 1,
+      "id": "7776539e-d249-451c-9731-8cab5a9958d0"
+    },
+    {
       "title": "test",
       "description": "",
       "category": "Fatnaður - Börn",
@@ -544,7 +559,7 @@
       "startsAt": "2026-01-07",
       "endsAt": "2026-01-14",
       "createdAt": "2026-01-07T20:01:37.327Z",
-      "viewCount": 1,
+      "viewCount": 2,
       "id": "234a36cc-ea50-4636-94b1-8685ad86aacd"
     },
     {
@@ -559,7 +574,7 @@
       "startsAt": "2026-01-07",
       "endsAt": "2026-01-31",
       "createdAt": "2026-01-07T17:54:55.276Z",
-      "viewCount": 7,
+      "viewCount": 9,
       "id": "43786de9-cbf1-48ed-8d24-206b972d0f01"
     },
     {
@@ -589,7 +604,7 @@
       "startsAt": "2026-01-05",
       "endsAt": "2026-01-29",
       "createdAt": "2026-01-05T22:15:06.477Z",
-      "viewCount": 14,
+      "viewCount": 15,
       "id": "a302f01b-9308-4863-b8d3-66fbe800b1c5"
     },
     {
@@ -604,7 +619,7 @@
       "startsAt": "2026-01-05",
       "endsAt": "2026-01-08",
       "createdAt": "2026-01-05T22:11:55.395Z",
-      "viewCount": 5,
+      "viewCount": 6,
       "id": "af4783d3-5d81-44d3-b0c8-147acbd3d349"
     },
     {
@@ -620,22 +635,7 @@
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
-      "viewCount": 7
-    },
-    {
-      "title": "test 2",
-      "description": "trest",
-      "category": "Heimili & húsgögn",
-      "price": 200,
-      "oldPrice": 1000,
-      "imageUrl": "/api/v1/uploads/6599f5b5-382a-49dc-81e6-6aca3b25603c.jpg",
-      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
-      "buyUrl": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-01-07T20:06:44.607Z",
-      "viewCount": 0,
-      "id": "7776539e-d249-451c-9731-8cab5a9958d0"
+      "viewCount": 9
     }
   ]
 }

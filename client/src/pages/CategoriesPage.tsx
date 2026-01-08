@@ -13,7 +13,7 @@ async function fetchPosts(): Promise<SalePostWithDetails[]> {
   return apiFetch<SalePostWithDetails[]>("/api/v1/posts");
 }
 
-// Grunnflokkar – samræmdir við CreatePost.tsx
+// Grunnflokkar
 const BASE_CATEGORIES = [
   "Fatnaður - Konur",
   "Fatnaður - Karlar",
@@ -49,14 +49,16 @@ function normalizeCategory(raw: string | null | undefined): string {
 }
 
 export default function CategoriesPage() {
-  const {
-    data: posts = [],
-    isLoading,
-    error,
-  } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["posts", "categories"],
     queryFn: fetchPosts,
   });
+
+  const posts: SalePostWithDetails[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.posts)
+      ? (data as any).posts
+      : [];
 
   const normalizedPosts = posts.map((p) => ({
     ...p,
@@ -126,22 +128,21 @@ export default function CategoriesPage() {
                     Allt
                   </Button>
 
-                  {Array.isArray(categories) &&
-                    categories.map((cat) => (
-                      <Button
-                        key={cat}
-                        size="sm"
-                        variant="outline"
-                        className={
-                          selectedCategory === cat
-                            ? "bg-white text-black text-xs border border-white"
-                            : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                        }
-                        onClick={() => setSelectedCategory(cat)}
-                      >
-                        {cat}
-                      </Button>
-                    ))}
+                  {categories.map((cat) => (
+                    <Button
+                      key={cat}
+                      size="sm"
+                      variant="outline"
+                      className={
+                        selectedCategory === cat
+                          ? "bg-white text-black text-xs border border-white"
+                          : "text-xs border border-white text-white hover:bg-white hover:text-black"
+                      }
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </Button>
+                  ))}
                 </div>
               </div>
             )}

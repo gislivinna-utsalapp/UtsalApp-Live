@@ -53,7 +53,7 @@ export default function Home() {
         </Card>
       )}
 
-      {!isLoading && !error && posts.length > 0 && (
+      {!isLoading && !error && Array.isArray(posts) && posts.length > 0 && (
         <section>
           {/* HÉR er nýja grid-ið:
               2 dálkar, minni gap => nettari og jafnari gluggar */}

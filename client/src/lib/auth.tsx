@@ -9,6 +9,10 @@ import {
 
 import { apiFetch } from "@/lib/api";
 
+/* =======================
+   TYPES
+======================= */
+
 type UserRole = "user" | "store";
 
 type StoreInfo = {
@@ -27,7 +31,7 @@ type User = {
   id: string;
   email: string;
   role: UserRole;
-  isAdmin?: boolean; // ✅ BÆTT VIÐ
+  isAdmin?: boolean;
 };
 
 export type AuthUser = {
@@ -52,6 +56,10 @@ type AuthContextType = {
   logout: () => Promise<void>;
 };
 
+/* =======================
+   CONTEXT + STORAGE KEYS
+======================= */
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_KEY = "utsalapp_auth_user";
@@ -66,11 +74,15 @@ type LoginResponse = {
     id: string;
     email: string;
     role: UserRole;
-    isAdmin?: boolean; // ✅ BÆTT VIÐ
+    isAdmin?: boolean;
   };
   store?: StoreInfo | null;
   token: string;
 };
+
+/* =======================
+   PROVIDER
+======================= */
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
@@ -93,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /* ---------- LOGIN ---------- */
   async function login(email: string, password: string) {
     setLoading(true);
     setAuthUser(null);
@@ -110,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authData: AuthUser = {
         user: {
           ...data.user,
-          isAdmin: data.user.isAdmin === true, // ✅ MIKILVÆGT
+          isAdmin: data.user.isAdmin === true,
         },
         store: data.store ?? null,
       };
@@ -118,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(TOKEN_KEY, data.token);
       localStorage.setItem(AUTH_KEY, JSON.stringify(authData));
 
-      // legacy
+      // legacy stuðningur
       localStorage.setItem(LEGACY_TOKEN_KEY, data.token);
       localStorage.setItem(LEGACY_USER_KEY, JSON.stringify(authData.user));
       if (typeof data.store !== "undefined") {
@@ -131,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  /* ---------- REGISTER STORE ---------- */
   async function registerStore(data: {
     storeName: string;
     email: string;
@@ -139,25 +153,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone?: string;
     website?: string;
   }) {
-    async function registerStore(data: {
-  storeName: string;
-  email: string;
-  password: string;
-  address?: string;
-  phone?: string;
-  website?: string;
-}) {
-  await apiFetch("/api/v1/auth/register-store", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
+    await apiFetch("/api/v1/auth/register-store", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
 
+  /* ---------- LOGOUT ---------- */
+  async function logout() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+    localStorage.removeItem(LEGACY_USER_KEY);
+    localStorage.removeItem(LEGACY_STORE_KEY);
+    setAuthUser(null);
+  }
 
   const value: AuthContextType = {
     authUser,
     isStore: authUser?.user?.role === "store",
-    isAdmin: authUser?.user?.isAdmin === true, // ✅ LAGAÐ
+    isAdmin: authUser?.user?.isAdmin === true,
     loading,
     login,
     registerStore,
@@ -166,6 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+/* =======================
+   HOOK
+======================= */
 
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);

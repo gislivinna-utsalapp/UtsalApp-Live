@@ -153,7 +153,16 @@ async function mapPostToFrontend(p: any) {
     priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
     priceSale: Number(p.price ?? p.priceSale ?? 0),
 
-    images: p.imageUrl ? [{ url: p.imageUrl, alt: p.title }] : [],
+    images: p.imageUrl
+      ? [
+          {
+            url: p.imageUrl.startsWith("http")
+              ? p.imageUrl
+              : `${process.env.PUBLIC_BASE_URL}${p.imageUrl}`,
+            alt: p.title,
+          },
+        ]
+      : [],
 
     startsAt: p.startsAt ?? null,
     endsAt: p.endsAt ?? null,

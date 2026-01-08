@@ -139,20 +139,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone?: string;
     website?: string;
   }) {
-    await apiFetch("/api/v1/auth/register-store", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
+    async function registerStore(data: {
+  storeName: string;
+  email: string;
+  password: string;
+  address?: string;
+  phone?: string;
+  website?: string;
+}) {
+  await apiFetch("/api/v1/auth/register-store", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
 
-  async function logout() {
-    localStorage.removeItem(AUTH_KEY);
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(LEGACY_TOKEN_KEY);
-    localStorage.removeItem(LEGACY_USER_KEY);
-    localStorage.removeItem(LEGACY_STORE_KEY);
-    setAuthUser(null);
-  }
 
   const value: AuthContextType = {
     authUser,

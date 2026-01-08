@@ -4,23 +4,17 @@
 export const API_BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "";
 
-// Býr til fulla URL út frá relative path + mögulegri base-url
+// Býr til fulla URL út frá relative path + API base-url
 function buildUrl(path: string): string {
   // Ef path er þegar absolute (http/https)
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
 
-  // Engin skilgreind base-url: notum relative slóð (virkar í Replit)
-  if (!API_BASE_URL) {
-    return path;
-  }
-
-  const base = API_BASE_URL.endsWith("/")
-    ? API_BASE_URL.slice(0, -1)
-    : API_BASE_URL;
+  const base = (API_BASE_URL || "").replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
-  return `${base}${p}`;
+
+  return base ? `${base}${p}` : p;
 }
 
 // Sameiginlegt API-fall sem bætir við Authorization haus ef token er til

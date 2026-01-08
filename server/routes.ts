@@ -899,13 +899,25 @@ export function registerRoutes(app: Express): void {
           .jpeg({ quality: 80 })
           .toFile(filepath);
 
-        res.json({ url: `/api/v1/uploads/${filename}` });
+        // ⬇️ SKILA URL SEM ER Í RAUN AÐGENGILEGT
+        res.json({ url: `/uploads/${filename}` });
       } catch (err) {
         console.error("upload error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     },
   );
+
+  // ------------------ IMAGE SERVE ------------------
+  router.get("/uploads/:filename", (req: Request, res: Response) => {
+    const filepath = path.join(UPLOAD_DIR, req.params.filename);
+
+    if (!fs.existsSync(filepath)) {
+      return res.status(404).end();
+    }
+
+    res.sendFile(filepath);
+  });
 
   // ⬅️ MOUNT API ROUTER (EINU SINNI)
   app.use("/api/v1", router);

@@ -7,33 +7,72 @@ type Props = {
   post: SalePostWithDetails;
 };
 
-// Hjálparfall til að byggja rétta myndaslóð
-function buildImageUrl(rawUrl?: string | null): string | null {
-  if (!rawUrl) return null;
+type ImageLike =
+  | string
+  | {
+      url?: string | null;
+      alt?: string | null;
+    }
+  | null
+  | undefined;
 
-  // Ef hún er nú þegar absolute (http/https) – skilar beint
-  if (/^https?:\/\//i.test(rawUrl)) {
-    return rawUrl;
-  }
+function buildImageUrl(rawPath?: string | null): string | null {
+  if (!rawPath) return null;
 
-  // Ef við höfum API_BASE_URL (Netlify / production)
+  // Absolute already
+  if (/^https?:\/\//i.test(rawPath)) return rawPath;
+
+  // Prefix with API base in production
   if (API_BASE_URL) {
     const base = API_BASE_URL.endsWith("/")
       ? API_BASE_URL.slice(0, -1)
       : API_BASE_URL;
-    const path = rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`;
-    return `${base}${path}`;
+    const p = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+    return `${base}${p}`;
   }
 
-  // Fallback: relative slóð (virkar í Replit dev þar sem frontend+backend eru á sama host)
-  return rawUrl;
+  // Dev fallback (same host)
+  return rawPath;
+}
+
+// Finna "fyrstu raunverulegu mynd" úr images sem getur verið:
+// - string[]
+// - object[]
+// - sparse array (holur)
+// - blanda
+function pickFirstImage(images: unknown): {
+  url: string | null;
+  alt: string | null;
+} {
+  const arr = Array.isArray(images) ? (images as ImageLike[]) : [];
+
+  for (const item of arr) {
+    if (!item) continue;
+
+    if (typeof item === "string") {
+      const s = item.trim();
+      if (s) return { url: s, alt: null };
+      continue;
+    }
+
+    if (typeof item === "object" && item !== null) {
+      const u = (item as any).url;
+      const a = (item as any).alt;
+      const url = typeof u === "string" ? u.trim() : "";
+      const alt = typeof a === "string" ? a.trim() : "";
+      if (url) return { url, alt: alt || null };
+    }
+  }
+
+  return { url: null, alt: null };
 }
 
 export function SalePostCard({ post }: Props) {
-  const imageUrl = buildImageUrl(post.images?.[0]?.url ?? null);
+  const { url: rawImage, alt: imageAlt } = pickFirstImage((post as any).images);
+  const imageUrl = buildImageUrl(rawImage);
 
   const discountPercent =
-    post.priceOriginal && post.priceSale
+    post.priceOriginal != null && post.priceSale != null
       ? Math.round(
           ((post.priceOriginal - post.priceSale) / post.priceOriginal) * 100,
         )
@@ -48,7 +87,7 @@ export function SalePostCard({ post }: Props) {
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={post.images?.[0]?.alt || post.title}
+            alt={imageAlt || post.title}
             className="h-full w-full object-cover"
             loading="lazy"
           />
@@ -71,9 +110,11 @@ export function SalePostCard({ post }: Props) {
             {post.store.name}
           </p>
         )}
+
         <h3 className="font-semibold text-sm text-neutral-900 line-clamp-1">
           {post.title}
         </h3>
+
         {post.description && (
           <p className="text-xs text-neutral-600 line-clamp-2">
             {post.description}

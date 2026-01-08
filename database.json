@@ -533,6 +533,50 @@
   ],
   "posts": [
     {
+      "title": "htefhb",
+      "description": "gfdwg",
+      "category": "Íþróttavörur",
+      "price": 10,
+      "oldPrice": 1000,
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": null,
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2026-01-08T17:25:10.987Z",
+      "viewCount": 0,
+      "id": "36380115-69f6-4b9b-bc3c-983cf6999d91"
+    },
+    {
+      "title": "few",
+      "description": "vd",
+      "category": "Fatnaður - Karlar",
+      "price": 200,
+      "oldPrice": 9000,
+      "imageUrl": "/uploads/c7661a0b-04cf-45d8-a99b-91bff95ea28d.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": null,
+      "startsAt": "2026-01-08",
+      "endsAt": "2026-01-22",
+      "createdAt": "2026-01-08T17:13:05.066Z",
+      "viewCount": 2,
+      "id": "2af809b8-d3e1-4962-b2c0-97c9d6e828ec"
+    },
+    {
+      "title": "test",
+      "description": "test",
+      "category": "Skór",
+      "price": 100,
+      "oldPrice": 1000,
+      "imageUrl": "/uploads/93d1a2c1-4d88-47cd-b852-6addce5505d2.jpg",
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": null,
+      "startsAt": "2026-01-08",
+      "endsAt": "2026-01-22",
+      "createdAt": "2026-01-08T16:58:21.019Z",
+      "viewCount": 2,
+      "id": "c9ce6394-5808-47c4-80bb-171072d60c4d"
+    },
+    {
       "title": "test 2",
       "description": "trest",
       "category": "Heimili & húsgögn",
@@ -544,7 +588,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2026-01-07T20:06:44.607Z",
-      "viewCount": 1,
+      "viewCount": 4,
       "id": "7776539e-d249-451c-9731-8cab5a9958d0"
     },
     {
@@ -559,7 +603,7 @@
       "startsAt": "2026-01-07",
       "endsAt": "2026-01-14",
       "createdAt": "2026-01-07T20:01:37.327Z",
-      "viewCount": 2,
+      "viewCount": 3,
       "id": "234a36cc-ea50-4636-94b1-8685ad86aacd"
     },
     {
@@ -574,7 +618,7 @@
       "startsAt": "2026-01-07",
       "endsAt": "2026-01-31",
       "createdAt": "2026-01-07T17:54:55.276Z",
-      "viewCount": 9,
+      "viewCount": 10,
       "id": "43786de9-cbf1-48ed-8d24-206b972d0f01"
     },
     {
@@ -589,7 +633,7 @@
       "startsAt": "2026-01-07",
       "endsAt": "2026-12-31",
       "createdAt": "2026-01-07T16:49:51.181Z",
-      "viewCount": 9,
+      "viewCount": 10,
       "id": "13bc43ca-f0ef-4e28-a52a-30ceebf4ab23"
     },
     {
@@ -619,7 +663,7 @@
       "startsAt": "2026-01-05",
       "endsAt": "2026-01-08",
       "createdAt": "2026-01-05T22:11:55.395Z",
-      "viewCount": 6,
+      "viewCount": 7,
       "id": "af4783d3-5d81-44d3-b0c8-147acbd3d349"
     },
     {
@@ -635,7 +679,21 @@
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
-      "viewCount": 9
+      "viewCount": 10
+    },
+    {
+      "title": "cdsac",
+      "description": "cdac",
+      "category": "Fatnaður - Konur",
+      "price": 2100,
+      "oldPrice": 3000,
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": null,
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2026-01-08T17:34:14.398Z",
+      "viewCount": 0,
+      "id": "015b56e7-7144-4b73-8f60-97e47e8e05ea"
     }
   ]
 }

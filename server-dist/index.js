@@ -1,6 +1,8 @@
 // server/index.ts
 import express2 from "express";
 import { createServer } from "http";
+import path3 from "path";
+import fs3 from "fs";
 
 // server/routes.ts
 import express from "express";
@@ -817,13 +819,20 @@ function registerRoutes(app) {
           fit: "inside",
           withoutEnlargement: true
         }).jpeg({ quality: 80 }).toFile(filepath);
-        res.json({ url: `/api/v1/uploads/${filename}` });
+        res.json({ url: `/uploads/${filename}` });
       } catch (err) {
         console.error("upload error", err);
         res.status(500).json({ message: "Villa kom upp" });
       }
     }
   );
+  router.get("/uploads/:filename", (req, res) => {
+    const filepath = path2.join(UPLOAD_DIR, req.params.filename);
+    if (!fs2.existsSync(filepath)) {
+      return res.status(404).end();
+    }
+    res.sendFile(filepath);
+  });
   app.use("/api/v1", router);
   if (process.env.NODE_ENV === "production") {
     const clientDistPath = path2.join(process.cwd(), "client", "dist");
@@ -838,8 +847,6 @@ function registerRoutes(app) {
 }
 
 // server/index.ts
-import path3 from "path";
-import fs3 from "fs";
 var PORT = Number(process.env.PORT) || 5e3;
 var UPLOAD_DIR2 = process.env.UPLOAD_DIR || path3.join(process.cwd(), "uploads");
 function main() {
@@ -856,13 +863,26 @@ function main() {
     console.error("[uploads] mkdir failed:", UPLOAD_DIR2, err);
   }
   const app = express2();
+  app.use(express2.json());
+  app.use(express2.urlencoded({ extended: true }));
+  app.use(
+    "/uploads",
+    express2.static(UPLOAD_DIR2, {
+      fallthrough: false,
+      index: false,
+      maxAge: "7d"
+    })
+  );
+  console.log("[static] serving /uploads from:", UPLOAD_DIR2);
   app.use((req, _res, next) => {
-    if (req.method === "POST" && req.originalUrl === "/api/v1/uploads") {
-      console.log("[UPLOAD REQUEST]", {
-        url: req.originalUrl,
-        contentType: req.headers["content-type"],
-        contentLength: req.headers["content-length"]
-      });
+    if (req.method === "POST" && req.originalUrl.startsWith("/api")) {
+      if (req.headers["content-type"]?.includes("multipart/form-data")) {
+        console.log("[UPLOAD REQUEST]", {
+          url: req.originalUrl,
+          contentType: req.headers["content-type"],
+          contentLength: req.headers["content-length"]
+        });
+      }
     }
     next();
   });
@@ -876,7 +896,9 @@ function main() {
         code: err?.code,
         name: err?.name
       });
-      if (err?.stack) console.error(err.stack);
+      if (err?.stack) {
+        console.error(err.stack);
+      }
       res.status(500).json({ error: "INTERNAL_SERVER_ERROR" });
     }
   );

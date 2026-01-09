@@ -2,6 +2,7 @@
 
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import type { SalePostWithDetails } from "@shared/schema";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { formatPrice, calculateDiscount, getTimeRemaining } from "@/lib/utils";
@@ -37,6 +38,8 @@ async function fetchPost(id: string): Promise<SalePostWithDetails> {
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  const [imageOpen, setImageOpen] = useState(false);
 
   const {
     data: post,
@@ -95,8 +98,6 @@ export default function PostDetail() {
     );
   }
 
-  // PASSAR VIÐ BACKEND:
-  // routes.ts → mapPostToFrontend: priceOriginal, priceSale, endsAt, buyUrl
   const discount = calculateDiscount(post.priceOriginal, post.priceSale);
 
   const remainingRaw = post.endsAt ? getTimeRemaining(post.endsAt) : null;
@@ -129,7 +130,6 @@ export default function PostDetail() {
     }
   }
 
-  // NÚNA notum við buildImageUrl → sama og forsíðan
   const mainImage = buildImageUrl(
     post.images && post.images.length > 0 ? post.images[0].url : null,
   );
@@ -151,17 +151,34 @@ export default function PostDetail() {
       <main className="px-4 py-4 space-y-4">
         <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
           {mainImage && (
-            <div className="aspect-[4/3] w-full bg-neutral-100 overflow-hidden">
-              <img
-                src={mainImage}
-                alt={post.title}
-                className="w-full h-full object-cover"
-              />
-            </div>
+            <>
+              <div
+                className="aspect-[4/3] w-full bg-neutral-100 overflow-hidden cursor-zoom-in"
+                onClick={() => setImageOpen(true)}
+              >
+                <img
+                  src={mainImage}
+                  alt={post.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              {imageOpen && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+                  onClick={() => setImageOpen(false)}
+                >
+                  <img
+                    src={mainImage}
+                    alt={post.title}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+              )}
+            </>
           )}
 
           <div className="p-4 space-y-4">
-            {/* Titill + verslun */}
             <div className="space-y-1">
               <h2 className="text-xl font-semibold mb-1 text-black">
                 {post.title}
@@ -176,7 +193,6 @@ export default function PostDetail() {
               )}
             </div>
 
-            {/* Afsláttur + verð */}
             <div className="space-y-2">
               {discount && (
                 <div className="inline-flex items-center gap-2 rounded-full bg-pink-100 text-pink-700 px-3 py-1">
@@ -204,14 +220,12 @@ export default function PostDetail() {
               )}
             </div>
 
-            {/* Lýsing */}
             {post.description && (
               <p className="text-sm text-neutral-800 whitespace-pre-line">
                 {post.description}
               </p>
             )}
 
-            {/* Flokkur */}
             {post.category && (
               <p className="text-xs text-neutral-500">
                 Flokkur:{" "}
@@ -221,7 +235,6 @@ export default function PostDetail() {
               </p>
             )}
 
-            {/* KAUPA HNAPPUR */}
             {post.buyUrl && (
               <div className="pt-2">
                 <a
@@ -230,8 +243,18 @@ export default function PostDetail() {
                   rel="noreferrer"
                   className="block"
                 >
-                  <Button className="w-full bg-black hover:bg-neutral-900 text-white text-sm py-2">
-                    Smelltu hér til að kaupa tilboðið
+                  <Button
+                    asChild
+                    className="w-full bg-pink-500 hover:bg-pink-600 text-white text-sm py-2 rounded-xl
+                               border-none shadow-none ring-0 focus:ring-0 focus:outline-none"
+                  >
+                    <a
+                      href={post.buyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Smelltu hér til að kaupa tilboðið
+                    </a>
                   </Button>
                 </a>
                 <p className="mt-1 text-[11px] text-neutral-500 text-center">

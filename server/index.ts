@@ -5,11 +5,12 @@ import path from "path";
 import fs from "fs";
 import { registerRoutes } from "./routes";
 
+// Uploads directory (Replit-only, einfalt og stöðugt)
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+
 const PORT = Number(process.env.PORT) || 5000;
 
 // Uploads dir (stöðugt bæði local + Render)
-const UPLOAD_DIR =
-  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
 
 function main() {
   /**
@@ -24,13 +25,11 @@ function main() {
   });
 
   /**
-   * 2) Tryggja að uploads mappa sé til
-   */
-  try {
+   /**
+ * 2) Tryggja að uploads mappa sé til
+ */
+  if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    console.log("[uploads] dir ready:", UPLOAD_DIR);
-  } catch (err) {
-    console.error("[uploads] mkdir failed:", UPLOAD_DIR, err);
   }
 
   const app = express();
@@ -42,17 +41,10 @@ function main() {
   app.use(express.urlencoded({ extended: true }));
 
   /**
-   * 4) STATIC SERVING – KRÍTÍSKT
-   * Þetta gerir /uploads/... aðgengilegt yfir HTTP
+   * 4) Static serving – KRÍTÍSKT
+   * Gerir /uploads/... aðgengilegt yfir HTTP
    */
-  app.use(
-    "/uploads",
-    express.static(UPLOAD_DIR, {
-      fallthrough: false,
-      index: false,
-      maxAge: "7d",
-    }),
-  );
+  app.use("/uploads", express.static(UPLOAD_DIR));
 
   console.log("[static] serving /uploads from:", UPLOAD_DIR);
 

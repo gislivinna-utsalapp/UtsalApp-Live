@@ -175,6 +175,13 @@ var UPLOAD_DIR = path2.join(process.cwd(), "uploads");
 if (!fs2.existsSync(UPLOAD_DIR)) {
   fs2.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+var upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024
+    // 5MB
+  }
+});
 var lastViewCache = {};
 var VIEW_DEDUP_WINDOW_MS = 5e3;
 var TRIAL_DAYS = 7;
@@ -243,10 +250,6 @@ async function requireActiveOrTrialStore(req, res, next) {
     res.status(500).json({ message: "Villa kom upp" });
   }
 }
-var upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }
-});
 async function mapPostToFrontend(p) {
   const store = p.storeId ? await storage.getStoreById(p.storeId) : null;
   const plan = store?.plan ?? store?.planType ?? "basic";
@@ -811,18 +814,26 @@ function registerRoutes(app) {
     async (req, res) => {
       try {
         if (!req.file) {
-          return res.status(400).json({ message: "Engin mynd" });
+          return res.status(400).json({ message: "Engin mynd send (req.file vantar)" });
+        }
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+          return res.status(400).json({ message: "Mynd er t\xF3m e\xF0a \xF3gild" });
+        }
+        if (!req.file.mimetype.startsWith("image/")) {
+          return res.status(400).json({ message: "Skr\xE1 er ekki mynd" });
         }
         const filename = `${crypto2.randomUUID()}.jpg`;
         const filepath = path2.join(UPLOAD_DIR, filename);
-        await sharp(req.file.buffer).resize(1200, 1200, {
-          fit: "inside",
-          withoutEnlargement: true
-        }).jpeg({ quality: 80 }).toFile(filepath);
-        res.json({ url: `/uploads/${filename}` });
+        await sharp(req.file.buffer).resize(1200, 1200, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(filepath);
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+        return res.json({
+          url: `${baseUrl}/uploads/${filename}`
+        });
       } catch (err) {
-        console.error("upload error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+        console.error("[UPLOAD SHARP ERROR]", err);
+        return res.status(500).json({
+          message: "Sharp gat ekki unni\xF0 \xFAr mynd"
+        });
       }
     }
   );
@@ -847,8 +858,8 @@ function registerRoutes(app) {
 }
 
 // server/index.ts
+var UPLOAD_DIR2 = path3.join(process.cwd(), "uploads");
 var PORT = Number(process.env.PORT) || 5e3;
-var UPLOAD_DIR2 = process.env.UPLOAD_DIR || path3.join(process.cwd(), "uploads");
 function main() {
   process.on("unhandledRejection", (reason) => {
     console.error("[unhandledRejection]", reason);
@@ -856,23 +867,13 @@ function main() {
   process.on("uncaughtException", (err) => {
     console.error("[uncaughtException]", err);
   });
-  try {
+  if (!fs3.existsSync(UPLOAD_DIR2)) {
     fs3.mkdirSync(UPLOAD_DIR2, { recursive: true });
-    console.log("[uploads] dir ready:", UPLOAD_DIR2);
-  } catch (err) {
-    console.error("[uploads] mkdir failed:", UPLOAD_DIR2, err);
   }
   const app = express2();
   app.use(express2.json());
   app.use(express2.urlencoded({ extended: true }));
-  app.use(
-    "/uploads",
-    express2.static(UPLOAD_DIR2, {
-      fallthrough: false,
-      index: false,
-      maxAge: "7d"
-    })
-  );
+  app.use("/uploads", express2.static(UPLOAD_DIR2));
   console.log("[static] serving /uploads from:", UPLOAD_DIR2);
   app.use((req, _res, next) => {
     if (req.method === "POST" && req.originalUrl.startsWith("/api")) {

@@ -277,11 +277,7 @@ export default function CreatePost() {
             )}
           </div>
 
-          <Button
-            type="submit"
-            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
-            disabled={isSubmitting}
-          >
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Bý til tilboð..." : "Búa til tilboð"}
           </Button>
         </form>

@@ -21,6 +21,7 @@ const CATEGORY_OPTIONS = [
   "Snyrtivörur",
   "Leikföng & börn",
   "Matur & veitingar",
+  "Happy Hour",
   "Annað",
 ];
 
@@ -46,7 +47,9 @@ async function uploadImage(file: File): Promise<string> {
   }
 
   const formData = new FormData();
-  formData.append("file", file);
+
+  // 🔑 VERÐUR að heita "image"
+  formData.append("image", file);
 
   const res = await fetch("/api/v1/uploads", {
     method: "POST",
@@ -162,6 +165,7 @@ export default function EditPost() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
     if (!id) {
       setErrorMsg("Vantar auðkenni tilboðs.");
       return;
@@ -193,7 +197,7 @@ export default function EditPost() {
     try {
       let finalImageUrl = existingImageUrl;
 
-      // Ef notandi valdi nýja mynd → hlaða henni upp
+      // Upload aðeins ef ný mynd er valin
       if (imageFile) {
         finalImageUrl = await uploadImage(imageFile);
       }
@@ -209,8 +213,11 @@ export default function EditPost() {
         endsAt: endsAt || null,
       };
 
+      // ✅ Mynd fer inn á réttan stað í payload
       if (finalImageUrl) {
         payload.images = [{ url: finalImageUrl }];
+      } else {
+        payload.images = [];
       }
 
       await apiFetch(`/api/v1/posts/${id}`, {
@@ -218,7 +225,7 @@ export default function EditPost() {
         body: JSON.stringify(payload),
       });
 
-      setSuccessMsg("Tilboð var uppfært.");
+      setSuccessMsg("Tilboð uppfært.");
       setTimeout(() => {
         navigate("/profile");
       }, 800);
@@ -231,6 +238,9 @@ export default function EditPost() {
       setIsSubmitting(false);
     }
   }
+
+  // ✅ LAGFÆRINGIN: Hér var áður tvítekinn kóði með `await` fyrir utan handleSubmit.
+  // Hann er fjarlægður svo build detti ekki út.
 
   if (loading) {
     return (
@@ -384,11 +394,7 @@ export default function EditPost() {
             )}
           </div>
 
-          <Button
-            type="submit"
-            className="w-full bg-[#FF7300] hover:bg-[#e56600] text-white"
-            disabled={isSubmitting}
-          >
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Uppfæri tilboð..." : "Vista breytingar"}
           </Button>
         </form>

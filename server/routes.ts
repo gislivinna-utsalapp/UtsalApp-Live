@@ -13,11 +13,20 @@ import crypto from "crypto";
 import { storage } from "./storage-db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
+// 🔑 Upload directory
+const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+
+// 🔑 Multer MUST be memoryStorage (annars er req.file.buffer undefined)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+});
 
 interface AuthRequest extends Request {
   user?: {
@@ -126,13 +135,6 @@ async function requireActiveOrTrialStore(
     res.status(500).json({ message: "Villa kom upp" });
   }
 }
-
-// ------------------------- UPLOAD -------------------------
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-});
 
 // ------------------------- MAPPA POST Í FRONTEND FORMAT -------------------------
 
@@ -885,25 +887,37 @@ export function registerRoutes(app: Express): void {
     async (req: AuthRequest, res: Response) => {
       try {
         if (!req.file) {
-          return res.status(400).json({ message: "Engin mynd" });
+          return res
+            .status(400)
+            .json({ message: "Engin mynd send (req.file vantar)" });
+        }
+
+        if (!req.file.buffer || req.file.buffer.length === 0) {
+          return res.status(400).json({ message: "Mynd er tóm eða ógild" });
+        }
+
+        if (!req.file.mimetype.startsWith("image/")) {
+          return res.status(400).json({ message: "Skrá er ekki mynd" });
         }
 
         const filename = `${crypto.randomUUID()}.jpg`;
         const filepath = path.join(UPLOAD_DIR, filename);
 
         await sharp(req.file.buffer)
-          .resize(1200, 1200, {
-            fit: "inside",
-            withoutEnlargement: true,
-          })
+          .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
           .jpeg({ quality: 80 })
           .toFile(filepath);
 
-        // ⬇️ SKILA URL SEM ER Í RAUN AÐGENGILEGT
-        res.json({ url: `/uploads/${filename}` });
+        const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+        return res.json({
+          url: `${baseUrl}/uploads/${filename}`,
+        });
       } catch (err) {
-        console.error("upload error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+        console.error("[UPLOAD SHARP ERROR]", err);
+        return res.status(500).json({
+          message: "Sharp gat ekki unnið úr mynd",
+        });
       }
     },
   );

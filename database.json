@@ -533,6 +533,21 @@
   ],
   "posts": [
     {
+      "title": "test",
+      "description": "test",
+      "category": "Fatnaður - Karlar",
+      "price": 20,
+      "oldPrice": 500,
+      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
+      "buyUrl": null,
+      "startsAt": null,
+      "endsAt": null,
+      "createdAt": "2026-01-09T18:30:37.913Z",
+      "viewCount": 7,
+      "id": "17c2da4b-f1dd-4934-9aa6-87525f062147",
+      "imageUrl": "http://526cb025-19f3-44f7-8f5d-6f058115b7de-00-1j9hm75tqhard.picard.replit.dev/uploads/778f14f7-b8b6-42eb-a4a3-837b1b8b9c02.jpg"
+    },
+    {
       "title": "ÚtsalApp",
       "description": "Í ÚtsalApp appinu finnur þú bestu verðin á því sem þú leitar að",
       "category": "Annað",
@@ -544,7 +559,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2026-01-09T12:23:23.198Z",
-      "viewCount": 1,
+      "viewCount": 5,
       "id": "df6b54bf-7356-4c8d-8a90-025cbdf58988"
     },
     {
@@ -559,7 +574,7 @@
       "startsAt": "2026-01-09",
       "endsAt": "2026-01-30",
       "createdAt": "2026-01-09T12:07:17.020Z",
-      "viewCount": 3,
+      "viewCount": 4,
       "id": "4af84227-12ae-4716-8315-dd5dedc622db"
     },
     {
@@ -589,7 +604,7 @@
       "startsAt": "2026-01-09",
       "endsAt": "2026-01-23",
       "createdAt": "2026-01-09T11:46:14.510Z",
-      "viewCount": 3,
+      "viewCount": 4,
       "id": "ef66d368-8f4b-4fa2-9dff-a34adba00f1d"
     },
     {
@@ -606,51 +621,6 @@
       "createdAt": "2026-01-08T16:58:21.019Z",
       "viewCount": 2,
       "id": "c9ce6394-5808-47c4-80bb-171072d60c4d"
-    },
-    {
-      "title": "test 2",
-      "description": "trest",
-      "category": "Heimili & húsgögn",
-      "price": 200,
-      "oldPrice": 1000,
-      "imageUrl": "/api/v1/uploads/6599f5b5-382a-49dc-81e6-6aca3b25603c.jpg",
-      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
-      "buyUrl": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-01-07T20:06:44.607Z",
-      "viewCount": 4,
-      "id": "7776539e-d249-451c-9731-8cab5a9958d0"
-    },
-    {
-      "title": "test",
-      "description": "",
-      "category": "Fatnaður - Börn",
-      "price": 1000,
-      "oldPrice": 2000,
-      "imageUrl": "/uploads/0afd4ba5-eafc-4ff8-b20e-7a5aa3091919.jpg",
-      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
-      "buyUrl": null,
-      "startsAt": "2026-01-07",
-      "endsAt": "2026-01-14",
-      "createdAt": "2026-01-07T20:01:37.327Z",
-      "viewCount": 3,
-      "id": "234a36cc-ea50-4636-94b1-8685ad86aacd"
-    },
-    {
-      "title": "Gítar á afslætti",
-      "description": "Noir gítar sem þarfnast lagfæringa. Keyptur á 50.000 fæst á 15.000",
-      "category": "Rafmagnstæki",
-      "price": 15000,
-      "oldPrice": 50000,
-      "imageUrl": "/uploads/9dbe46ee-83a0-40c5-9ad5-d960f7c839c6.jpg",
-      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
-      "buyUrl": null,
-      "startsAt": "2026-01-07",
-      "endsAt": "2026-01-31",
-      "createdAt": "2026-01-07T17:54:55.276Z",
-      "viewCount": 10,
-      "id": "43786de9-cbf1-48ed-8d24-206b972d0f01"
     },
     {
       "title": "Gleðilegt nýtt ár 🥳",
@@ -694,7 +664,7 @@
       "startsAt": "2026-01-05",
       "endsAt": "2026-01-08",
       "createdAt": "2026-01-05T22:11:55.395Z",
-      "viewCount": 7,
+      "viewCount": 8,
       "id": "af4783d3-5d81-44d3-b0c8-147acbd3d349"
     },
     {
@@ -710,7 +680,7 @@
       "endsAt": "2025-12-03",
       "createdAt": "2025-11-26T10:37:17.890Z",
       "id": "76a61ef3-6169-4802-a07a-39e3e4a1ea62",
-      "viewCount": 10
+      "viewCount": 12
     }
   ]
 }

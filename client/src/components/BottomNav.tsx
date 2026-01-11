@@ -8,13 +8,18 @@ export default function BottomNav() {
   const { isAdmin, loading } = useAuth();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground z-20 shadow-lg">
+    <nav
+      className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground z-20 shadow-lg"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
         <Link
           to="/"
           className={`flex-1 text-center transition-opacity ${
             tab === "/" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
+        >
+
         >
           Heim
         </Link>

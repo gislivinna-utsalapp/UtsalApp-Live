@@ -24,9 +24,10 @@ export default function Home() {
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
       {/* Toppurinn með % og texta */}
       <header className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center shadow-lg">
-          <span className="text-3xl font-extrabold text-black">%</span>
+        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center shadow-lg">
+          <span className="text-3xl font-extrabold text-white">%</span>
         </div>
+
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-white">ÚtsalApp</h1>
           <p className="text-sm text-gray-200">

@@ -35,11 +35,7 @@ function buildImageUrl(rawPath?: string | null): string | null {
   return rawPath;
 }
 
-// Finna "fyrstu raunverulegu mynd" úr images sem getur verið:
-// - string[]
-// - object[]
-// - sparse array (holur)
-// - blanda
+// Finnur fyrstu raunverulegu mynd úr images
 function pickFirstImage(images: unknown): {
   url: string | null;
   alt: string | null;
@@ -72,7 +68,11 @@ export function SalePostCard({ post }: Props) {
   const imageUrl = buildImageUrl(rawImage);
 
   const discountPercent =
-    post.priceOriginal != null && post.priceSale != null
+    typeof post.priceOriginal === "number" &&
+    typeof post.priceSale === "number" &&
+    post.priceOriginal > 0 &&
+    post.priceSale > 0 &&
+    post.priceSale < post.priceOriginal
       ? Math.round(
           ((post.priceOriginal - post.priceSale) / post.priceOriginal) * 100,
         )
@@ -83,27 +83,29 @@ export function SalePostCard({ post }: Props) {
       to={`/post/${post.id}`}
       className="block rounded-2xl overflow-hidden shadow-md bg-card border border-border hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
     >
-      <div className="relative h-36 w-full overflow-hidden bg-neutral-900">
+      {/* MYNDARRAMMI – stærri en textabox */}
+      <div className="relative w-full aspect-[4/5] overflow-hidden bg-neutral-900">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={imageAlt || post.title}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover"
             loading="lazy"
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center text-xs text-neutral-400">
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-400">
             Engin mynd skráð
           </div>
         )}
 
         {discountPercent !== null && (
-          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md">
+          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-[11px] font-bold px-3 py-1 rounded-full shadow-md">
             -{discountPercent}%
           </div>
         )}
       </div>
 
+      {/* TEXTABOX – minna og léttara */}
       <div className="p-3 space-y-1">
         {post.store && (
           <p className="text-[10px] uppercase tracking-wide text-neutral-500">

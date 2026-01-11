@@ -658,11 +658,13 @@ export default function Profile() {
                   onClick={() => navigate(`/post/${post.id}`)}
                 >
                   {firstImageUrl && (
-                    <img
-                      src={firstImageUrl}
-                      alt={post.images?.[0]?.alt || post.title}
-                      className="w-20 h-20 object-cover rounded-md flex-shrink-0"
-                    />
+                    <div className="relative w-20 aspect-square overflow-hidden rounded-md flex-shrink-0 bg-muted">
+                      <img
+                        src={firstImageUrl}
+                        alt={post.images?.[0]?.alt || post.title}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
+                    </div>
                   )}
 
                   <div className="flex-1 min-w-0 flex flex-col gap-1">

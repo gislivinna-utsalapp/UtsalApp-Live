@@ -1,6 +1,7 @@
 // client/src/pages/CreatePost.tsx
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
@@ -33,12 +34,15 @@ type CreatePostPayload = {
   buyUrl?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
-  images: string[]; // 🔴 LAGFÆRT: var { url }[]
+  images: {
+    url: string;
+    alt?: string;
+  }[];
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-// Upload image – EKKERT breytt nema að við skilum string
+// Upload image
 async function uploadImage(file: File): Promise<string> {
   const token =
     localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
@@ -63,8 +67,6 @@ async function uploadImage(file: File): Promise<string> {
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.error("Upload response:", text);
     throw new Error("Tókst ekki að hlaða upp mynd.");
   }
 
@@ -73,11 +75,12 @@ async function uploadImage(file: File): Promise<string> {
     throw new Error("Server skilaði ekki myndaslóð.");
   }
 
-  return data.url; // 🔴 strengur: /api/v1/uploads/xxx.jpg
+  return data.url;
 }
 
 export default function CreatePost() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -89,21 +92,33 @@ export default function CreatePost() {
   const [endsAt, setEndsAt] = useState("");
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) {
       setImageFile(null);
-      setImagePreview(null);
+      setImageUrl(null);
       return;
     }
+
+    setErrorMsg(null);
     setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+
+    try {
+      const uploadedUrl = await uploadImage(file);
+      setImageUrl(uploadedUrl);
+    } catch (err: any) {
+      setImageFile(null);
+      setImageUrl(null);
+      setErrorMsg(
+        err instanceof Error ? err.message : "Tókst ekki að hlaða upp mynd.",
+      );
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -129,18 +144,14 @@ export default function CreatePost() {
       return;
     }
 
-    if (!imageFile) {
-      setErrorMsg("Veldu mynd fyrir tilboðið.");
+    if (!imageUrl) {
+      setErrorMsg("Mynd er ekki tilbúin.");
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // 1. Upload mynd
-      const imageUrl = await uploadImage(imageFile);
-
-      // 2. Payload – EINA breytingin hér
       const payload: CreatePostPayload = {
         title: title.trim(),
         description: description.trim(),
@@ -150,13 +161,21 @@ export default function CreatePost() {
         buyUrl: buyUrl.trim() || null,
         startsAt: startsAt || null,
         endsAt: endsAt || null,
-        images: [imageUrl], // 🔴 LAGFÆRT
+        images: [
+          {
+            url: imageUrl,
+            alt: title.trim(),
+          },
+        ],
       };
 
       await apiFetch("/api/v1/posts", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-posts"] });
 
       setSuccessMsg("Tilboð var búið til.");
       setTimeout(() => navigate("/profile"), 800);
@@ -165,7 +184,7 @@ export default function CreatePost() {
       setErrorMsg(
         err instanceof Error
           ? err.message
-          : "Tókst ekki að búa til auglýsingu.",
+          : "Villa kom upp við að búa til tilboð.",
       );
     } finally {
       setIsSubmitting(false);
@@ -191,19 +210,13 @@ export default function CreatePost() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">
-            <Label htmlFor="title">Titill tilboðs</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
+            <Label>Titill tilboðs</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="description">Lýsing</Label>
+            <Label>Lýsing</Label>
             <textarea
-              id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full border border-black rounded-md px-3 py-2 text-sm bg-white min-h-[80px]"
@@ -211,13 +224,11 @@ export default function CreatePost() {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="category">Flokkur</Label>
+            <Label>Flokkur</Label>
             <select
-              id="category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="w-full border border-black rounded-md px-3 py-2 text-sm bg-white"
-              required
             >
               <option value="">Veldu flokk…</option>
               {CATEGORY_OPTIONS.map((opt) => (
@@ -228,32 +239,26 @@ export default function CreatePost() {
             </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Verð áður</Label>
-              <Input
-                value={priceOriginal}
-                onChange={(e) => setPriceOriginal(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>Tilboðsverð</Label>
-              <Input
-                value={priceSale}
-                onChange={(e) => setPriceSale(e.target.value)}
-                required
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              placeholder="Verð áður"
+              value={priceOriginal}
+              onChange={(e) => setPriceOriginal(e.target.value)}
+            />
+            <Input
+              placeholder="Tilboðsverð"
+              value={priceSale}
+              onChange={(e) => setPriceSale(e.target.value)}
+            />
           </div>
 
-          <div className="space-y-1">
-            <Label>Linkur til að kaupa</Label>
-            <Input value={buyUrl} onChange={(e) => setBuyUrl(e.target.value)} />
-          </div>
+          <Input
+            placeholder="Linkur til að kaupa"
+            value={buyUrl}
+            onChange={(e) => setBuyUrl(e.target.value)}
+          />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Input
               type="date"
               value={startsAt}
@@ -269,11 +274,15 @@ export default function CreatePost() {
           <div className="space-y-2">
             <Label>Mynd</Label>
             <Input type="file" accept="image/*" onChange={handleImageChange} />
-            {imagePreview && (
-              <img
-                src={imagePreview}
-                className="w-full max-h-60 object-cover rounded-md border mt-2"
-              />
+
+            {imageUrl && (
+              <div className="relative w-full aspect-[4/3] rounded-md border bg-muted flex items-center justify-center overflow-hidden">
+                <img
+                  src={imageUrl}
+                  alt="Preview"
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
             )}
           </div>
 

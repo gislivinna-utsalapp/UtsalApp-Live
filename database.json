@@ -533,36 +533,6 @@
   ],
   "posts": [
     {
-      "title": "test",
-      "description": "test",
-      "category": "Fatnaður - Karlar",
-      "price": 20,
-      "oldPrice": 500,
-      "storeId": "eed1989a-02bd-465f-ab65-eea215daeaaa",
-      "buyUrl": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-01-09T18:30:37.913Z",
-      "viewCount": 7,
-      "id": "17c2da4b-f1dd-4934-9aa6-87525f062147",
-      "imageUrl": "http://526cb025-19f3-44f7-8f5d-6f058115b7de-00-1j9hm75tqhard.picard.replit.dev/uploads/778f14f7-b8b6-42eb-a4a3-837b1b8b9c02.jpg"
-    },
-    {
-      "title": "ÚtsalApp",
-      "description": "Í ÚtsalApp appinu finnur þú bestu verðin á því sem þú leitar að",
-      "category": "Annað",
-      "price": 100,
-      "oldPrice": 10000000,
-      "imageUrl": "http://526cb025-19f3-44f7-8f5d-6f058115b7de-00-1j9hm75tqhard.picard.replit.dev/uploads/78f4660e-fb1f-4dc4-8316-5d5f4cf691c1.jpg",
-      "storeId": "632f2590-bdb5-4bc4-8313-be61dc2ccc85",
-      "buyUrl": "https://utsalapp-live.onrender.com/",
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-01-09T12:23:23.198Z",
-      "viewCount": 5,
-      "id": "df6b54bf-7356-4c8d-8a90-025cbdf58988"
-    },
-    {
       "title": "Nautalund ur sælkerabúðinni",
       "description": "Það er ekki hægt að mæla nóg með þessari nautalund",
       "category": "Annað",
@@ -574,7 +544,7 @@
       "startsAt": "2026-01-09",
       "endsAt": "2026-01-30",
       "createdAt": "2026-01-09T12:07:17.020Z",
-      "viewCount": 4,
+      "viewCount": 6,
       "id": "4af84227-12ae-4716-8315-dd5dedc622db"
     },
     {
@@ -589,7 +559,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2026-01-09T11:49:39.554Z",
-      "viewCount": 8,
+      "viewCount": 9,
       "id": "be950a3b-9cb9-46e1-816b-2f866ef8f1ed"
     },
     {
@@ -604,7 +574,7 @@
       "startsAt": "2026-01-09",
       "endsAt": "2026-01-23",
       "createdAt": "2026-01-09T11:46:14.510Z",
-      "viewCount": 4,
+      "viewCount": 5,
       "id": "ef66d368-8f4b-4fa2-9dff-a34adba00f1d"
     },
     {
@@ -619,7 +589,7 @@
       "startsAt": "2026-01-08",
       "endsAt": "2026-01-22",
       "createdAt": "2026-01-08T16:58:21.019Z",
-      "viewCount": 2,
+      "viewCount": 3,
       "id": "c9ce6394-5808-47c4-80bb-171072d60c4d"
     },
     {

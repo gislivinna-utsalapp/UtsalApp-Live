@@ -140,11 +140,7 @@ export function SalePostCard({ post }: Props) {
           )}
         </div>
 
-        {typeof post.viewCount === "number" && (
-          <p className="mt-0.5 text-[10px] text-neutral-500">
-            {post.viewCount} skoðanir
-          </p>
-        )}
+        {/* viewCount fjarlægt af forsíðu */}
       </div>
     </Link>
   );

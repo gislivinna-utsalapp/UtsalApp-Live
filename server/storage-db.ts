@@ -4,7 +4,22 @@ import path from "path";
 import crypto from "crypto";
 import type { User, Store, SalePost } from "@shared/schema";
 
-const DB_FILE = process.env.DB_PATH || "/var/data/database.json";
+function resolveDbFile(): string {
+  const prodPath = "/var/data/database.json";
+
+  try {
+    const dir = path.dirname(prodPath);
+    if (fs.existsSync(dir)) {
+      return prodPath;
+    }
+  } catch {
+    // no-op
+  }
+
+  return path.join(process.cwd(), "database.json");
+}
+
+const DB_FILE = resolveDbFile();
 
 interface DatabaseShape {
   users: User[];
@@ -13,6 +28,12 @@ interface DatabaseShape {
 }
 
 function loadDatabase(): DatabaseShape {
+  const dir = path.dirname(DB_FILE);
+
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   if (!fs.existsSync(DB_FILE)) {
     const initial: DatabaseShape = { users: [], stores: [], posts: [] };
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");

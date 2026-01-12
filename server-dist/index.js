@@ -19,8 +19,23 @@ import crypto2 from "crypto";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-var DB_FILE = path.join(process.cwd(), "database.json");
+function resolveDbFile() {
+  const prodPath = "/var/data/database.json";
+  try {
+    const dir = path.dirname(prodPath);
+    if (fs.existsSync(dir)) {
+      return prodPath;
+    }
+  } catch {
+  }
+  return path.join(process.cwd(), "database.json");
+}
+var DB_FILE = resolveDbFile();
 function loadDatabase() {
+  const dir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   if (!fs.existsSync(DB_FILE)) {
     const initial = { users: [], stores: [], posts: [] };
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2), "utf8");

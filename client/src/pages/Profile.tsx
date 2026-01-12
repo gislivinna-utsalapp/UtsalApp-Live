@@ -312,11 +312,11 @@ export default function Profile() {
     : false;
 
   const createdAtLabel = formatDate(
-    store.createdAt ?? billing?.createdAt ?? null,
+    store?.createdAt ?? billing?.createdAt ?? null,
   );
 
   // KPI fyrir yfirlit
-  const { activeOffersCount, totalViews } = useMemo(() => {
+  const kpi = useMemo(() => {
     const now = Date.now();
 
     const activeCount = safeStorePosts.filter((p) => {
@@ -330,10 +330,16 @@ export default function Profile() {
       0,
     );
 
-    return { activeOffersCount: activeCount, totalViews: views };
+    return {
+      activeOffersCount: activeCount,
+      totalViews: views,
+    };
   }, [safeStorePosts]);
 
-  async function handleActivatePlan() {
+  const { activeOffersCount, totalViews } = kpi;
+
+  // --- ACTIVATE PLAN HANDLER (VERÐUR AÐ VERA HEILT FALL) ---
+  const handleActivatePlan = async () => {
     if (!store?.id) return;
     if (!selectedPlan) return;
 
@@ -364,6 +370,7 @@ export default function Profile() {
       }
     } catch (err) {
       console.error("activate-plan error:", err);
+
       let msg =
         err instanceof Error
           ? err.message
@@ -383,8 +390,9 @@ export default function Profile() {
     } finally {
       setActivatingPlanId(null);
     }
-  }
+  };
 
+  // --- DELETE POST HANDLER (ÓBREYTT) ---
   async function handleDeletePost(post: StorePost) {
     if (!post.id) return;
 

@@ -10,33 +10,45 @@ export default function BottomNav() {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 bg-primary text-primary-foreground z-20 shadow-lg"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      style={{
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}
     >
-      <div className="max-w-4xl mx-auto flex items-center justify-between px-4 py-2 text-xs font-medium">
+      <div
+        className="
+          max-w-4xl mx-auto
+          flex items-center justify-between
+          px-4
+          py-3
+          text-sm
+          font-medium
+        "
+        style={{
+          minHeight: "64px", // ≈ 1/3 minna en áður
+        }}
+      >
         <Link
           to="/"
           className={`flex-1 text-center transition-opacity ${
             tab === "/" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
-
-        >
           Heim
         </Link>
 
         <Link
-          to="/search"
+          to="/leit"
           className={`flex-1 text-center transition-opacity ${
-            tab === "/search" ? "opacity-100 font-semibold" : "opacity-70"
+            tab === "/leit" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
           Leita
         </Link>
 
         <Link
-          to="/categories"
+          to="/flokkar"
           className={`flex-1 text-center transition-opacity ${
-            tab === "/categories" ? "opacity-100 font-semibold" : "opacity-70"
+            tab === "/flokkar" ? "opacity-100 font-semibold" : "opacity-70"
           }`}
         >
           Flokkar
@@ -54,7 +66,7 @@ export default function BottomNav() {
         {!loading && isAdmin && (
           <Link
             to="/admin"
-            className={`px-2 text-center transition-opacity ${
+            className={`px-3 text-center transition-opacity ${
               tab === "/admin"
                 ? "opacity-100 font-semibold underline"
                 : "opacity-70"

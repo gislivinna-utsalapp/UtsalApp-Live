@@ -83,7 +83,7 @@ export function SalePostCard({ post }: Props) {
       to={`/post/${post.id}`}
       className="block rounded-2xl overflow-hidden shadow-md bg-card border border-border hover:scale-[1.01] hover:shadow-lg transition-transform duration-150"
     >
-      {/* MYNDARRAMMI – stærri en textabox */}
+      {/* MYNDARRAMMI */}
       <div className="relative w-full aspect-[4/5] overflow-hidden bg-neutral-900">
         {imageUrl ? (
           <img
@@ -105,12 +105,16 @@ export function SalePostCard({ post }: Props) {
         )}
       </div>
 
-      {/* TEXTABOX – minna og léttara */}
+      {/* TEXTABOX */}
       <div className="p-3 space-y-1">
         {post.store && (
-          <p className="text-[10px] uppercase tracking-wide text-neutral-500">
+          <Link
+            to={`/store/${post.store.id}`}
+            onClick={(e) => e.stopPropagation()} // 🔑 mikilvægast
+            className="inline-block text-[10px] uppercase tracking-wide text-neutral-500 hover:underline"
+          >
             {post.store.name}
-          </p>
+          </Link>
         )}
 
         <h3 className="font-semibold text-sm text-neutral-900 line-clamp-1">

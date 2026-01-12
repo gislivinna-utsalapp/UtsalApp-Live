@@ -26,6 +26,7 @@ const BASE_CATEGORIES = [
   "Leikföng & börn",
   "Matur & veitingar",
   "Happy Hour",
+  "Upplifun", // ✅ NÝR FLOKKUR
   "Annað",
 ];
 
@@ -42,6 +43,7 @@ function normalizeCategory(raw: string | null | undefined): string {
   if (lower === "snyrtivorur") return "Snyrtivörur";
   if (lower === "annad") return "Annað";
   if (lower === "heimili") return "Heimili & húsgögn";
+  if (lower === "upplifun" || lower === "upplifanir") return "Upplifun";
 
   if (BASE_CATEGORIES.includes(c)) return c;
 
@@ -54,32 +56,40 @@ export default function CategoriesPage() {
     queryFn: fetchPosts,
   });
 
+  // 🔒 ALLTAF ARRAY
   const posts: SalePostWithDetails[] = Array.isArray(data)
     ? data
     : Array.isArray((data as any)?.posts)
       ? (data as any).posts
       : [];
 
-  const normalizedPosts = posts.map((p) => ({
-    ...p,
-    _normCategory: normalizeCategory(p.category),
-  }));
+  // 🔒 Normalized posts alltaf array
+  const normalizedPosts = Array.isArray(posts)
+    ? posts.map((p) => ({
+        ...p,
+        _normCategory: normalizeCategory(p.category),
+      }))
+    : [];
 
+  // 🔒 Categories alltaf array
   const categories = Array.from(
     new Set([
       ...BASE_CATEGORIES,
       ...normalizedPosts
         .map((p) => p._normCategory)
-        .filter((c) => c && c.length > 0),
+        .filter((c) => typeof c === "string" && c.length > 0),
     ]),
   ).sort();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // 🔒 VARNARFILTER
+  const safePosts = Array.isArray(normalizedPosts) ? normalizedPosts : [];
+
   const visiblePosts =
     selectedCategory === null
-      ? normalizedPosts
-      : normalizedPosts.filter((p) => p._normCategory === selectedCategory);
+      ? safePosts
+      : safePosts.filter((p) => p._normCategory === selectedCategory);
 
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">

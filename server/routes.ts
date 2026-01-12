@@ -643,6 +643,29 @@ export function registerRoutes(app: Express): void {
     }
   });
 
+  // ------------------ STORES: GET ONE (PUBLIC) ------------------
+  app.get("/api/v1/stores/:id", async (req, res) => {
+    try {
+      const store = await storage.getStoreById(req.params.id);
+
+      if (!store) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+
+      res.json({
+        id: store.id,
+        name: store.name,
+        address: (store as any).address ?? "",
+        phone: (store as any).phone ?? "",
+        website: (store as any).website ?? "",
+        createdAt: (store as any).createdAt ?? null,
+      });
+    } catch (err) {
+      console.error("get store error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
   // ------------------ STORES: POSTS FOR ONE STORE (PROFILE) ------------------
   app.get("/api/v1/stores/:storeId/posts", async (req, res) => {
     try {

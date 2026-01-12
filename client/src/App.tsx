@@ -13,6 +13,7 @@ import PostDetail from "./pages/PostDetail";
 import Profile from "./pages/Profile";
 import About from "./pages/About";
 import NotFound from "./pages/not-found";
+import StorePage from "./pages/StorePage"; // ✅ VIÐBÓT
 
 // ❌ Enginn HashRouter hér
 // ❌ Enginn PrivateRoute í debug-mode
@@ -75,6 +76,9 @@ export default function App() {
           <Route path="/flokkar" element={<CategoriesPage />} />
           <Route path="/about" element={<About />} />
           <Route path="/post/:id" element={<PostDetail />} />
+
+          {/* ✅ NÝR ROUTE FYRIR VERSLUN */}
+          <Route path="/store/:id" element={<StorePage />} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/register-store" element={<RegisterStore />} />

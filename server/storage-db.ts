@@ -4,7 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import type { User, Store, SalePost } from "@shared/schema";
 
-const DB_FILE = path.join(process.cwd(), "database.json");
+const DB_FILE = process.env.DB_PATH || "/var/data/database.json";
 
 interface DatabaseShape {
   users: User[];

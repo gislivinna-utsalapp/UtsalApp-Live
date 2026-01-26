@@ -191,7 +191,8 @@ var storage = new DbStorage();
 // server/config/uploads.ts
 import path2 from "path";
 import fs2 from "fs";
-var UPLOAD_DIR = process.env.NODE_ENV === "production" ? "/var/data/uploads" : path2.join(process.cwd(), "uploads");
+var isRender = process.env.RENDER === "true";
+var UPLOAD_DIR = isRender ? "/var/data/uploads" : path2.join(process.cwd(), "uploads");
 if (!fs2.existsSync(UPLOAD_DIR)) {
   fs2.mkdirSync(UPLOAD_DIR, { recursive: true });
 }

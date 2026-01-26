@@ -1,7 +1,10 @@
 // server/index.ts
 import express from "express";
 import { createServer } from "http";
+import path from "path";
+
 import { registerRoutes } from "./routes";
+import { UPLOAD_DIR } from "./config/uploads";
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -20,19 +23,24 @@ function main() {
   const app = express();
 
   /**
-   * 2) Body parsers
+   * 2) SERVE UPLOADS (CRITICAL – MUST BE FIRST)
+   */
+  console.log("[uploads] serving static files from:", UPLOAD_DIR);
+  app.use("/uploads", express.static(UPLOAD_DIR));
+
+  /**
+   * 3) Body parsers
    */
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
   /**
-   * 3) API routes
-   * ⚠️ ALL upload / static / uploads logic lives INSIDE routes.ts
+   * 4) API routes
    */
   registerRoutes(app, "/api");
 
   /**
-   * 4) Global API error handler
+   * 5) Global API error handler
    * Skilar alltaf JSON (aldrei HTML)
    */
   app.use(
@@ -59,7 +67,7 @@ function main() {
   );
 
   /**
-   * 5) Start server
+   * 6) Start server
    */
   const server = createServer(app);
 

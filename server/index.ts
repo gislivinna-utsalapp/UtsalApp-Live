@@ -2,6 +2,7 @@
 import express from "express";
 import { createServer } from "http";
 import path from "path";
+import fs from "fs";
 
 import { registerRoutes } from "./routes";
 import { UPLOAD_DIR } from "./config/uploads";
@@ -23,9 +24,22 @@ function main() {
   const app = express();
 
   /**
-   * 2) SERVE UPLOADS (CRITICAL – MUST BE FIRST)
+   * 2) SERVE UPLOADS (GLOBAL, BEFORE EVERYTHING)
    */
-  console.log("[uploads] serving static files from:", UPLOAD_DIR);
+  console.log("[uploads] UPLOAD_DIR =", UPLOAD_DIR);
+  try {
+    if (fs.existsSync(UPLOAD_DIR)) {
+      console.log(
+        "[uploads] files on disk:",
+        fs.readdirSync(UPLOAD_DIR).slice(0, 10),
+      );
+    } else {
+      console.warn("[uploads] directory does NOT exist");
+    }
+  } catch (err) {
+    console.error("[uploads] error reading upload dir", err);
+  }
+
   app.use("/uploads", express.static(UPLOAD_DIR));
 
   /**

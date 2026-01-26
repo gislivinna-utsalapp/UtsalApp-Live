@@ -1,4 +1,4 @@
-// vite.config.ts (root, ekki inni í client/)
+// vite.config.ts (root)
 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -31,9 +31,9 @@ export default defineConfig({
 
   server: {
     host: true,
-    port: 5173,
+    port: 3000, // ⬅️ BREYTT (var 5173)
     strictPort: true,
-    allowedHosts: true, // leyfir Replit dómenn að tengjast
+    allowedHosts: true,
     proxy: {
       "/api": { target: "http://localhost:5000", changeOrigin: true },
       "/uploads": { target: "http://localhost:5000", changeOrigin: true },

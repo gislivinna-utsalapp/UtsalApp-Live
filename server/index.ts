@@ -1,16 +1,9 @@
 // server/index.ts
 import express from "express";
 import { createServer } from "http";
-import path from "path";
-import fs from "fs";
 import { registerRoutes } from "./routes";
 
-// Uploads directory (Replit-only, einfalt og stöðugt)
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-
 const PORT = Number(process.env.PORT) || 5000;
-
-// Uploads dir (stöðugt bæði local + Render)
 
 function main() {
   /**
@@ -24,53 +17,22 @@ function main() {
     console.error("[uncaughtException]", err);
   });
 
-  /**
-   /**
- * 2) Tryggja að uploads mappa sé til
- */
-  if (!fs.existsSync(UPLOAD_DIR)) {
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-  }
-
   const app = express();
 
   /**
-   * 3) Body parsers
+   * 2) Body parsers
    */
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
   /**
-   * 4) Static serving – KRÍTÍSKT
-   * Gerir /uploads/... aðgengilegt yfir HTTP
-   */
-  app.use("/uploads", express.static(UPLOAD_DIR));
-
-  console.log("[static] serving /uploads from:", UPLOAD_DIR);
-
-  /**
-   * 5) Upload request logger (debug)
-   */
-  app.use((req, _res, next) => {
-    if (req.method === "POST" && req.originalUrl.startsWith("/api")) {
-      if (req.headers["content-type"]?.includes("multipart/form-data")) {
-        console.log("[UPLOAD REQUEST]", {
-          url: req.originalUrl,
-          contentType: req.headers["content-type"],
-          contentLength: req.headers["content-length"],
-        });
-      }
-    }
-    next();
-  });
-
-  /**
-   * 6) API routes
+   * 3) API routes
+   * ⚠️ ALL upload / static / uploads logic lives INSIDE routes.ts
    */
   registerRoutes(app, "/api");
 
   /**
-   * 7) Global API error handler
+   * 4) Global API error handler
    * Skilar alltaf JSON (aldrei HTML)
    */
   app.use(
@@ -97,7 +59,7 @@ function main() {
   );
 
   /**
-   * 8) Start server
+   * 5) Start server
    */
   const server = createServer(app);
 

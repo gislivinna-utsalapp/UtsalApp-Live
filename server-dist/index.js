@@ -1,8 +1,6 @@
 // server/index.ts
 import express2 from "express";
 import { createServer } from "http";
-import path3 from "path";
-import fs3 from "fs";
 
 // server/routes.ts
 import express from "express";
@@ -10,10 +8,9 @@ import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import sharp from "sharp";
-import path2 from "path";
-import fs2 from "fs";
 import crypto2 from "crypto";
+import path3 from "path";
+import fs3 from "fs";
 
 // server/storage-db.ts
 import fs from "fs";
@@ -115,19 +112,26 @@ var DbStorage = class {
   async findUserById(id) {
     return this.db.users.find((u) => u.id === id);
   }
-  // ---------------- STORES ----------------
-  async createStore(store) {
+  createStore = async (store) => {
+    const now = /* @__PURE__ */ new Date();
+    const trialDays = 7;
+    const accessEndsAt = store.accessEndsAt ?? new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1e3).toISOString();
     const newStore = {
       ...store,
       id: crypto.randomUUID(),
+      // existing logic – HALDA
       plan: store.plan ?? "basic",
-      trialEndsAt: store.trialEndsAt ?? null,
-      billingStatus: store.billingStatus ?? "trial"
+      billingStatus: store.billingStatus ?? "trial",
+      // 👇 NÝI KJARNINN
+      accessEndsAt,
+      // valfrjálst – til sögulegrar notkunar / UI
+      trialEndsAt: store.trialEndsAt ?? accessEndsAt,
+      createdAt: now.toISOString()
     };
     this.db.stores.push(newStore);
     saveDatabase(this.db);
     return newStore;
-  }
+  };
   async getStoreById(id) {
     return this.db.stores.find((s) => s.id === id);
   }
@@ -184,14 +188,26 @@ var DbStorage = class {
 };
 var storage = new DbStorage();
 
-// server/routes.ts
-var JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
-var UPLOAD_DIR = path2.join(process.cwd(), "uploads");
+// server/config/uploads.ts
+import path2 from "path";
+import fs2 from "fs";
+var UPLOAD_DIR = process.env.NODE_ENV === "production" ? "/var/data/uploads" : path2.join(process.cwd(), "uploads");
 if (!fs2.existsSync(UPLOAD_DIR)) {
   fs2.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+
+// server/routes.ts
+var JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 var upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, UPLOAD_DIR);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path3.extname(file.originalname) || ".jpg";
+      cb(null, `${crypto2.randomUUID()}${ext.toLowerCase()}`);
+    }
+  }),
   limits: {
     fileSize: 5 * 1024 * 1024
     // 5MB
@@ -230,41 +246,6 @@ function isTrialExpired(store) {
   if (!Number.isFinite(ts)) return false;
   return Date.now() > ts;
 }
-async function requireActiveOrTrialStore(req, res, next) {
-  try {
-    if (!req.user?.storeId) {
-      return res.status(400).json({ message: "Engin tengd verslun fannst fyrir notanda" });
-    }
-    let store = await storage.getStoreById(req.user.storeId);
-    if (!store) {
-      return res.status(404).json({ message: "Verslun fannst ekki" });
-    }
-    if (!store.trialEndsAt && store.billingStatus !== "expired") {
-      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-      const updated = await storage.updateStore(store.id, {
-        trialEndsAt,
-        billingStatus: store.billingStatus ?? "trial"
-      });
-      if (updated) {
-        store = updated;
-      }
-    }
-    if (isTrialExpired(store)) {
-      if (store.billingStatus !== "expired") {
-        await storage.updateStore(store.id, {
-          billingStatus: "expired"
-        });
-      }
-      return res.status(403).json({
-        message: "Fr\xEDviku \xFEinni er loki\xF0. Haf\xF0u samband vi\xF0 \xDAtsalApp til a\xF0 virkja \xE1skrift."
-      });
-    }
-    next();
-  } catch (err) {
-    console.error("requireActiveOrTrialStore error", err);
-    res.status(500).json({ message: "Villa kom upp" });
-  }
-}
 async function mapPostToFrontend(p) {
   const store = p.storeId ? await storage.getStoreById(p.storeId) : null;
   const plan = store?.plan ?? store?.planType ?? "basic";
@@ -278,7 +259,7 @@ async function mapPostToFrontend(p) {
     priceSale: Number(p.price ?? p.priceSale ?? 0),
     images: p.imageUrl ? [
       {
-        url: p.imageUrl.startsWith("http") ? p.imageUrl : `https://utsalapp-live.onrender.com${p.imageUrl}`,
+        url: p.imageUrl,
         alt: p.title
       }
     ] : [],
@@ -305,11 +286,11 @@ function getPlanRankForPost(post, storesById) {
   if (plan === "pro") return 2;
   return 1;
 }
-function registerRoutes(app) {
+async function registerRoutes(app) {
   const router = express.Router();
   router.use(cors());
   router.use(express.json());
-  router.use("/uploads", express.static(UPLOAD_DIR));
+  app.use("/uploads", express.static(UPLOAD_DIR));
   router.post("/auth/register-store", async (req, res) => {
     try {
       const {
@@ -320,58 +301,43 @@ function registerRoutes(app) {
         phone,
         website
       } = req.body;
-      const email = (rawEmail ?? "").trim().toLowerCase();
-      const password = (rawPassword ?? "").trim();
-      if (!storeName || !email || !password) {
-        return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
+      if (!storeName || !rawEmail || !rawPassword) {
+        return res.status(400).json({ error: "Missing required fields" });
       }
-      const existing = await storage.findUserByEmail(email);
-      if (existing) {
-        return res.status(400).json({ message: "Netfang er \xFEegar \xED notkun" });
-      }
-      const passwordHash = await bcrypt.hash(password, 10);
-      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-      const store = await storage.createStore({
+      const email = rawEmail.trim().toLowerCase();
+      const password = rawPassword;
+      const now = /* @__PURE__ */ new Date();
+      const trialDays = 7;
+      const accessEndsAt = new Date(
+        now.getTime() + trialDays * 24 * 60 * 60 * 1e3
+      ).toISOString();
+      const store = await createStore({
         name: storeName,
-        address: (address ?? "").trim(),
-        phone: (phone ?? "").trim(),
-        website: (website ?? "").trim(),
-        logoUrl: "",
-        ownerEmail: email,
-        plan: "basic",
-        trialEndsAt,
-        billingStatus: "trial"
-      });
-      const user = await storage.createUser({
         email,
-        passwordHash,
-        role: "store",
-        storeId: store.id
+        password,
+        address,
+        phone,
+        website,
+        // 👇 NÝTT – þetta er lykillinn
+        accessEndsAt,
+        trialEndsAt: accessEndsAt
       });
-      const billingActive = true;
-      return res.json({
-        message: "Verslun skr\xE1\xF0",
-        user: { id: user.id, email: user.email, role: user.role },
+      return res.status(201).json({
+        ok: true,
         store: {
           id: store.id,
           name: store.name,
-          address: store.address ?? "",
-          phone: store.phone ?? "",
-          website: store.website ?? "",
-          plan: store.plan ?? "basic",
-          planType: store.plan ?? "basic",
-          trialEndsAt: store.trialEndsAt ?? null,
-          billingStatus: store.billingStatus ?? "trial",
-          billingActive,
-          createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
+          accessEndsAt: store.accessEndsAt
         }
       });
     } catch (err) {
-      console.error("register-store error", err);
-      res.status(500).json({ message: "Villa kom upp" });
+      console.error("register-store error:", err);
+      return res.status(500).json({ error: "Failed to register store" });
     }
   });
+  function normalizeEmail(rawEmail) {
+    return (rawEmail ?? "").trim().toLowerCase();
+  }
   router.post("/stores/register", async (req, res) => {
     try {
       const {
@@ -387,10 +353,6 @@ function registerRoutes(app) {
       if (!storeName || !email || !password) {
         return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
       }
-      const existing = await storage.findUserByEmail(email);
-      if (existing) {
-        return res.status(400).json({ message: "Netfang er \xFEegar \xED notkun" });
-      }
       const passwordHash = await bcrypt.hash(password, 10);
       const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
       const store = await storage.createStore({
@@ -426,12 +388,11 @@ function registerRoutes(app) {
           billingStatus: store.billingStatus ?? "trial",
           billingActive,
           createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
         }
       });
     } catch (err) {
-      console.error("stores/register alias error", err);
-      res.status(500).json({ message: "Villa kom upp" });
+      console.error("register-store error", err);
+      return res.status(500).json({ message: "Villa kom upp" });
     }
   });
   router.post("/auth/login", async (req, res) => {
@@ -536,8 +497,8 @@ function registerRoutes(app) {
       return res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  app.get(
-    "/api/v1/stores/me/billing",
+  router.get(
+    "/stores/me/billing",
     auth("store"),
     async (req, res) => {
       try {
@@ -566,7 +527,6 @@ function registerRoutes(app) {
           trialExpired: isTrialExpired(store),
           daysLeft,
           createdAt: store.createdAt ?? null
-          // BÆTT VIÐ
         });
       } catch (err) {
         console.error("stores/me/billing error", err);
@@ -628,7 +588,7 @@ function registerRoutes(app) {
       }
     }
   );
-  app.get("/api/v1/stores", async (_req, res) => {
+  router.get("/stores", async (_req, res) => {
     try {
       const stores = await storage.listStores();
       res.json(stores);
@@ -637,7 +597,7 @@ function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  app.get("/api/v1/stores/:id", async (req, res) => {
+  router.get("/stores/:id", async (req, res) => {
     try {
       const store = await storage.getStoreById(req.params.id);
       if (!store) {
@@ -656,7 +616,7 @@ function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  app.get("/api/v1/stores/:storeId/posts", async (req, res) => {
+  router.get("/stores/:storeId/posts", async (req, res) => {
     try {
       const storeId = req.params.storeId;
       const posts = await storage.getPostsByStore(storeId);
@@ -667,7 +627,7 @@ function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  app.get("/api/v1/posts", async (req, res) => {
+  router.get("/posts", async (req, res) => {
     try {
       const q = req.query.q?.toLowerCase() || "";
       const [posts, stores] = await Promise.all([
@@ -682,9 +642,7 @@ function registerRoutes(app) {
       filtered.sort((a, b) => {
         const pa = getPlanRankForPost(a, storesById);
         const pb = getPlanRankForPost(b, storesById);
-        if (pb !== pa) {
-          return pb - pa;
-        }
+        if (pb !== pa) return pb - pa;
         const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bd - ad;
@@ -696,7 +654,7 @@ function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  app.get("/api/v1/posts/:id", async (req, res) => {
+  router.get("/posts/:id", async (req, res) => {
     try {
       const all = await storage.listPosts();
       const post = all.find((p) => p.id === req.params.id);
@@ -726,51 +684,60 @@ function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  router.post(
-    "/posts",
-    auth("store"),
-    requireActiveOrTrialStore,
-    async (req, res) => {
-      try {
-        const {
-          title,
-          description,
-          category,
-          priceOriginal,
-          priceSale,
-          buyUrl,
-          startsAt,
-          endsAt,
-          images
-        } = req.body;
-        if (!title || priceOriginal == null || priceSale == null || !category) {
-          return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
-        }
-        const imageUrl = Array.isArray(images) && images.length > 0 ? images[0].url : "";
-        const newPost = await storage.createPost({
-          title,
-          description,
-          category,
-          price: Number(priceSale),
-          oldPrice: Number(priceOriginal),
-          imageUrl,
-          storeId: req.user.storeId,
-          buyUrl: buyUrl || null,
-          startsAt: startsAt || null,
-          endsAt: endsAt || null,
-          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-          viewCount: 0
-        });
-        const mapped = await mapPostToFrontend(newPost);
-        res.json(mapped);
-      } catch (err) {
-        console.error("create post error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+  router.post("/posts", auth("store"), async (req, res) => {
+    try {
+      const storeId = req.user?.storeId;
+      if (!storeId) {
+        return res.status(401).json({ message: "Ekki innskr\xE1\xF0 verslun" });
       }
+      const store = await storage.getStoreById(storeId);
+      if (!store) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+      if (!store.accessEndsAt || new Date(store.accessEndsAt) <= /* @__PURE__ */ new Date()) {
+        return res.status(403).json({
+          message: "A\xF0gangur verslunar er \xFAtrunninn",
+          accessEndsAt: store.accessEndsAt ?? null
+        });
+      }
+      const {
+        title,
+        description,
+        category,
+        priceOriginal,
+        priceSale,
+        buyUrl,
+        startsAt,
+        endsAt,
+        images
+      } = req.body;
+      if (!title || priceOriginal == null || priceSale == null || !category) {
+        return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
+      }
+      const imageUrl = Array.isArray(images) && images.length > 0 ? images[0].url : "";
+      const newPost = await storage.createPost({
+        title,
+        description,
+        category,
+        price: Number(priceSale),
+        oldPrice: Number(priceOriginal),
+        imageUrl,
+        storeId,
+        buyUrl: buyUrl || null,
+        startsAt: startsAt || null,
+        endsAt: endsAt || null,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        viewCount: 0
+      });
+      const mapped = await mapPostToFrontend(newPost);
+      res.json(mapped);
+    } catch (err) {
+      console.error("create post error", err);
+      res.status(500).json({ message: "Villa kom upp" });
     }
-  );
-  app.put(
-    "/api/v1/posts/:id",
+  });
+  router.put(
+    "/posts/:id",
     auth("store"),
     async (req, res) => {
       try {
@@ -819,8 +786,8 @@ function registerRoutes(app) {
       }
     }
   );
-  app.delete(
-    "/api/v1/posts/:id",
+  router.delete(
+    "/posts/:id",
     auth("store"),
     async (req, res) => {
       try {
@@ -842,57 +809,37 @@ function registerRoutes(app) {
     }
   );
   router.post(
-    "/uploads",
+    "/uploads/image",
     auth("store"),
     upload.single("image"),
     async (req, res) => {
       try {
         if (!req.file) {
-          return res.status(400).json({ message: "Engin mynd send (req.file vantar)" });
+          return res.status(400).json({ message: "Engin mynd m\xF3ttekin" });
         }
-        if (!req.file.buffer || req.file.buffer.length === 0) {
-          return res.status(400).json({ message: "Mynd er t\xF3m e\xF0a \xF3gild" });
-        }
-        if (!req.file.mimetype.startsWith("image/")) {
-          return res.status(400).json({ message: "Skr\xE1 er ekki mynd" });
-        }
-        const filename = `${crypto2.randomUUID()}.jpg`;
-        const filepath = path2.join(UPLOAD_DIR, filename);
-        await sharp(req.file.buffer).resize(1200, 1200, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 80 }).toFile(filepath);
-        const baseUrl = `${req.protocol}://${req.get("host")}`;
-        return res.json({
-          url: `${baseUrl}/uploads/${filename}`
+        return res.status(200).json({
+          imageUrl: `/uploads/${req.file.filename}`
         });
       } catch (err) {
-        console.error("[UPLOAD SHARP ERROR]", err);
-        return res.status(500).json({
-          message: "Sharp gat ekki unni\xF0 \xFAr mynd"
-        });
+        console.error("upload image error", err);
+        return res.status(500).json({ message: "Myndaupphle\xF0sla mist\xF3kst" });
       }
     }
   );
-  router.get("/uploads/:filename", (req, res) => {
-    const filepath = path2.join(UPLOAD_DIR, req.params.filename);
-    if (!fs2.existsSync(filepath)) {
-      return res.status(404).end();
-    }
-    res.sendFile(filepath);
-  });
   app.use("/api/v1", router);
-  if (process.env.NODE_ENV === "production") {
-    const clientDistPath = path2.join(process.cwd(), "client", "dist");
+  const clientDistPath = path3.join(process.cwd(), "client", "dist");
+  if (fs3.existsSync(clientDistPath)) {
     app.use(express.static(clientDistPath));
     app.get("*", (req, res, next) => {
       if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
         return next();
       }
-      res.sendFile(path2.join(clientDistPath, "index.html"));
+      return res.sendFile(path3.join(clientDistPath, "index.html"));
     });
   }
 }
 
 // server/index.ts
-var UPLOAD_DIR2 = path3.join(process.cwd(), "uploads");
 var PORT = Number(process.env.PORT) || 5e3;
 function main() {
   process.on("unhandledRejection", (reason) => {
@@ -901,26 +848,9 @@ function main() {
   process.on("uncaughtException", (err) => {
     console.error("[uncaughtException]", err);
   });
-  if (!fs3.existsSync(UPLOAD_DIR2)) {
-    fs3.mkdirSync(UPLOAD_DIR2, { recursive: true });
-  }
   const app = express2();
   app.use(express2.json());
   app.use(express2.urlencoded({ extended: true }));
-  app.use("/uploads", express2.static(UPLOAD_DIR2));
-  console.log("[static] serving /uploads from:", UPLOAD_DIR2);
-  app.use((req, _res, next) => {
-    if (req.method === "POST" && req.originalUrl.startsWith("/api")) {
-      if (req.headers["content-type"]?.includes("multipart/form-data")) {
-        console.log("[UPLOAD REQUEST]", {
-          url: req.originalUrl,
-          contentType: req.headers["content-type"],
-          contentLength: req.headers["content-length"]
-        });
-      }
-    }
-    next();
-  });
   registerRoutes(app, "/api");
   app.use(
     (err, req, res, _next) => {

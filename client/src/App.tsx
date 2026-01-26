@@ -16,6 +16,8 @@ import Profile from "./pages/Profile";
 import About from "./pages/About";
 import NotFound from "./pages/not-found";
 import StorePage from "./pages/StorePage";
+import PricingPage from "./pages/PricingPage";
+
 import BottomNav from "@/components/BottomNav";
 
 /* ======================================================
@@ -50,6 +52,7 @@ export default function App() {
           <Route path="/leit" element={<SearchPage />} />
           <Route path="/flokkar" element={<CategoriesPage />} />
           <Route path="/about" element={<About />} />
+          <Route path="/pricing" element={<PricingPage />} />
 
           <Route path="/post/:id" element={<PostDetail />} />
           <Route path="/store/:id" element={<StorePage />} />

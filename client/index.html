@@ -39,5 +39,53 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- ============================= -->
+    <!-- PWA INSTALL TRACKING (GA4) -->
+    <!-- ============================= -->
+    <script>
+      let deferredPrompt = null;
+
+      // 1. Þegar install prompt er tiltækt
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+
+        if (window.gtag) {
+          gtag("event", "pwa_install_prompt_shown", {
+            event_category: "PWA",
+            event_label: "install_prompt",
+          });
+        }
+      });
+
+      // 2. Þegar notandi samþykkir install
+      window.addEventListener("appinstalled", () => {
+        if (window.gtag) {
+          gtag("event", "pwa_installed", {
+            event_category: "PWA",
+            event_label: "installed",
+          });
+        }
+        deferredPrompt = null;
+      });
+
+      // 3. Þegar app er opnað af homescreen (standalone)
+      function isStandalone() {
+        return (
+          window.matchMedia("(display-mode: standalone)").matches ||
+          window.navigator.standalone === true
+        );
+      }
+
+      if (isStandalone()) {
+        if (window.gtag) {
+          gtag("event", "pwa_opened_standalone", {
+            event_category: "PWA",
+            event_label: "standalone_mode",
+          });
+        }
+      }
+    </script>
   </body>
 </html>

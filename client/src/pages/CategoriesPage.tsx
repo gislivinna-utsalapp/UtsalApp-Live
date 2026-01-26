@@ -26,8 +26,17 @@ const BASE_CATEGORIES = [
   "Leikföng & börn",
   "Matur & veitingar",
   "Happy Hour",
+  "2 fyrir 1",
+  "Tilboð",
+  "Verkfæri",
+  "Bíllinn",
+  "Heilsa og útlit",
+  "Hljóðfæri",
+  "Gjafaleikur",
+  "Opnunartilboð",
   "Upplifun", // ✅ NÝR FLOKKUR
   "Annað",
+  "Viðburðir",
 ];
 
 // Normalizer
@@ -112,7 +121,7 @@ export default function CategoriesPage() {
 
       {!isLoading && !error && (
         <>
-          {/* FLOKKASLEÐI */}
+          {/* FLOKKADROPDOWN */}
           <section className="space-y-2">
             <h2 className="text-sm font-semibold text-white">Flokkar</h2>
 
@@ -123,37 +132,23 @@ export default function CategoriesPage() {
             )}
 
             {categories.length > 0 && (
-              <div className="-mx-3 px-3 overflow-x-auto">
-                <div className="flex gap-2 flex-nowrap whitespace-nowrap py-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={
-                      selectedCategory === null
-                        ? "bg-white text-black text-xs border border-white"
-                        : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                    }
-                    onClick={() => setSelectedCategory(null)}
-                  >
-                    Allt
-                  </Button>
-
+              <div className="space-y-2">
+                <select
+                  value={selectedCategory ?? ""}
+                  onChange={(e) =>
+                    setSelectedCategory(
+                      e.target.value === "" ? null : e.target.value,
+                    )
+                  }
+                  className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-pink-400"
+                >
+                  <option value="">Allt</option>
                   {categories.map((cat) => (
-                    <Button
-                      key={cat}
-                      size="sm"
-                      variant="outline"
-                      className={
-                        selectedCategory === cat
-                          ? "bg-white text-black text-xs border border-white"
-                          : "text-xs border border-white text-white hover:bg-white hover:text-black"
-                      }
-                      onClick={() => setSelectedCategory(cat)}
-                    >
+                    <option key={cat} value={cat}>
                       {cat}
-                    </Button>
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
             )}
           </section>

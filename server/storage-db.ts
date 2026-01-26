@@ -137,23 +137,40 @@ export class DbStorage {
     return this.db.users.find((u) => u.id === id);
   }
 
-  // ---------------- STORES ----------------
-
-  async createStore(
+  createStore = async (
     store: Omit<Store, "id"> & Record<string, any>,
-  ): Promise<Store & any> {
+  ): Promise<Store & any> => {
+    const now = new Date();
+
+    // ===== PRUFUVIKA (7 dagar) =====
+    const trialDays = 7;
+    const accessEndsAt =
+      store.accessEndsAt ??
+      new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000).toISOString();
+    // ==============================
+
     const newStore: any = {
       ...store,
       id: crypto.randomUUID(),
+
+      // existing logic – HALDA
       plan: store.plan ?? "basic",
-      trialEndsAt: store.trialEndsAt ?? null,
       billingStatus: store.billingStatus ?? "trial",
+
+      // 👇 NÝI KJARNINN
+      accessEndsAt,
+
+      // valfrjálst – til sögulegrar notkunar / UI
+      trialEndsAt: store.trialEndsAt ?? accessEndsAt,
+
+      createdAt: now.toISOString(),
     };
 
     this.db.stores.push(newStore);
     saveDatabase(this.db);
+
     return newStore;
-  }
+  };
 
   async getStoreById(id: string): Promise<(Store & any) | undefined> {
     return this.db.stores.find((s: any) => s.id === id);

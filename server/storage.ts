@@ -4,7 +4,6 @@ import { createServer, type Server } from "http";
 import express from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import multer from "multer";
 import sharp from "sharp";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
@@ -98,17 +97,6 @@ function auth(requiredRole?: "store" | "admin") {
     }
   };
 }
-
-// --------------------------------------------------
-// MULTER FILE UPLOAD
-// --------------------------------------------------
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-  },
-});
 
 // --------------------------------------------------
 // RATE LIMIT
@@ -237,7 +225,7 @@ export function registerRoutes(app: Express): Server {
   // ME
   // -----------------------------------------
 
-  app.get("/api/v1/me", auth(), async (req: AuthRequest, res: Response) => {
+  router.get("/me", auth(), async (req: AuthRequest, res: Response) => {
     return res.json(req.user);
   });
 
@@ -426,7 +414,7 @@ export function registerRoutes(app: Express): Server {
   // LIST POSTS
   // -----------------------------------------
 
-  app.get("/api/v1/posts", async (req: Request, res: Response) => {
+  router.get("/posts", async (req: Request, res: Response) => {
     const q = (req.query.q as string)?.toLowerCase() || "";
     const posts = await storage.listPosts();
 
@@ -443,7 +431,7 @@ export function registerRoutes(app: Express): Server {
   // LIST STORES
   // -----------------------------------------
 
-  app.get("/api/v1/stores", async (req: Request, res: Response) => {
+  router.get("/stores", async (req: Request, res: Response) => {
     const stores = await storage.listStores();
     return res.json(stores);
   });

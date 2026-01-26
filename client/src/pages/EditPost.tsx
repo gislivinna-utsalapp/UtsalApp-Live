@@ -17,12 +17,22 @@ const CATEGORY_OPTIONS = [
   "Skór",
   "Íþróttavörur",
   "Heimili & húsgögn",
-  "Rafmagnstæki",
+  "Raftæki",
   "Snyrtivörur",
   "Leikföng & börn",
   "Matur & veitingar",
   "Happy Hour",
+  "2 fyrir 1",
+  "Tilboð",
+  "Verkfæri",
+  "Bíllinn",
+  "Heilsa og útlit",
+  "Hljóðfæri",
+  "Gjafaleikur",
+  "Opnunartilboð",
+  "Upplifun", // ✅ NÝR FLOKKUR
   "Annað",
+  "Viðburðir",
 ];
 
 type UpdatePostPayload = {
@@ -37,7 +47,7 @@ type UpdatePostPayload = {
   images?: { url: string }[];
 };
 
-// Endurnýtum upload-token-lógík úr CreatePost
+// Samræmd uploadImage-útfærsla (EditPost)
 async function uploadImage(file: File): Promise<string> {
   const token =
     localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
@@ -47,11 +57,9 @@ async function uploadImage(file: File): Promise<string> {
   }
 
   const formData = new FormData();
-
-  // 🔑 VERÐUR að heita "image"
   formData.append("image", file);
 
-  const res = await fetch("/api/v1/uploads", {
+  const res = await fetch("/api/v1/uploads/image", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -60,20 +68,15 @@ async function uploadImage(file: File): Promise<string> {
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    console.error("Upload response text (edit):", text);
     if (res.status === 401) {
       throw new Error("Ekki innskráður. Skráðu þig inn aftur.");
     }
     throw new Error("Tókst ekki að hlaða upp mynd.");
   }
 
-  const data = (await res.json().catch(() => null)) as { url?: string } | null;
-  if (!data?.url) {
-    throw new Error("Server skilaði ekki myndaslóð.");
-  }
+  const data = (await res.json()) as { imageUrl: string };
 
-  return data.url;
+  return data.imageUrl;
 }
 
 export default function EditPost() {

@@ -5,3 +5,6 @@ server/public
 vite.config.ts.*
 *.tar.gz
 database.json
+
+# Ignore all uploads (dev & local data)
+**/uploads/

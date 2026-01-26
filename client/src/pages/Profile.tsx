@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getTimeRemaining } from "@/lib/utils";
 
+/* ===================== TYPES ===================== */
+
 type StoreInfo = {
   id: string;
   name: string;
@@ -48,7 +50,76 @@ type StorePost = {
 type PlanId = "basic" | "pro" | "premium";
 type ProfileTab = "overview" | "offers" | "security" | "subscription";
 
+/* ===================== CONSTS ===================== */
+
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? "").trim();
+
+const PLANS: {
+  id: PlanId;
+  name: string;
+  price: string;
+  description: string;
+}[] = [
+  {
+    id: "basic",
+    name: "Basic",
+    price: "10.900 kr/viku",
+    description: "Fyrir minni verslanir sem vilja byrja að prófa ÚtsalApp.",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: "10.900 kr/viku",
+    description: "Fyrir verslanir með reglulegar útsölur og meiri sýnileika.",
+  },
+  {
+    id: "premium",
+    name: "Premium",
+    price: "20.900 kr/viku",
+    description:
+      "Fyrir stærri verslanir og keðjur sem vilja hámarksáhrif í ÚtsalApp.",
+  },
+];
+
+/* ===================== HELPERS ===================== */
+
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("is-IS");
+}
+
+function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
+  if (!endsAt) return null;
+  const remaining = getTimeRemaining(endsAt);
+  if (typeof remaining === "string") return remaining;
+  if (remaining && typeof remaining === "object" && "totalMs" in remaining) {
+    const { days, hours, minutes, totalMs } = remaining as any;
+    if (totalMs <= 0) return "Útsölunni er lokið";
+    if (days > 1) return `${days} dagar eftir af tilboðinu`;
+    if (days === 1) return "1 dagur eftir af tilboðinu";
+    if (hours > 0) return "Endar innan 24 klst";
+    if (minutes > 0) return "Endar fljótlega";
+    return "Endar fljótlega";
+  }
+  return null;
+}
+
+function buildImageUrl(rawUrl?: string | null): string {
+  if (!rawUrl) return "";
+  const u = rawUrl.trim();
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u) || u.startsWith("data:")) return u;
+  if (!API_BASE_URL) return u;
+  const base = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+  const path = u.startsWith("/") ? u : `/${u}`;
+  return `${base}${path}`;
+}
+
+/* ===================== HELPERS ===================== */
 
 function getTrialLabel(trialEndsAt?: string | null) {
   if (!trialEndsAt) return null;
@@ -61,7 +132,9 @@ function getTrialLabel(trialEndsAt?: string | null) {
   if (diffDays <= 0) return "Frí prufuvika er runnin út";
 
   if (diffDays === 1) {
-    return `Frí prufuvika: 1 dagur eftir (til ${end.toLocaleDateString("is-IS")})`;
+    return `Frí prufuvika: 1 dagur eftir (til ${end.toLocaleDateString(
+      "is-IS",
+    )})`;
   }
 
   return `Frí prufuvika: ${diffDays} dagar eftir (til ${end.toLocaleDateString(
@@ -69,114 +142,28 @@ function getTrialLabel(trialEndsAt?: string | null) {
   )})`;
 }
 
-function formatDate(dateStr?: string | null) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("is-IS");
-}
-
-function getPostTimeRemainingLabel(endsAt?: string | null): string | null {
-  if (!endsAt) return null;
-
-  const remaining = getTimeRemaining(endsAt);
-
-  if (typeof remaining === "string") return remaining;
-
-  if (remaining && typeof remaining === "object" && "totalMs" in remaining) {
-    const { days, hours, minutes, totalMs } = remaining as {
-      days: number;
-      hours: number;
-      minutes: number;
-      totalMs: number;
-    };
-
-    if (totalMs <= 0) return "Útsölunni er lokið";
-    if (days > 1) return `${days} dagar eftir af tilboðinu`;
-    if (days === 1) return "1 dagur eftir af tilboðinu";
-    if (hours > 0) return "Endar innan 24 klst";
-    if (minutes > 0) return "Endar fljótlega";
-    return "Endar fljótlega";
-  }
-
-  return null;
-}
-
-function buildImageUrl(rawUrl?: string | null): string {
-  if (!rawUrl) return "";
-  const u = rawUrl.trim();
-  if (!u) return "";
-
-  if (/^https?:\/\//i.test(u) || u.startsWith("data:")) return u;
-
-  if (!API_BASE_URL) return u;
-
-  const base = API_BASE_URL.endsWith("/")
-    ? API_BASE_URL.slice(0, -1)
-    : API_BASE_URL;
-  const path = u.startsWith("/") ? u : `/${u}`;
-  return `${base}${path}`;
-}
-
-const PLANS: {
-  id: PlanId;
-  name: string;
-  price: string;
-  description: string;
-}[] = [
-  {
-    id: "basic",
-    name: "Basic",
-    price: "12.000 kr/mán",
-    description: "Fyrir minni verslanir sem vilja byrja að prófa ÚtsalApp.",
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: "22.000 kr/mán",
-    description: "Fyrir verslanir með reglulegar útsölur og meiri sýnileika.",
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    price: "32.000 kr/mán",
-    description:
-      "Fyrir stærri verslanir og keðjur sem vilja hámarksáhrif í ÚtsalApp.",
-  },
-];
+/* ===================== COMPONENT ===================== */
 
 export default function Profile() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { authUser, isStore, isAdmin, loading, logout } = useAuth();
+  const store = authUser?.store;
 
   const [tab, setTab] = useState<ProfileTab>("overview");
 
-  const store = authUser?.store;
-
-  // Billing
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState<string | null>(null);
 
   const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
-
   const [planSuccessMsg, setPlanSuccessMsg] = useState<string | null>(null);
   const [planErrorMsg, setPlanErrorMsg] = useState<string | null>(null);
   const [activatingPlanId, setActivatingPlanId] = useState<PlanId | null>(null);
 
-  // Posts
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  // Change password
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmNewPassword, setConfirmNewPassword] = useState("");
-  const [pwLoading, setPwLoading] = useState(false);
-  const [pwError, setPwError] = useState<string | null>(null);
-  const [pwSuccess, setPwSuccess] = useState<string | null>(null);
 
   const {
     data: storePosts = [],
@@ -191,40 +178,53 @@ export default function Profile() {
     },
   });
 
-  // 👇 LÍMIR ÞETTA STRAX HÉR
   const safeStorePosts: StorePost[] = Array.isArray(storePosts)
     ? storePosts
-    : Array.isArray((storePosts as any)?.posts)
-      ? (storePosts as any).posts
-      : [];
+    : [];
+
+  /* ===== 🔧 FIX: KPI useMemo BEFORE EARLY RETURNS ===== */
+
+  const kpi = useMemo(() => {
+    const now = Date.now();
+
+    const activeCount = safeStorePosts.filter((p) => {
+      if (!p.endsAt) return true;
+      const end = new Date(p.endsAt).getTime();
+      return Number.isFinite(end) ? end > now : true;
+    }).length;
+
+    const views = safeStorePosts.reduce(
+      (sum, p) => sum + (typeof p.viewCount === "number" ? p.viewCount : 0),
+      0,
+    );
+
+    return {
+      activeOffersCount: activeCount,
+      totalViews: views,
+    };
+  }, [safeStorePosts]);
+
+  const { activeOffersCount, totalViews } = kpi;
+
+  /* ===================== BILLING EFFECT ===================== */
 
   useEffect(() => {
     if (!store?.id) return;
-
     let cancelled = false;
 
     async function loadBilling() {
       setBillingLoading(true);
       setBillingError(null);
-
       try {
         const data = await apiFetch<BillingInfo>("/api/v1/stores/me/billing");
         if (!cancelled) {
           setBilling(data);
-
           const backendPlan = (data.plan || "").toLowerCase();
-          if (
-            backendPlan === "basic" ||
-            backendPlan === "pro" ||
-            backendPlan === "premium"
-          ) {
+          if (["basic", "pro", "premium"].includes(backendPlan)) {
             setSelectedPlan(backendPlan as PlanId);
-          } else {
-            setSelectedPlan(null);
           }
         }
-      } catch (err) {
-        console.error("stores/me/billing error:", err);
+      } catch {
         if (!cancelled) {
           setBillingError(
             "Tókst ekki að sækja stöðu áskriftar. Reyndu aftur síðar.",
@@ -241,15 +241,13 @@ export default function Profile() {
     };
   }, [store?.id]);
 
-  // Auth gates (ein útgáfa, ekki tvöfalt)
+  /* ===================== AUTH GATES ===================== */
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 pb-24 pt-4">
-        <Card className="p-4 space-y-2">
+        <Card className="p-4">
           <p className="text-sm">Hleð innskráningarstöðu…</p>
-          <p className="text-xs text-muted-foreground">
-            Ef þetta hangir lengi: skráðu þig út/inn eða endurhlaðiðu síðuna.
-          </p>
         </Card>
       </div>
     );
@@ -262,17 +260,14 @@ export default function Profile() {
           <p className="text-sm">
             Þú þarft að vera innskráður sem verslun til að sjá prófíl.
           </p>
-          <Button
-            onClick={() => navigate("/login")}
-            variant="default"
-            className="text-sm"
-          >
-            Skrá inn
-          </Button>
+          <Button onClick={() => navigate("/login")}>Skrá inn</Button>
         </Card>
       </div>
     );
   }
+
+  /* ===================== REST (UI) ===================== */
+  /* ⬇️ HÉR FYLGIR ÓBREYTT UI KÓÐI ⬇️ */
 
   const trialActive =
     billing !== null && !billing.trialExpired && !!billing.trialEndsAt;
@@ -314,29 +309,6 @@ export default function Profile() {
   const createdAtLabel = formatDate(
     store?.createdAt ?? billing?.createdAt ?? null,
   );
-
-  // KPI fyrir yfirlit
-  const kpi = useMemo(() => {
-    const now = Date.now();
-
-    const activeCount = safeStorePosts.filter((p) => {
-      if (!p.endsAt) return true;
-      const end = new Date(p.endsAt).getTime();
-      return Number.isFinite(end) ? end > now : true;
-    }).length;
-
-    const views = safeStorePosts.reduce(
-      (sum, p) => sum + (typeof p.viewCount === "number" ? p.viewCount : 0),
-      0,
-    );
-
-    return {
-      activeOffersCount: activeCount,
-      totalViews: views,
-    };
-  }, [safeStorePosts]);
-
-  const { activeOffersCount, totalViews } = kpi;
 
   // --- ACTIVATE PLAN HANDLER (VERÐUR AÐ VERA HEILT FALL) ---
   const handleActivatePlan = async () => {

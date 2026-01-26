@@ -4,12 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { apiFetch } from "@/lib/api";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-// Flokkar
 const CATEGORY_OPTIONS = [
   "Fatnaður - Konur",
   "Fatnaður - Karlar",
@@ -22,7 +22,17 @@ const CATEGORY_OPTIONS = [
   "Leikföng & börn",
   "Matur & veitingar",
   "Happy Hour",
+  "2 fyrir 1",
+  "Tilboð",
+  "Verkfæri",
+  "Bíllinn",
+  "Heilsa og útlit",
+  "Hljóðfæri",
+  "Gjafaleikur",
+  "Opnunartilboð",
+  "Upplifun",
   "Annað",
+  "Viðburðir",
 ];
 
 type CreatePostPayload = {
@@ -42,7 +52,9 @@ type CreatePostPayload = {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-// Upload image
+// ====================
+// Upload helper
+// ====================
 async function uploadImage(file: File): Promise<string> {
   const token =
     localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
@@ -55,8 +67,8 @@ async function uploadImage(file: File): Promise<string> {
   formData.append("image", file);
 
   const url = API_BASE_URL
-    ? `${API_BASE_URL}/api/v1/uploads`
-    : "/api/v1/uploads";
+    ? `${API_BASE_URL}/api/v1/uploads/image`
+    : "/api/v1/uploads/image";
 
   const res = await fetch(url, {
     method: "POST",
@@ -70,14 +82,18 @@ async function uploadImage(file: File): Promise<string> {
     throw new Error("Tókst ekki að hlaða upp mynd.");
   }
 
-  const data = (await res.json()) as { url?: string };
-  if (!data?.url) {
+  const data = (await res.json()) as { imageUrl?: string };
+
+  if (!data?.imageUrl) {
     throw new Error("Server skilaði ekki myndaslóð.");
   }
 
-  return data.url;
+  return data.imageUrl;
 }
 
+// ====================
+// Component
+// ====================
 export default function CreatePost() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -132,7 +148,7 @@ export default function CreatePost() {
     }
 
     if (!category.trim()) {
-      setErrorMsg("Veldu flokk fyrir tilboðið.");
+      setErrorMsg("Veldu flokk.");
       return;
     }
 
@@ -161,12 +177,7 @@ export default function CreatePost() {
         buyUrl: buyUrl.trim() || null,
         startsAt: startsAt || null,
         endsAt: endsAt || null,
-        images: [
-          {
-            url: imageUrl,
-            alt: title.trim(),
-          },
-        ],
+        images: [{ url: imageUrl, alt: title.trim() }],
       };
 
       await apiFetch("/api/v1/posts", {
@@ -180,7 +191,6 @@ export default function CreatePost() {
       setSuccessMsg("Tilboð var búið til.");
       setTimeout(() => navigate("/profile"), 800);
     } catch (err: any) {
-      console.error(err);
       setErrorMsg(
         err instanceof Error
           ? err.message
@@ -196,50 +206,35 @@ export default function CreatePost() {
       <h1 className="text-lg font-semibold mb-3">Búa til nýtt tilboð</h1>
 
       <Card className="p-4 space-y-4">
-        {errorMsg && (
-          <div className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-md px-3 py-2">
-            {errorMsg}
-          </div>
-        )}
-
+        {errorMsg && <div className="text-xs text-red-600">{errorMsg}</div>}
         {successMsg && (
-          <div className="text-xs text-green-700 bg-green-50 border border-green-100 rounded-md px-3 py-2">
-            {successMsg}
-          </div>
+          <div className="text-xs text-green-600">{successMsg}</div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1">
-            <Label>Titill tilboðs</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
+          <Label>Titill</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
 
-          <div className="space-y-1">
-            <Label>Lýsing</Label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full border border-black rounded-md px-3 py-2 text-sm bg-white min-h-[80px]"
-            />
-          </div>
+          <Label>Lýsing</Label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full border rounded-md p-2 text-sm"
+          />
 
-          <div className="space-y-1">
-            <Label>Flokkur</Label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full border border-black rounded-md px-3 py-2 text-sm bg-white"
-            >
-              <option value="">Veldu flokk…</option>
-              {CATEGORY_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Label>Flokkur</Label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full border rounded-md p-2 text-sm"
+          >
+            <option value="">Veldu flokk</option>
+            {CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt}>{opt}</option>
+            ))}
+          </select>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             <Input
               placeholder="Verð áður"
               value={priceOriginal}
@@ -253,12 +248,13 @@ export default function CreatePost() {
           </div>
 
           <Input
-            placeholder="Linkur til að kaupa"
+            placeholder="Kauplinkur"
             value={buyUrl}
             onChange={(e) => setBuyUrl(e.target.value)}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* ✅ TIMABUNDIN TILBOD */}
+          <div className="grid grid-cols-2 gap-2">
             <Input
               type="date"
               value={startsAt}
@@ -271,23 +267,18 @@ export default function CreatePost() {
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Mynd</Label>
-            <Input type="file" accept="image/*" onChange={handleImageChange} />
+          <Input type="file" accept="image/*" onChange={handleImageChange} />
 
-            {imageUrl && (
-              <div className="relative w-full aspect-[4/3] rounded-md border bg-muted flex items-center justify-center overflow-hidden">
-                <img
-                  src={imageUrl}
-                  alt="Preview"
-                  className="max-h-full max-w-full object-contain"
-                />
-              </div>
-            )}
-          </div>
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt="Preview"
+              className="max-h-64 object-contain"
+            />
+          )}
 
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Bý til tilboð..." : "Búa til tilboð"}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Bý til..." : "Búa til tilboð"}
           </Button>
         </form>
       </Card>

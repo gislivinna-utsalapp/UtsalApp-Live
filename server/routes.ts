@@ -5,24 +5,26 @@ import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import sharp from "sharp";
+import crypto from "crypto";
 import path from "path";
 import fs from "fs";
-import crypto from "crypto";
 
 import { storage } from "./storage-db";
+import { UPLOAD_DIR } from "./config/uploads";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
-// 🔑 Upload directory
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-// 🔑 Multer MUST be memoryStorage (annars er req.file.buffer undefined)
+// 🔑 Multer – disk storage (FINAL, RECOMMENDED)
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, UPLOAD_DIR);
+    },
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || ".jpg";
+      cb(null, `${crypto.randomUUID()}${ext.toLowerCase()}`);
+    },
+  }),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
   },
@@ -158,9 +160,7 @@ async function mapPostToFrontend(p: any) {
     images: p.imageUrl
       ? [
           {
-            url: p.imageUrl.startsWith("http")
-              ? p.imageUrl
-              : `https://utsalapp-live.onrender.com${p.imageUrl}`,
+            url: p.imageUrl,
             alt: p.title,
           },
         ]
@@ -201,7 +201,7 @@ function getPlanRankForPost(
 
 // ------------------------- ROUTES START -------------------------
 
-export function registerRoutes(app: Express): void {
+export async function registerRoutes(app: Express): Promise<void> {
   const router = express.Router();
 
   // Grunn middleware
@@ -209,7 +209,7 @@ export function registerRoutes(app: Express): void {
   router.use(express.json());
 
   // Static fyrir uploads
-  router.use("/uploads", express.static(UPLOAD_DIR));
+  app.use("/uploads", express.static(UPLOAD_DIR));
 
   // ------------------ AUTH: REGISTER STORE ------------------
   router.post("/auth/register-store", async (req: Request, res: Response) => {
@@ -230,66 +230,52 @@ export function registerRoutes(app: Express): void {
         website?: string;
       };
 
-      const email = (rawEmail ?? "").trim().toLowerCase();
-      const password = (rawPassword ?? "").trim();
-
-      if (!storeName || !email || !password) {
-        return res.status(400).json({ message: "Vantar upplýsingar" });
+      if (!storeName || !rawEmail || !rawPassword) {
+        return res.status(400).json({ error: "Missing required fields" });
       }
 
-      const existing = await storage.findUserByEmail(email);
-      if (existing) {
-        return res.status(400).json({ message: "Netfang er þegar í notkun" });
-      }
+      const email = rawEmail.trim().toLowerCase();
+      const password = rawPassword;
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      // ===== ACCESS LOGIC: PRUFUVIKA =====
+      const now = new Date();
+      const trialDays = 7;
+      const accessEndsAt = new Date(
+        now.getTime() + trialDays * 24 * 60 * 60 * 1000,
+      ).toISOString();
+      // ==================================
 
-      // Ný verslun fær strax 7 daga fríviku
-      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-
-      const store = await storage.createStore({
+      const store = await createStore({
         name: storeName,
-        address: (address ?? "").trim(),
-        phone: (phone ?? "").trim(),
-        website: (website ?? "").trim(),
-        logoUrl: "",
-        ownerEmail: email,
-        plan: "basic",
-        trialEndsAt,
-        billingStatus: "trial",
-      } as any);
-
-      const user = await storage.createUser({
         email,
-        passwordHash,
-        role: "store",
-        storeId: store.id,
-      } as any);
+        password,
+        address,
+        phone,
+        website,
 
-      const billingActive = true; // trial er virkt
+        // 👇 NÝTT – þetta er lykillinn
+        accessEndsAt,
+        trialEndsAt: accessEndsAt,
+      });
 
-      return res.json({
-        message: "Verslun skráð",
-        user: { id: user.id, email: user.email, role: user.role },
+      return res.status(201).json({
+        ok: true,
         store: {
           id: store.id,
           name: store.name,
-          address: (store as any).address ?? "",
-          phone: (store as any).phone ?? "",
-          website: (store as any).website ?? "",
-          plan: (store as any).plan ?? "basic",
-          planType: (store as any).plan ?? "basic",
-          trialEndsAt: (store as any).trialEndsAt ?? null,
-          billingStatus: (store as any).billingStatus ?? "trial",
-          billingActive,
-          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+          accessEndsAt: store.accessEndsAt,
         },
       });
     } catch (err) {
-      console.error("register-store error", err);
-      res.status(500).json({ message: "Villa kom upp" });
+      console.error("register-store error:", err);
+      return res.status(500).json({ error: "Failed to register store" });
     }
   });
+
+  // helper function – má vera utan routes
+  function normalizeEmail(rawEmail?: string): string {
+    return (rawEmail ?? "").trim().toLowerCase();
+  }
 
   // ------------------ AUTH: REGISTER STORE (LEGACY ALIAS) ------------------
   router.post("/stores/register", async (req, res) => {
@@ -303,8 +289,8 @@ export function registerRoutes(app: Express): void {
         website,
       } = req.body as {
         storeName?: string;
-        email?: string;
-        password?: string;
+        rawEmail?: string;
+        rawPassword?: string;
         address?: string;
         phone?: string;
         website?: string;
@@ -315,11 +301,6 @@ export function registerRoutes(app: Express): void {
 
       if (!storeName || !email || !password) {
         return res.status(400).json({ message: "Vantar upplýsingar" });
-      }
-
-      const existing = await storage.findUserByEmail(email);
-      if (existing) {
-        return res.status(400).json({ message: "Netfang er þegar í notkun" });
       }
 
       const passwordHash = await bcrypt.hash(password, 10);
@@ -361,12 +342,12 @@ export function registerRoutes(app: Express): void {
           trialEndsAt: (store as any).trialEndsAt ?? null,
           billingStatus: (store as any).billingStatus ?? "trial",
           billingActive,
-          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+          createdAt: (store as any).createdAt ?? null,
         },
       });
     } catch (err) {
-      console.error("stores/register alias error", err);
-      res.status(500).json({ message: "Villa kom upp" });
+      console.error("register-store error", err);
+      return res.status(500).json({ message: "Villa kom upp" });
     }
   });
 
@@ -506,8 +487,8 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ STORES: BILLING INFO FYRIR VERSLUN ------------------
-  app.get(
-    "/api/v1/stores/me/billing",
+  router.get(
+    "/stores/me/billing",
     auth("store"),
     async (req: AuthRequest, res: Response) => {
       try {
@@ -544,7 +525,7 @@ export function registerRoutes(app: Express): void {
           billingStatus,
           trialExpired: isTrialExpired(store),
           daysLeft,
-          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+          createdAt: (store as any).createdAt ?? null,
         });
       } catch (err) {
         console.error("stores/me/billing error", err);
@@ -633,7 +614,7 @@ export function registerRoutes(app: Express): void {
   );
 
   // ------------------ STORES: LIST ALL ------------------
-  app.get("/api/v1/stores", async (_req, res) => {
+  router.get("/stores", async (_req, res) => {
     try {
       const stores = await storage.listStores();
       res.json(stores);
@@ -644,7 +625,7 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ STORES: GET ONE (PUBLIC) ------------------
-  app.get("/api/v1/stores/:id", async (req, res) => {
+  router.get("/stores/:id", async (req, res) => {
     try {
       const store = await storage.getStoreById(req.params.id);
 
@@ -667,7 +648,7 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ STORES: POSTS FOR ONE STORE (PROFILE) ------------------
-  app.get("/api/v1/stores/:storeId/posts", async (req, res) => {
+  router.get("/stores/:storeId/posts", async (req, res) => {
     try {
       const storeId = req.params.storeId;
       const posts = await storage.getPostsByStore(storeId);
@@ -680,11 +661,10 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ POSTS: LIST ALL (MEÐ PLAN RÖÐUN) ------------------
-  app.get("/api/v1/posts", async (req, res) => {
+  router.get("/posts", async (req, res) => {
     try {
       const q = (req.query.q as string)?.toLowerCase() || "";
 
-      // Sækjum öll tilboð + allar verslanir (fyrir plan)
       const [posts, stores] = await Promise.all([
         storage.listPosts(),
         storage.listStores(),
@@ -695,26 +675,20 @@ export function registerRoutes(app: Express): void {
         storesById[s.id] = s;
       }
 
-      // Filter eftir leitarstreng ef til
       const filtered = q
         ? posts.filter((p: any) => (p.title || "").toLowerCase().includes(q))
         : posts;
 
-      // RÖÐUN:
-      // 1) plan: premium > pro > basic
-      // 2) innan pakka: nýjustu createdAt efst
       filtered.sort((a: any, b: any) => {
         const pa = getPlanRankForPost(a, storesById);
         const pb = getPlanRankForPost(b, storesById);
 
-        if (pb !== pa) {
-          return pb - pa; // hærri plan rank ofar
-        }
+        if (pb !== pa) return pb - pa;
 
         const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
 
-        return bd - ad; // nýjustu efst
+        return bd - ad;
       });
 
       const mapped = await Promise.all(filtered.map(mapPostToFrontend));
@@ -726,13 +700,15 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ POSTS: DETAIL (MEÐ “ANTI DOUBLE COUNT”) ------------------
-  app.get("/api/v1/posts/:id", async (req, res) => {
+  router.get("/posts/:id", async (req, res) => {
     try {
       const all = await storage.listPosts();
       const post = all.find((p: any) => p.id === req.params.id);
       if (!post) {
         return res.status(404).json({ message: "Tilboð fannst ekki" });
       }
+
+      // hér kemur restin af kóðanum ÓBREYTT
 
       // Einföld IP-greining
       const ipHeader = (req.headers["x-forwarded-for"] as string) || "";
@@ -766,58 +742,72 @@ export function registerRoutes(app: Express): void {
   });
 
   // ------------------ POSTS: CREATE ------------------
-  router.post(
-    "/posts",
-    auth("store"),
-    requireActiveOrTrialStore,
-    async (req: AuthRequest, res) => {
-      try {
-        const {
-          title,
-          description,
-          category,
-          priceOriginal,
-          priceSale,
-          buyUrl,
-          startsAt,
-          endsAt,
-          images,
-        } = req.body;
+  router.post("/posts", auth("store"), async (req: AuthRequest, res) => {
+    try {
+      const storeId = req.user?.storeId;
 
-        if (!title || priceOriginal == null || priceSale == null || !category) {
-          return res.status(400).json({ message: "Vantar upplýsingar" });
-        }
-
-        const imageUrl =
-          Array.isArray(images) && images.length > 0 ? images[0].url : "";
-
-        const newPost = await storage.createPost({
-          title,
-          description,
-          category,
-          price: Number(priceSale),
-          oldPrice: Number(priceOriginal),
-          imageUrl,
-          storeId: req.user!.storeId!,
-          buyUrl: buyUrl || null,
-          startsAt: startsAt || null,
-          endsAt: endsAt || null,
-          createdAt: new Date().toISOString(),
-          viewCount: 0,
-        } as any);
-
-        const mapped = await mapPostToFrontend(newPost);
-        res.json(mapped);
-      } catch (err) {
-        console.error("create post error", err);
-        res.status(500).json({ message: "Villa kom upp" });
+      if (!storeId) {
+        return res.status(401).json({ message: "Ekki innskráð verslun" });
       }
-    },
-  );
+
+      const store = await storage.getStoreById(storeId);
+      if (!store) {
+        return res.status(404).json({ message: "Verslun fannst ekki" });
+      }
+
+      // 🔒 AÐGANGSSTÝRING – SINGLE SOURCE OF TRUTH
+      if (!store.accessEndsAt || new Date(store.accessEndsAt) <= new Date()) {
+        return res.status(403).json({
+          message: "Aðgangur verslunar er útrunninn",
+          accessEndsAt: store.accessEndsAt ?? null,
+        });
+      }
+
+      const {
+        title,
+        description,
+        category,
+        priceOriginal,
+        priceSale,
+        buyUrl,
+        startsAt,
+        endsAt,
+        images,
+      } = req.body;
+
+      if (!title || priceOriginal == null || priceSale == null || !category) {
+        return res.status(400).json({ message: "Vantar upplýsingar" });
+      }
+
+      const imageUrl =
+        Array.isArray(images) && images.length > 0 ? images[0].url : "";
+
+      const newPost = await storage.createPost({
+        title,
+        description,
+        category,
+        price: Number(priceSale),
+        oldPrice: Number(priceOriginal),
+        imageUrl,
+        storeId,
+        buyUrl: buyUrl || null,
+        startsAt: startsAt || null,
+        endsAt: endsAt || null,
+        createdAt: new Date().toISOString(),
+        viewCount: 0,
+      } as any);
+
+      const mapped = await mapPostToFrontend(newPost);
+      res.json(mapped);
+    } catch (err) {
+      console.error("create post error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
 
   // ------------------ POSTS: UPDATE ------------------
-  app.put(
-    "/api/v1/posts/:id",
+  router.put(
+    "/posts/:id",
     auth("store"),
     async (req: AuthRequest, res: Response) => {
       try {
@@ -876,8 +866,8 @@ export function registerRoutes(app: Express): void {
   );
 
   // ------------------ POSTS: DELETE (STORE OWN) ------------------
-  app.delete(
-    "/api/v1/posts/:id",
+  router.delete(
+    "/posts/:id",
     auth("store"),
     async (req: AuthRequest, res: Response) => {
       try {
@@ -902,75 +892,44 @@ export function registerRoutes(app: Express): void {
     },
   );
 
-  // ------------------ IMAGE UPLOAD ------------------
+  // ------------------ UPLOAD IMAGE (SINGLE SOURCE OF TRUTH) ------------------
   router.post(
-    "/uploads",
+    "/uploads/image",
     auth("store"),
     upload.single("image"),
     async (req: AuthRequest, res: Response) => {
       try {
         if (!req.file) {
-          return res
-            .status(400)
-            .json({ message: "Engin mynd send (req.file vantar)" });
+          return res.status(400).json({ message: "Engin mynd móttekin" });
         }
 
-        if (!req.file.buffer || req.file.buffer.length === 0) {
-          return res.status(400).json({ message: "Mynd er tóm eða ógild" });
-        }
-
-        if (!req.file.mimetype.startsWith("image/")) {
-          return res.status(400).json({ message: "Skrá er ekki mynd" });
-        }
-
-        const filename = `${crypto.randomUUID()}.jpg`;
-        const filepath = path.join(UPLOAD_DIR, filename);
-
-        await sharp(req.file.buffer)
-          .resize(1200, 1200, { fit: "inside", withoutEnlargement: true })
-          .jpeg({ quality: 80 })
-          .toFile(filepath);
-
-        const baseUrl = `${req.protocol}://${req.get("host")}`;
-
-        return res.json({
-          url: `${baseUrl}/uploads/${filename}`,
+        return res.status(200).json({
+          imageUrl: `/uploads/${req.file.filename}`,
         });
       } catch (err) {
-        console.error("[UPLOAD SHARP ERROR]", err);
-        return res.status(500).json({
-          message: "Sharp gat ekki unnið úr mynd",
-        });
+        console.error("upload image error", err);
+        return res.status(500).json({ message: "Myndaupphleðsla mistókst" });
       }
     },
   );
 
-  // ------------------ IMAGE SERVE ------------------
-  router.get("/uploads/:filename", (req: Request, res: Response) => {
-    const filepath = path.join(UPLOAD_DIR, req.params.filename);
-
-    if (!fs.existsSync(filepath)) {
-      return res.status(404).end();
-    }
-
-    res.sendFile(filepath);
-  });
-
   // ⬅️ MOUNT API ROUTER (EINU SINNI)
   app.use("/api/v1", router);
 
-  // ------------------ STATIC FILES & SPA FALLBACK (AÐEINS Í PRODUCTION) ------------------
-  if (process.env.NODE_ENV === "production") {
-    // HÉR ER LAGFÆRINGIN: byggið er undir client/dist
-    const clientDistPath = path.join(process.cwd(), "client", "dist");
+  // ------------------ STATIC FILES & SPA FALLBACK ------------------
+  const clientDistPath = path.join(process.cwd(), "client", "dist");
 
+  if (fs.existsSync(clientDistPath)) {
     app.use(express.static(clientDistPath));
 
     app.get("*", (req, res, next) => {
       if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
         return next();
       }
-      res.sendFile(path.join(clientDistPath, "index.html"));
+
+      return res.sendFile(path.join(clientDistPath, "index.html"));
     });
   }
+
+  // ⬅️ LOKAR registerRoutes(app)
 }

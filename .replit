@@ -6,12 +6,20 @@ run = "bash -lc 'npm start'"
 
 [nix]
 channel = "stable-24_05"
-packages = ["ps"]
+packages = ["ps", "lsof"]
 
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["sh", "-c", "npm start"]
+
+[[ports]]
+localPort = 3000
+externalPort = 3003
+
+[[ports]]
+localPort = 4173
+externalPort = 3002
 
 [[ports]]
 localPort = 5000

@@ -325,7 +325,7 @@ async function requirePlanSelected(req, res, next) {
       return res.status(404).json({ message: "Verslun fannst ekki" });
     }
     const plan = store.plan;
-    const allowed = ["basic", "pro", "premium"];
+    const allowed = ["basic", "pro", "premium", "unlimited"];
     if (!plan || !allowed.includes(plan)) {
       return res.status(403).json({
         message: "\xDE\xFA \xFEarft a\xF0 velja pakka \xE1\xF0ur en \xFE\xFA getur b\xFAi\xF0 til tilbo\xF0.",
@@ -577,7 +577,7 @@ async function registerRoutes(app) {
     async (req, res) => {
       try {
         const bodyPlan = req.body.plan ?? req.body.planType;
-        const allowed = ["basic", "pro", "premium"];
+        const allowed = ["basic", "pro", "premium", "unlimited"];
         if (!bodyPlan || !allowed.includes(bodyPlan)) {
           return res.status(400).json({ message: "\xD3gild pakkategund" });
         }
@@ -826,7 +826,7 @@ async function registerRoutes(app) {
     async (req, res) => {
       try {
         const { plan } = req.body;
-        if (!plan || !["basic", "pro", "premium"].includes(plan)) {
+        if (!plan || !["basic", "pro", "premium", "unlimited"].includes(plan)) {
           return res.status(400).json({ error: "Invalid plan" });
         }
         if (!req.user?.storeId) {

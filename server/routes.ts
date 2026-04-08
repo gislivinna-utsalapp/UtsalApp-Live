@@ -118,7 +118,7 @@ async function requirePlanSelected(
     }
 
     const plan = (store as any).plan;
-    const allowed = ["basic", "pro", "premium"];
+    const allowed = ["basic", "pro", "premium", "unlimited"];
 
     if (!plan || !allowed.includes(plan)) {
       return res.status(403).json({
@@ -472,7 +472,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         const bodyPlan = (req.body.plan ?? req.body.planType) as
           | string
           | undefined;
-        const allowed = ["basic", "pro", "premium"];
+        const allowed = ["basic", "pro", "premium", "unlimited"];
 
         if (!bodyPlan || !allowed.includes(bodyPlan)) {
           return res.status(400).json({ message: "Ógild pakkategund" });
@@ -795,7 +795,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       try {
         const { plan } = req.body as { plan?: string };
 
-        if (!plan || !["basic", "pro", "premium"].includes(plan)) {
+        if (!plan || !["basic", "pro", "premium", "unlimited"].includes(plan)) {
           return res.status(400).json({ error: "Invalid plan" });
         }
 

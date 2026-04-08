@@ -359,18 +359,19 @@ export default function Profile() {
   );
 
   // --- ACTIVATE PLAN HANDLER (VERÐUR AÐ VERA HEILT FALL) ---
-  const handleActivatePlan = async () => {
+  const handleActivatePlan = async (overridePlan?: PlanId) => {
     if (!store?.id) return;
-    if (!selectedPlan) return;
+    const planToActivate = overridePlan ?? selectedPlan;
+    if (!planToActivate) return;
 
     setPlanErrorMsg(null);
     setPlanSuccessMsg(null);
-    setActivatingPlanId(selectedPlan);
+    setActivatingPlanId(planToActivate);
 
     try {
       await apiFetch<StoreInfo>("/api/v1/stores/activate-plan", {
         method: "POST",
-        body: JSON.stringify({ plan: selectedPlan }),
+        body: JSON.stringify({ plan: planToActivate }),
       });
 
       const updatedBilling = await apiFetch<BillingInfo>(
@@ -773,13 +774,15 @@ export default function Profile() {
                   Valinn pakki
                 </p>
                 <p className="text-lg font-semibold">
-                  {displayPlan === "basic"
-                    ? "Basic"
-                    : displayPlan === "pro"
-                      ? "Pro"
-                      : displayPlan === "premium"
-                        ? "Premium"
-                        : "Enginn"}
+                  {displayPlan === "unlimited"
+                    ? "Ótakmarkaðar auglýsingar"
+                    : displayPlan === "basic"
+                      ? "Basic"
+                      : displayPlan === "pro"
+                        ? "Pro"
+                        : displayPlan === "premium"
+                          ? "Premium"
+                          : "Enginn"}
                 </p>
               </div>
             </div>
@@ -1279,131 +1282,94 @@ export default function Profile() {
 
       {/* SUBSCRIPTION */}
       {tab === "subscription" && (
-        <Card className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Pakkar og frívika</h2>
-          </div>
+        <Card className="p-4 space-y-4">
+          <h2 className="text-sm font-semibold">Áskrift</h2>
 
           {billingLoading && (
-            <p className="text-xs text-muted-foreground">
-              Sæki stöðu áskriftar…
-            </p>
+            <p className="text-xs text-muted-foreground">Sæki stöðu áskriftar…</p>
           )}
-
           {billingError && (
             <p className="text-xs text-red-600">{billingError}</p>
           )}
 
-          {!billingLoading && !billingError && !trialActive && (
-            <p className="text-xs text-muted-foreground">
-              Veldu pakka sem hentar versluninni þinni. Smelltu svo á hnappinn
-              hér fyrir neðan til að virkja 7 daga fríviku á valda áskrift.
-            </p>
-          )}
-
-          {!billingLoading && !billingError && trialActive && activePlan && (
-            <p className="text-xs text-[#059669]">
-              Frí prufuvika er virk á pakkann{" "}
-              <span className="font-medium">
-                {activePlan === "basic"
-                  ? "Basic"
-                  : activePlan === "pro"
-                    ? "Pro"
-                    : "Premium"}
-              </span>
-              .
-            </p>
-          )}
-
-          {planErrorMsg && (
-            <p className="text-xs text-red-600">{planErrorMsg}</p>
-          )}
-
-          {planSuccessMsg && (
-            <p className="text-xs text-green-600">{planSuccessMsg}</p>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {PLANS.map((plan) => {
-              const isSelected = selectedPlan === plan.id;
-              const isActive = activePlan === plan.id;
-              const isActivating = activatingPlanId === plan.id;
-
-              return (
-                <div
-                  key={plan.id}
-                  className={`border rounded-lg p-3 text-xs flex flex-col gap-2 cursor-pointer ${
-                    isSelected
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-background hover:bg-muted"
-                  }`}
-                  onClick={() => setSelectedPlan(plan.id)}
-                >
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="text-sm font-semibold">{plan.name}</h3>
-                    <span className="font-bold">{plan.price}</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    {plan.description}
+          {!billingLoading && !billingError && (
+            <>
+              {trialActive && (
+                <div className="rounded-lg bg-green-50 border border-green-200 p-3">
+                  <p className="text-xs text-green-700 font-medium">
+                    Frí prufuvika er virk
                   </p>
-                  {isSelected && (
-                    <p className="text-[11px] text-primary font-medium">
-                      Valin áskriftarleið
-                    </p>
-                  )}
-                  {isActive && trialActive && (
-                    <p className="text-[11px] text-[#059669] font-medium">
-                      Frívika virk á þessum pakka
-                    </p>
-                  )}
-                  {isActivating && (
-                    <p className="text-[11px] text-muted-foreground">
-                      Uppfæri pakka…
-                    </p>
+                  {trialLabel && (
+                    <p className="text-xs text-green-600 mt-0.5">{trialLabel}</p>
                   )}
                 </div>
-              );
-            })}
-          </div>
+              )}
 
-          <div className="pt-2">
-            <Button
-              variant="default"
-              className="w-full text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={mainButtonDisabled}
-              onClick={handleActivatePlan}
-            >
-              {mainButtonLabel}
-            </Button>
-          </div>
+              <div className="border-2 border-primary rounded-lg p-4 space-y-3">
+                <div className="flex items-baseline justify-between flex-wrap gap-2">
+                  <h3 className="text-sm font-semibold">Ótakmarkaðar auglýsingar</h3>
+                  <div className="text-right">
+                    <span className="text-base font-bold">59.900 kr</span>
+                    <span className="text-xs text-muted-foreground ml-1">+ VSK / mán</span>
+                  </div>
+                </div>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  <li>· Ótakmarkaður fjöldi auglýsinga</li>
+                  <li>· Fullt aðgengi að öllum eiginleikum</li>
+                  <li>· Hægt að hætta hvenær sem er</li>
+                </ul>
+                {(activePlan === "unlimited" || trialActive) && (
+                  <p className="text-xs text-primary font-medium">
+                    {trialActive ? "Frívika virk á þessum pakka" : "Virk áskrift"}
+                  </p>
+                )}
+              </div>
 
-          <div className="border-t border-border pt-3 space-y-2">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Framlengja aðgang
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Smelltu hér til að framlengja aðgang þinn um 7 daga til viðbótar
-              við núverandi lok prufutímabils.
-            </p>
+              {planErrorMsg && (
+                <p className="text-xs text-red-600">{planErrorMsg}</p>
+              )}
+              {planSuccessMsg && (
+                <p className="text-xs text-green-600">{planSuccessMsg}</p>
+              )}
 
-            {extendSuccessMsg && (
-              <p className="text-xs text-green-600">{extendSuccessMsg}</p>
-            )}
-            {extendErrorMsg && (
-              <p className="text-xs text-red-600">{extendErrorMsg}</p>
-            )}
+              {!trialActive && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="w-full text-xs"
+                  disabled={billingLoading || !!activatingPlanId}
+                  onClick={() => handleActivatePlan("unlimited" as PlanId)}
+                >
+                  {activatingPlanId ? "Virkja…" : "Virkja 7 daga fríviku"}
+                </Button>
+              )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={extendingTrial}
-              onClick={handleExtendTrial}
-              data-testid="button-extend-trial"
-            >
-              {extendingTrial ? "Framlengi aðgang…" : "Framlengja um 7 daga"}
-            </Button>
-          </div>
+              <div className="border-t border-border pt-3 space-y-2">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Framlengja aðgang
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Framlengja aðgang um 7 daga til viðbótar við núverandi lok prufutímabils.
+                </p>
+                {extendSuccessMsg && (
+                  <p className="text-xs text-green-600">{extendSuccessMsg}</p>
+                )}
+                {extendErrorMsg && (
+                  <p className="text-xs text-red-600">{extendErrorMsg}</p>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+                  disabled={extendingTrial}
+                  onClick={handleExtendTrial}
+                  data-testid="button-extend-trial"
+                >
+                  {extendingTrial ? "Framlengi aðgang…" : "Framlengja um 7 daga"}
+                </Button>
+              </div>
+            </>
+          )}
         </Card>
       )}
     </div>

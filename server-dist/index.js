@@ -1055,6 +1055,25 @@ async function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
+  router.post("/promote-admin", async (req, res) => {
+    try {
+      const { email, secret } = req.body;
+      const PROMOTE_SECRET = "UtsalApp2026Admin!";
+      if (!secret || secret !== PROMOTE_SECRET) {
+        return res.status(403).json({ message: "Rangt leynior\xF0" });
+      }
+      const targetEmail = (email || "gisli@utsalapp.is").trim().toLowerCase();
+      const user = await storage.findUserByEmail(targetEmail);
+      if (!user) {
+        return res.status(404).json({ message: "Notandi fannst ekki" });
+      }
+      await storage.updateUser(user.id, { isAdmin: true });
+      res.json({ success: true, message: `${targetEmail} er n\xFA admin` });
+    } catch (err) {
+      console.error("promote-admin error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
   app.use("/api/v1", router);
   const clientDistPath = path3.join(process.cwd(), "client", "dist");
   if (fs3.existsSync(clientDistPath)) {

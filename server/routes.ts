@@ -1090,6 +1090,30 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ------------------ ONE-TIME ADMIN PROMOTION ------------------
+  router.post("/promote-admin", async (req: Request, res: Response) => {
+    try {
+      const { email, secret } = req.body;
+      const PROMOTE_SECRET = "UtsalApp2026Admin!";
+
+      if (!secret || secret !== PROMOTE_SECRET) {
+        return res.status(403).json({ message: "Rangt leyniorð" });
+      }
+
+      const targetEmail = (email || "gisli@utsalapp.is").trim().toLowerCase();
+      const user = await storage.findUserByEmail(targetEmail);
+      if (!user) {
+        return res.status(404).json({ message: "Notandi fannst ekki" });
+      }
+
+      await storage.updateUser(user.id, { isAdmin: true });
+      res.json({ success: true, message: `${targetEmail} er nú admin` });
+    } catch (err) {
+      console.error("promote-admin error:", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
   // ⬅️ MOUNT API ROUTER (EINU SINNI)
   app.use("/api/v1", router);
 

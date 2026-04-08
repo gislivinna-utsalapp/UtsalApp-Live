@@ -416,27 +416,47 @@ async function registerRoutes(app) {
         role: "store",
         storeId: store.id
       });
-      req.session.user = {
-        id: user.id,
-        role: "store",
-        storeId: store.id
-      };
-      await new Promise((resolve, reject) => {
-        req.session.save((err) => err ? reject(err) : resolve());
-      });
+      const isAdmin = user.isAdmin === true;
+      const token = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          storeId: store.id,
+          isAdmin
+        },
+        JWT_SECRET,
+        { expiresIn: "7d" }
+      );
+      try {
+        req.session.user = {
+          id: user.id,
+          role: "store",
+          storeId: store.id
+        };
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => err ? reject(err) : resolve());
+        });
+      } catch {
+      }
       return res.status(201).json({
         success: true,
         user: {
           id: user.id,
           email: user.email,
-          role: user.role
+          role: user.role,
+          isAdmin
         },
         store: {
           id: store.id,
           name: store.name,
-          plan: store.plan,
-          billingStatus: store.billingStatus
-        }
+          plan: store.plan ?? "basic",
+          billingStatus: store.billingStatus ?? "trial",
+          address: store.address ?? "",
+          phone: store.phone ?? "",
+          website: store.website ?? ""
+        },
+        token
       });
     } catch (err) {
       console.error("[auth/register-store] error:", err);

@@ -258,31 +258,51 @@ export async function registerRoutes(app: Express): Promise<void> {
         storeId: store.id,
       } as any);
 
-      // 3️⃣ 🔑 AUTO-LOGIN (lykilatriðið)
-      (req.session as any).user = {
-        id: user.id,
-        role: "store",
-        storeId: store.id,
-      };
+      // 3️⃣ 🔑 AUTO-LOGIN – JWT token strax
+      const isAdmin = (user as any).isAdmin === true;
+      const token = jwt.sign(
+        {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          storeId: store.id,
+          isAdmin,
+        },
+        JWT_SECRET,
+        { expiresIn: "7d" },
+      );
 
-      await new Promise<void>((resolve, reject) => {
-        req.session.save((err) => (err ? reject(err) : resolve()));
-      });
+      // Session fallback
+      try {
+        (req.session as any).user = {
+          id: user.id,
+          role: "store",
+          storeId: store.id,
+        };
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => (err ? reject(err) : resolve()));
+        });
+      } catch {}
 
-      // 4️⃣ Response
+      // 4️⃣ Response – sama format og login
       return res.status(201).json({
         success: true,
         user: {
           id: user.id,
           email: user.email,
           role: user.role,
+          isAdmin,
         },
         store: {
           id: store.id,
           name: store.name,
-          plan: store.plan,
-          billingStatus: store.billingStatus,
+          plan: (store as any).plan ?? "basic",
+          billingStatus: (store as any).billingStatus ?? "trial",
+          address: (store as any).address ?? "",
+          phone: (store as any).phone ?? "",
+          website: (store as any).website ?? "",
         },
+        token,
       });
     } catch (err) {
       console.error("[auth/register-store] error:", err);

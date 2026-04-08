@@ -12,6 +12,22 @@ interface RegisterResponse {
   id?: string;
   storeId?: string;
   message?: string;
+  token?: string;
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+    isAdmin?: boolean;
+  };
+  store?: {
+    id: string;
+    name: string;
+    plan?: string;
+    billingStatus?: string;
+    address?: string;
+    phone?: string;
+    website?: string;
+  };
 }
 
 export default function RegisterStore() {
@@ -74,28 +90,43 @@ export default function RegisterStore() {
         },
       );
 
-      setCreatedStoreId(data.storeId || data.id || null);
+      setCreatedStoreId(data.storeId || data.store?.id || data.id || null);
 
-      // --- Sjálfvirk innskráning eftir skráningu ---
-      try {
-        // Notum sama email/lykilorð og var notað í skráningunni
-        // Gert ráð fyrir að login taki (email, password)
-        await login(email.trim(), password.trim());
+      if (data.token && data.user) {
+        localStorage.setItem("utsalapp_token", data.token);
+        localStorage.setItem("token", data.token);
+        const authData = {
+          user: {
+            id: data.user.id,
+            email: data.user.email,
+            role: data.user.role as "user" | "store",
+            isAdmin: data.user.isAdmin === true,
+          },
+          store: data.store ?? null,
+        };
+        localStorage.setItem("utsalapp_auth_user", JSON.stringify(authData));
+        localStorage.setItem("auth_user", JSON.stringify(authData.user));
+        if (data.store) {
+          localStorage.setItem("auth_store", JSON.stringify(data.store));
+        }
 
-        // Förum í plan-val áður en aðgangur fæst
         navigate("/choose-plan", { replace: true });
+        window.location.reload();
+        return;
+      }
 
+      try {
+        await login(email.trim(), password.trim());
+        navigate("/choose-plan", { replace: true });
         return;
       } catch (loginErr) {
         console.error("Sjálfvirk innskráning tókst ekki", loginErr);
-        // Ef login klikkar, sýnum venjuleg skilaboð og bjóðum upp á handvirka innskráningu
         setSuccessMsg(
           data.message ||
             "Verslun hefur verið skráð, en sjálfvirk innskráning tókst ekki. Vinsamlegast skráðu þig inn handvirkt.",
         );
       }
 
-      // Hreinsa lykilorð úr formi (ef við endum hér án redirect)
       setPassword("");
       setPasswordConfirm("");
     } catch (err) {

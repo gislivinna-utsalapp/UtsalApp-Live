@@ -1,13 +1,24 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+
 type Plan = "basic" | "pro" | "premium";
 
 export default function ChoosePlanPage() {
   const navigate = useNavigate();
+  const { authUser, loading: authLoading } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("utsalapp_token") ||
+        localStorage.getItem("token") ||
+        ""
+      : "";
 
   async function handleContinue() {
     if (!selectedPlan) {
@@ -15,36 +26,25 @@ export default function ChoosePlanPage() {
       return;
     }
 
+    if (!token) {
+      setError("Þú þarft að vera innskráð(ur) til að velja pakka. Vinsamlegast skráðu þig inn.");
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch("/api/v1/stores/select-plan", {
+      await apiFetch("/api/v1/stores/select-plan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-        credentials: "include", // ⬅️ session-cookie fer nú með
         body: JSON.stringify({ plan: selectedPlan }),
       });
 
-      if (res.status === 401) {
-        throw new Error("Þú þarft að vera innskráð(ur) til að velja pakka.");
-      }
-
-      if (res.status === 403) {
-        const data = await res.json().catch(() => null);
-        throw new Error(
-          data?.message || "Þú hefur ekki heimild til að velja pakka.",
-        );
-      }
-
-      if (!res.ok) {
-        throw new Error("Ekki tókst að vista pakka. Reyndu aftur.");
-      }
-
-      // 👉 greiðsluskref kemur síðar
-      navigate("/dashboard");
+      navigate("/profile", { replace: true });
     } catch (err) {
       console.error("select-plan error:", err);
       setError(
@@ -53,6 +53,14 @@ export default function ChoosePlanPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Hleð...</p>
+      </div>
+    );
   }
 
   return (
@@ -97,6 +105,7 @@ export default function ChoosePlanPage() {
             onClick={handleContinue}
             disabled={loading}
             className="px-8 py-3 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-700 disabled:opacity-50"
+            data-testid="button-choose-plan-continue"
           >
             {loading ? "Vinn..." : "Halda áfram"}
           </button>
@@ -105,8 +114,6 @@ export default function ChoosePlanPage() {
     </div>
   );
 }
-
-/* ------------------ SUB COMPONENT ------------------ */
 
 type PlanCardProps = {
   title: string;
@@ -128,6 +135,7 @@ function PlanCard({
   return (
     <div
       onClick={onClick}
+      data-testid={`card-plan-${title.toLowerCase()}`}
       className={`
         cursor-pointer border rounded-2xl p-6 transition
         ${selected ? "border-pink-600 ring-2 ring-pink-200" : "border-gray-200"}

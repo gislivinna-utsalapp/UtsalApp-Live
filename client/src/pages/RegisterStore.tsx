@@ -111,7 +111,6 @@ export default function RegisterStore() {
         }
 
         navigate("/choose-plan", { replace: true });
-        window.location.reload();
         return;
       }
 

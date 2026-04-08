@@ -8,6 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getTimeRemaining } from "@/lib/utils";
+import { MapPin, Phone, Globe } from "lucide-react";
 
 /* ===================== TYPES ===================== */
 
@@ -48,7 +49,7 @@ type StorePost = {
 };
 
 type PlanId = "basic" | "pro" | "premium";
-type ProfileTab = "overview" | "offers" | "security" | "subscription";
+type ProfileTab = "overview" | "appearance" | "offers" | "security" | "subscription";
 
 /* ===================== CONSTS ===================== */
 
@@ -176,6 +177,17 @@ export default function Profile() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSuccess, setPwSuccess] = useState<string | null>(null);
 
+  const [logoUrl, setLogoUrl] = useState<string>("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editAddress, setEditAddress] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editWebsite, setEditWebsite] = useState("");
+  const [infoSaving, setInfoSaving] = useState(false);
+  const [infoMsg, setInfoMsg] = useState<string | null>(null);
+  const [infoError, setInfoError] = useState<string | null>(null);
+  const [appearanceLoaded, setAppearanceLoaded] = useState(false);
+
   const {
     data: storePosts = [],
     isLoading: loadingPosts,
@@ -251,6 +263,31 @@ export default function Profile() {
       cancelled = true;
     };
   }, [store?.id]);
+
+  /* ===================== APPEARANCE LOAD ===================== */
+
+  useEffect(() => {
+    if (tab !== "appearance" || appearanceLoaded || !store?.id) return;
+
+    async function loadStoreDetail() {
+      try {
+        const data = await apiFetch<any>(`/api/v1/stores/${store!.id}`);
+        setEditName(data.name || store!.name || "");
+        setEditAddress(data.address || "");
+        setEditPhone(data.phone || "");
+        setEditWebsite(data.website || "");
+        setLogoUrl(data.logoUrl || "");
+        setAppearanceLoaded(true);
+      } catch {
+        setEditName(store!.name || "");
+        setEditAddress((store as any)?.address || "");
+        setEditPhone((store as any)?.phone || "");
+        setEditWebsite((store as any)?.website || "");
+        setAppearanceLoaded(true);
+      }
+    }
+    loadStoreDetail();
+  }, [tab, appearanceLoaded, store]);
 
   /* ===================== AUTH GATES ===================== */
 
@@ -503,9 +540,93 @@ export default function Profile() {
     }
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLogoUploading(true);
+    setInfoError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+
+      const token =
+        localStorage.getItem("utsalapp_token") ||
+        localStorage.getItem("token") ||
+        "";
+
+      const res = await fetch(
+        `${API_BASE_URL || ""}/api/v1/stores/me/logo`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        },
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || "Myndaupphleðsla mistókst");
+      }
+
+      const data = await res.json();
+      setLogoUrl(data.logoUrl || "");
+      setInfoMsg("Merki uppfært!");
+    } catch (err) {
+      console.error("logo upload error:", err);
+      setInfoError(
+        err instanceof Error ? err.message : "Myndaupphleðsla mistókst",
+      );
+    } finally {
+      setLogoUploading(false);
+    }
+  }
+
+  async function handleSaveInfo(e: React.FormEvent) {
+    e.preventDefault();
+    setInfoMsg(null);
+    setInfoError(null);
+    setInfoSaving(true);
+
+    try {
+      const data = await apiFetch<any>("/api/v1/stores/me/update-info", {
+        method: "POST",
+        body: JSON.stringify({
+          name: editName,
+          address: editAddress,
+          phone: editPhone,
+          website: editWebsite,
+        }),
+      });
+
+      setEditName(data.name || editName);
+      setEditAddress(data.address || "");
+      setEditPhone(data.phone || "");
+      setEditWebsite(data.website || "");
+      setLogoUrl(data.logoUrl || logoUrl);
+      setInfoMsg("Upplýsingar vistaðar!");
+    } catch (err) {
+      console.error("save info error:", err);
+      let msg =
+        err instanceof Error
+          ? err.message
+          : "Villa kom upp við vistun.";
+      const match = msg.match(/\{.*\}/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.message) msg = parsed.message;
+        } catch {}
+      }
+      setInfoError(msg);
+    } finally {
+      setInfoSaving(false);
+    }
+  }
+
   function handleLogout() {
     logout();
-    // React-safe logout redirect
     window.location.hash = "#/login";
   }
 
@@ -557,6 +678,14 @@ export default function Profile() {
             onClick={() => setTab("overview")}
           >
             Yfirlit
+          </button>
+          <button
+            type="button"
+            className={tabButtonClass(tab === "appearance")}
+            onClick={() => setTab("appearance")}
+            data-testid="tab-appearance"
+          >
+            Útlit
           </button>
           <button
             type="button"
@@ -707,6 +836,235 @@ export default function Profile() {
                 <p className="text-[11px] text-muted-foreground">
                   Virkjaðu fríviku til að byrja að setja inn tilboð.
                 </p>
+              )}
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* APPEARANCE */}
+      {tab === "appearance" && (
+        <>
+          <Card className="p-4 space-y-4">
+            <h2 className="text-sm font-semibold">Merki verslunar</h2>
+            <p className="text-xs text-muted-foreground">
+              Hladdu upp merki sem birtist á opinberu verslunar­síðunni þinni.
+            </p>
+
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 w-20 h-20 rounded-md bg-primary/10 flex items-center justify-center overflow-hidden border border-border">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt="Merki"
+                    className="w-full h-full object-cover"
+                    data-testid="img-store-logo"
+                  />
+                ) : (
+                  <span className="text-primary text-xl font-bold">
+                    {(editName || store.name || "?")
+                      .split(" ")
+                      .filter(Boolean)
+                      .map((w) => w[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block" data-testid="label-upload-logo">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    disabled={logoUploading}
+                    data-testid="input-upload-logo"
+                  />
+                  <span className="inline-block text-xs px-4 py-2 rounded-md bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity">
+                    {logoUploading ? "Hleð upp..." : "Velja mynd"}
+                  </span>
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  JPG, PNG eða WebP. Mælt með 200×200px eða stærra.
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          <Card className="p-4 space-y-4">
+            <h2 className="text-sm font-semibold">Upplýsingar verslunar</h2>
+            <p className="text-xs text-muted-foreground">
+              Þetta eru upplýsingarnar sem notendur sjá þegar þeir skoða verslunina þína.
+            </p>
+
+            <form onSubmit={handleSaveInfo} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium block mb-1">Nafn verslunar</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  data-testid="input-store-name"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1">Heimilisfang</label>
+                <input
+                  type="text"
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                  placeholder="t.d. Laugavegur 22, 101 Reykjavík"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  data-testid="input-store-address"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1">Sími</label>
+                <input
+                  type="text"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="t.d. 555-1234"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  data-testid="input-store-phone"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium block mb-1">Vefsíða</label>
+                <input
+                  type="text"
+                  value={editWebsite}
+                  onChange={(e) => setEditWebsite(e.target.value)}
+                  placeholder="t.d. https://minverslun.is"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  data-testid="input-store-website"
+                />
+              </div>
+
+              {infoMsg && <p className="text-xs text-green-600">{infoMsg}</p>}
+              {infoError && <p className="text-xs text-red-600">{infoError}</p>}
+
+              <Button
+                type="submit"
+                variant="default"
+                size="sm"
+                className="w-full text-xs"
+                disabled={infoSaving}
+                data-testid="button-save-info"
+              >
+                {infoSaving ? "Vista..." : "Vista breytingar"}
+              </Button>
+            </form>
+          </Card>
+
+          <Card className="p-4 space-y-4">
+            <h2 className="text-sm font-semibold">Forskoðun — svona lítur síðan þín út</h2>
+            <p className="text-xs text-muted-foreground">
+              Þetta er það sem notendur sjá þegar þeir smella á nafn verslunarinnar.
+            </p>
+
+            <div className="border border-border rounded-lg overflow-hidden bg-background">
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-14 h-14 rounded-md bg-primary/10 flex items-center justify-center overflow-hidden">
+                    {logoUrl ? (
+                      <img
+                        src={logoUrl}
+                        alt={editName || store.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-primary text-base font-bold">
+                        {(editName || store.name || "?")
+                          .split(" ")
+                          .filter(Boolean)
+                          .map((w) => w[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-bold leading-tight truncate">
+                      {editName || store.name || "Nafn verslunar"}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 border-t border-border pt-3 text-sm text-muted-foreground">
+                  {editAddress && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                      <span>{editAddress}</span>
+                    </div>
+                  )}
+                  {editPhone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                      <span>{editPhone}</span>
+                    </div>
+                  )}
+                  {editWebsite && (
+                    <div className="flex items-center gap-2">
+                      <Globe className="w-3.5 h-3.5 flex-shrink-0 text-primary" />
+                      <span className="truncate">{editWebsite.replace(/^https?:\/\//, "")}</span>
+                    </div>
+                  )}
+                  {!editAddress && !editPhone && !editWebsite && (
+                    <p className="text-xs text-muted-foreground italic">
+                      Fylltu út upplýsingarnar hér að ofan til að sjá forskoðun.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {safeStorePosts.length > 0 ? (
+                <div className="border-t border-border p-3">
+                  <p className="text-xs font-medium mb-2 text-muted-foreground">
+                    Útsölur og tilboð ({safeStorePosts.length})
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {safeStorePosts.slice(0, 3).map((p) => {
+                      const img = Array.isArray(p.images) && p.images[0];
+                      const url = img
+                        ? buildImageUrl(typeof img === "string" ? img : img.url)
+                        : "";
+                      return (
+                        <div
+                          key={p.id}
+                          className="aspect-square rounded-md bg-muted overflow-hidden"
+                        >
+                          {url ? (
+                            <img
+                              src={url}
+                              alt={p.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground">
+                              {p.title}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-border p-4 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    Engin virk tilboð enn
+                  </p>
+                </div>
               )}
             </div>
           </Card>

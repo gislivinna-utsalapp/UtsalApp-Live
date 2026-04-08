@@ -674,6 +674,63 @@ async function registerRoutes(app) {
     }
   );
   router.post(
+    "/stores/me/logo",
+    auth("store"),
+    upload.single("logo"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        if (!req.file) {
+          return res.status(400).json({ message: "Engin mynd m\xF3ttekin" });
+        }
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = toAbsoluteImageUrl(relativePath, req);
+        await storage.updateStore(req.user.storeId, { logoUrl: absoluteUrl });
+        return res.json({ logoUrl: absoluteUrl });
+      } catch (err) {
+        console.error("upload logo error:", err);
+        return res.status(500).json({ message: "Myndaupphle\xF0sla mist\xF3kst" });
+      }
+    }
+  );
+  router.post(
+    "/stores/me/update-info",
+    auth("store"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        const { name, address, phone, website } = req.body;
+        const updates = {};
+        if (typeof name === "string" && name.trim()) updates.name = name.trim();
+        if (typeof address === "string") updates.address = address.trim();
+        if (typeof phone === "string") updates.phone = phone.trim();
+        if (typeof website === "string") updates.website = website.trim();
+        if (Object.keys(updates).length === 0) {
+          return res.status(400).json({ message: "Engar breytingar fundust" });
+        }
+        const updated = await storage.updateStore(req.user.storeId, updates);
+        if (!updated) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+        return res.json({
+          id: updated.id,
+          name: updated.name,
+          address: updated.address ?? "",
+          phone: updated.phone ?? "",
+          website: updated.website ?? "",
+          logoUrl: updated.logoUrl ?? ""
+        });
+      } catch (err) {
+        console.error("update-info error:", err);
+        return res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
+  router.post(
     "/stores/change-password",
     auth("store"),
     async (req, res) => {
@@ -730,6 +787,7 @@ async function registerRoutes(app) {
         address: store.address ?? "",
         phone: store.phone ?? "",
         website: store.website ?? "",
+        logoUrl: store.logoUrl ?? "",
         createdAt: store.createdAt ?? null
       });
     } catch (err) {

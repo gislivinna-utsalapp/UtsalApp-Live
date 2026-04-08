@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Phone, Globe, ArrowLeft, ShoppingBag } from "lucide-react";
 
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { SalePostCard } from "@/components/SalePostCard";
 
@@ -39,6 +39,16 @@ export default function StorePage() {
   });
 
   const safePosts = Array.isArray(posts) ? posts : [];
+
+  function buildLogoUrl(raw?: string | null): string {
+    if (!raw) return "";
+    if (/^https?:\/\//i.test(raw)) return raw;
+    if (!API_BASE_URL) return raw;
+    const base = API_BASE_URL.endsWith("/") ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    return `${base}${raw.startsWith("/") ? raw : `/${raw}`}`;
+  }
+
+  const logoSrc = buildLogoUrl(store?.logoUrl);
 
   const initials = store?.name
     ? store.name
@@ -79,21 +89,21 @@ export default function StorePage() {
 
   return (
     <div className="space-y-4">
-      <Link
-        to="/stores"
+      <button
+        onClick={() => window.history.back()}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         data-testid="link-back-stores"
       >
         <ArrowLeft className="w-3 h-3" />
-        Allar verslanir
-      </Link>
+        Til baka
+      </button>
 
       <Card className="p-5 space-y-4">
         <div className="flex items-center gap-4">
           <div className="flex-shrink-0 w-16 h-16 rounded-md bg-primary/10 flex items-center justify-center overflow-hidden">
-            {store.logoUrl ? (
+            {logoSrc ? (
               <img
-                src={store.logoUrl}
+                src={logoSrc}
                 alt={store.name}
                 className="w-full h-full object-cover"
               />

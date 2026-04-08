@@ -603,6 +603,74 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // ------------------ STORES: UPLOAD LOGO ------------------
+  router.post(
+    "/stores/me/logo",
+    auth("store"),
+    upload.single("logo"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        if (!req.file) {
+          return res.status(400).json({ message: "Engin mynd móttekin" });
+        }
+
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = toAbsoluteImageUrl(relativePath, req);
+
+        await storage.updateStore(req.user.storeId, { logoUrl: absoluteUrl });
+
+        return res.json({ logoUrl: absoluteUrl });
+      } catch (err) {
+        console.error("upload logo error:", err);
+        return res.status(500).json({ message: "Myndaupphleðsla mistókst" });
+      }
+    },
+  );
+
+  // ------------------ STORES: UPDATE PUBLIC INFO ------------------
+  router.post(
+    "/stores/me/update-info",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+
+        const { name, address, phone, website } = req.body;
+        const updates: Record<string, any> = {};
+        if (typeof name === "string" && name.trim()) updates.name = name.trim();
+        if (typeof address === "string") updates.address = address.trim();
+        if (typeof phone === "string") updates.phone = phone.trim();
+        if (typeof website === "string") updates.website = website.trim();
+
+        if (Object.keys(updates).length === 0) {
+          return res.status(400).json({ message: "Engar breytingar fundust" });
+        }
+
+        const updated = await storage.updateStore(req.user.storeId, updates);
+        if (!updated) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+
+        return res.json({
+          id: (updated as any).id,
+          name: (updated as any).name,
+          address: (updated as any).address ?? "",
+          phone: (updated as any).phone ?? "",
+          website: (updated as any).website ?? "",
+          logoUrl: (updated as any).logoUrl ?? "",
+        });
+      } catch (err) {
+        console.error("update-info error:", err);
+        return res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
   // ------------------ STORES: CHANGE PASSWORD ------------------
   router.post(
     "/stores/change-password",
@@ -679,6 +747,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         address: (store as any).address ?? "",
         phone: (store as any).phone ?? "",
         website: (store as any).website ?? "",
+        logoUrl: (store as any).logoUrl ?? "",
         createdAt: (store as any).createdAt ?? null,
       });
     } catch (err) {

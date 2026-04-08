@@ -110,10 +110,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setAuthUser(null);
 
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+    const trimmedPassword = (password ?? "").trim();
+
     try {
       const data = await apiFetch<LoginResponse>("/api/v1/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password: trimmedPassword,
+        }),
       });
 
       if (!data?.user || !data?.token) {
@@ -153,10 +160,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone?: string;
     website?: string;
   }) {
-    await apiFetch("/api/v1/auth/register-store", {
+    // Skrá verslun – backend á að setja session
+    await apiFetch("/api/v1/stores/register", {
       method: "POST",
       body: JSON.stringify(data),
+      credentials: "include",
     });
+
+    // Sækja innskráðan notanda úr session (implicit auth)
+    const me = await apiFetch("/api/v1/me", {
+      credentials: "include",
+    });
+
+    // Setja notanda í state
+    setAuthUser(me);
   }
 
   /* ---------- LOGOUT ---------- */
@@ -180,16 +197,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+} // 👈 LOKAR AuthProvider – MJÖG MIKILVÆGT
 
 /* =======================
-   HOOK
+ USE AUTH HOOK
 ======================= */
-
 export function useAuth(): AuthContextType {
   const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return ctx;
 }

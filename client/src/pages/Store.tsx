@@ -150,12 +150,14 @@ export default function Store() {
         {/* === ACCESS NOTICE === */}
         {!hasAccess && (
           <Card className="p-6 text-center border-destructive/40 bg-destructive/5">
-            <p className="font-medium mb-2">
-              Aðgangur verslunar er tímabundið lokaður
+            <p className="font-medium mb-2">Aðgangur verslunar er útrunninn</p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Virkjaðu aðgang til að birta útsölur á ný.
             </p>
-            <p className="text-sm text-muted-foreground">
-              Hafðu samband við ÚtsalApp til að virkja aðgang aftur.
-            </p>
+
+            <Button onClick={() => setLocation("/login")} variant="default">
+              Skrá inn og virkja aðgang
+            </Button>
           </Card>
         )}
 

@@ -1,0 +1,66 @@
+I want to keep the 7-day access system for store profiles, but make it possible to extend access by another 7 days without any payment integration inside the app.
+
+Goal:
+- New store profiles get 7 days of access by default
+- Access can be extended by 7 more days manually
+- No payment system should be required
+- This should work safely without breaking login/auth
+
+Tasks:
+
+1. Keep 7-day access on profile creation
+- When a new store/user profile is created, set:
+  - trialEndsAt = now + 7 days
+  - accessEndsAt = now + 7 days
+- Keep the current 7-day default if it already exists
+
+2. Add manual extension logic
+- Create a backend function or route to extend a store's access by 7 days
+- If access has not expired yet:
+  - add 7 days to the current accessEndsAt
+- If access has already expired:
+  - set accessEndsAt = now + 7 days
+- Optionally also update trialEndsAt the same way for consistency
+
+3. Add a simple admin/manual endpoint
+- Create a route like:
+  POST /api/v1/stores/:storeId/extend-access
+- This route should extend access by 7 days
+- Do NOT add payment processing
+- Keep it simple and secure
+
+4. Frontend / profile dashboard
+- On the profile/dashboard page, show:
+  - current access status
+  - access end date
+  - days remaining if active
+- Add a button like:
+  - "Extend 7 days"
+- That button should call the extend-access endpoint
+- No checkout, no Stripe, no payment UI
+
+5. Access control
+- Keep the existing rule that only active stores can create posts if that is already implemented
+- But make sure the new extension route updates access correctly so posting works again immediately after extension
+
+6. Safety requirements
+- Do NOT break login, auth, JWT, or session logic
+- Do NOT remove the current user/store system
+- Only modify access duration logic
+- Keep existing structure as much as possible
+
+7. Important implementation detail
+- Search the codebase for:
+  - TRIAL_MS
+  - trialEndsAt
+  - accessEndsAt
+  - createStore
+  - register
+  - create post route
+- Update all related logic consistently
+
+End result:
+- New profiles get 7 days
+- Admin/user can extend another 7 days with one button/action
+- No payment integration
+- Profile clearly shows access status and end date

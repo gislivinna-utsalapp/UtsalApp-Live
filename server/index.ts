@@ -3,6 +3,7 @@ import express from "express";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
+import session from "express-session";
 
 import { registerRoutes } from "./routes";
 import { UPLOAD_DIR } from "./config/uploads";
@@ -22,6 +23,25 @@ function main() {
   });
 
   const app = express();
+
+  // IMPORTANT: Replit/proxy environments
+  app.set("trust proxy", 1);
+
+  /**
+   * ✅ Session middleware (MUST be before routes)
+   */
+  app.use(
+    session({
+      secret: process.env.SESSION_SECRET || "utsalapp-dev-session-secret",
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: false, // keep false for now on Replit
+      },
+    }),
+  );
 
   /**
    * 2) SERVE UPLOADS (GLOBAL, BEFORE EVERYTHING)

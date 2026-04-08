@@ -84,57 +84,36 @@ function isTrialExpired(store: any): boolean {
   return Date.now() > ts;
 }
 
-// Middleware: verslun þarf að vera í trial eða active til að búa til tilboð
-async function requireActiveOrTrialStore(
+// Middleware: verslun þarf að hafa valið pakka (basic/pro/premium) til að búa til tilboð
+async function requirePlanSelected(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
 ) {
   try {
     if (!req.user?.storeId) {
-      return res
-        .status(400)
-        .json({ message: "Engin tengd verslun fannst fyrir notanda" });
+      return res.status(401).json({ message: "Óheimilt" });
     }
 
-    let store = await storage.getStoreById(req.user.storeId);
+    const store = await storage.getStoreById(req.user.storeId);
     if (!store) {
       return res.status(404).json({ message: "Verslun fannst ekki" });
     }
 
-    // Ef verslun hefur ekki fengið trial áður og er ekki expired → gefum 7 daga frá núna
-    if (
-      !(store as any).trialEndsAt &&
-      (store as any).billingStatus !== "expired"
-    ) {
-      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-      const updated = await storage.updateStore(store.id, {
-        trialEndsAt,
-        billingStatus: (store as any).billingStatus ?? "trial",
-      } as any);
-      if (updated) {
-        store = updated;
-      }
-    }
+    const plan = (store as any).plan;
+    const allowed = ["basic", "pro", "premium"];
 
-    // Ef trial er útrunnið og ekki active → stoppa
-    if (isTrialExpired(store)) {
-      if ((store as any).billingStatus !== "expired") {
-        await storage.updateStore(store.id, {
-          billingStatus: "expired",
-        } as any);
-      }
-
+    if (!plan || !allowed.includes(plan)) {
       return res.status(403).json({
-        message:
-          "Fríviku þinni er lokið. Hafðu samband við ÚtsalApp til að virkja áskrift.",
+        message: "Þú þarft að velja pakka áður en þú getur búið til tilboð.",
+        code: "PLAN_REQUIRED",
       });
     }
 
-    next();
+    return next();
   } catch (err) {
-    console.error("requireActiveOrTrialStore error", err);
-    res.status(500).json({ message: "Villa kom upp" });
+    console.error("requirePlanSelected error", err);
+    return res.status(500).json({ message: "Villa kom upp" });
   }
 }
 
@@ -211,7 +190,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Static fyrir uploads
   app.use("/uploads", express.static(UPLOAD_DIR));
 
-  // ------------------ AUTH: REGISTER STORE ------------------
+  // ------------------ AUTH: REGISTER STORE (AUTO-LOGIN) ------------------
   router.post("/auth/register-store", async (req: Request, res: Response) => {
     try {
       const {
@@ -235,89 +214,24 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       const email = rawEmail.trim().toLowerCase();
-      const password = rawPassword;
+      const password = rawPassword.trim();
 
-      // ===== ACCESS LOGIC: PRUFUVIKA =====
-      const now = new Date();
-      const trialDays = 7;
-      const accessEndsAt = new Date(
-        now.getTime() + trialDays * 24 * 60 * 60 * 1000,
-      ).toISOString();
-      // ==================================
-
-      const store = await createStore({
-        name: storeName,
-        email,
-        password,
-        address,
-        phone,
-        website,
-
-        // 👇 NÝTT – þetta er lykillinn
-        accessEndsAt,
-        trialEndsAt: accessEndsAt,
-      });
-
-      return res.status(201).json({
-        ok: true,
-        store: {
-          id: store.id,
-          name: store.name,
-          accessEndsAt: store.accessEndsAt,
-        },
-      });
-    } catch (err) {
-      console.error("register-store error:", err);
-      return res.status(500).json({ error: "Failed to register store" });
-    }
-  });
-
-  // helper function – má vera utan routes
-  function normalizeEmail(rawEmail?: string): string {
-    return (rawEmail ?? "").trim().toLowerCase();
-  }
-
-  // ------------------ AUTH: REGISTER STORE (LEGACY ALIAS) ------------------
-  router.post("/stores/register", async (req, res) => {
-    try {
-      const {
-        storeName,
-        email: rawEmail,
-        password: rawPassword,
-        address,
-        phone,
-        website,
-      } = req.body as {
-        storeName?: string;
-        rawEmail?: string;
-        rawPassword?: string;
-        address?: string;
-        phone?: string;
-        website?: string;
-      };
-
-      const email = (rawEmail ?? "").trim().toLowerCase();
-      const password = (rawPassword ?? "").trim();
-
-      if (!storeName || !email || !password) {
-        return res.status(400).json({ message: "Vantar upplýsingar" });
-      }
-
-      const passwordHash = await bcrypt.hash(password, 10);
-
-      const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
-
+      // 1️⃣ Búa til STORE (engin password hér!)
       const store = await storage.createStore({
-        name: storeName,
+        name: storeName.trim(),
         address: (address ?? "").trim(),
         phone: (phone ?? "").trim(),
         website: (website ?? "").trim(),
         logoUrl: "",
-        ownerEmail: email,
+        ownerEmail: email, // 🔥 mikilvægt
         plan: "basic",
-        trialEndsAt,
         billingStatus: "trial",
+        accessEndsAt: null,
+        trialEndsAt: null,
       } as any);
+
+      // 2️⃣ Búa til USER
+      const passwordHash = await bcrypt.hash(password, 10);
 
       const user = await storage.createUser({
         email,
@@ -326,34 +240,43 @@ export async function registerRoutes(app: Express): Promise<void> {
         storeId: store.id,
       } as any);
 
-      const billingActive = true;
+      // 3️⃣ 🔑 AUTO-LOGIN (lykilatriðið)
+      (req.session as any).user = {
+        id: user.id,
+        role: "store",
+        storeId: store.id,
+      };
 
-      return res.json({
-        message: "Verslun skráð",
-        user: { id: user.id, email: user.email, role: user.role },
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err) => (err ? reject(err) : resolve()));
+      });
+
+      // 4️⃣ Response
+      return res.status(201).json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+        },
         store: {
           id: store.id,
           name: store.name,
-          address: (store as any).address ?? "",
-          phone: (store as any).phone ?? "",
-          website: (store as any).website ?? "",
-          plan: (store as any).plan ?? "basic",
-          planType: (store as any).plan ?? "basic",
-          trialEndsAt: (store as any).trialEndsAt ?? null,
-          billingStatus: (store as any).billingStatus ?? "trial",
-          billingActive,
-          createdAt: (store as any).createdAt ?? null,
+          plan: store.plan,
+          billingStatus: store.billingStatus,
         },
       });
     } catch (err) {
-      console.error("register-store error", err);
-      return res.status(500).json({ message: "Villa kom upp" });
+      console.error("[auth/register-store] error:", err);
+      return res.status(500).json({ error: "Failed to register store" });
     }
   });
 
   // ------------------ AUTH: LOGIN ------------------
   router.post("/auth/login", async (req: Request, res: Response) => {
     try {
+      console.log("------ LOGIN DEBUG START ------");
+
       const rawEmail = (req.body?.email ?? "") as string;
       const rawPassword = (req.body?.password ?? "") as string;
 
@@ -364,16 +287,46 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Vantar netfang og lykilorð" });
       }
 
+      // ------------------ USER LOOKUP ------------------
+      console.log("Looking up user...");
       const user = await storage.findUserByEmail(email);
+      console.log("User lookup done");
+
       if (!user) {
         return res.status(401).json({ message: "Rangt netfang eða lykilorð" });
       }
 
-      const ok = await bcrypt.compare(password, user.passwordHash);
-      if (!ok) {
+      // ------------------ PASSWORD CHECK ------------------
+      let passwordOk = false;
+
+      const storedHash = user.passwordHash || (user as any).password || null;
+
+      if (storedHash && storedHash.startsWith("$2")) {
+        console.log("Starting bcrypt compare...");
+        const start = Date.now();
+
+        passwordOk = await bcrypt.compare(password, storedHash);
+
+        console.log("bcrypt compare took:", Date.now() - start, "ms");
+      }
+
+      // Legacy fallback (plain password upgrade)
+      if (!passwordOk && (user as any).password === password) {
+        console.log("Legacy password match – upgrading hash");
+
+        passwordOk = true;
+
+        const newHash = await bcrypt.hash(password, 8); // lækkað cost í 8
+        await storage.updateUser(user.id, {
+          passwordHash: newHash,
+        } as any);
+      }
+
+      if (!passwordOk) {
         return res.status(401).json({ message: "Rangt netfang eða lykilorð" });
       }
 
+      // ------------------ STORE ------------------
       let store = user.storeId
         ? await storage.getStoreById(user.storeId)
         : null;
@@ -384,15 +337,18 @@ export async function registerRoutes(app: Express): Promise<void> {
         (store as any).billingStatus !== "expired"
       ) {
         const trialEndsAt = new Date(Date.now() + TRIAL_MS).toISOString();
+
         const updated = await storage.updateStore(store.id, {
           trialEndsAt,
           billingStatus: (store as any).billingStatus ?? "trial",
         } as any);
+
         if (updated) store = updated;
       }
 
       const isAdmin = (user as any).isAdmin === true;
 
+      // ------------------ JWT ------------------
       const token = jwt.sign(
         {
           id: user.id,
@@ -405,32 +361,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         { expiresIn: "7d" },
       );
 
-      let storePayload: any = null;
-
-      if (store) {
-        const plan = (store as any).plan ?? "basic";
-        const billingStatus =
-          (store as any).billingStatus ??
-          ((store as any).billingActive ? "active" : "trial");
-
-        const billingActive =
-          billingStatus === "active" || billingStatus === "trial";
-
-        storePayload = {
-          id: store.id,
-          name: store.name,
-          address: (store as any).address ?? "",
-          phone: (store as any).phone ?? "",
-          website: (store as any).website ?? "",
-          plan,
-          planType: plan,
-          trialEndsAt: (store as any).trialEndsAt ?? null,
-          billingStatus,
-          billingActive,
-          createdAt: (store as any).createdAt ?? null,
-        };
-      }
-
       return res.json({
         user: {
           id: user.id,
@@ -438,51 +368,12 @@ export async function registerRoutes(app: Express): Promise<void> {
           role: user.role,
           isAdmin,
         },
-        store: storePayload,
+        store,
         token,
       });
     } catch (err) {
-      console.error("login error:", err);
-      return res.status(500).json({ message: "Villa kom upp" });
-    }
-  });
-
-  // ------------------ AUTH: ME ------------------
-  // ------------------ AUTH: ME ------------------
-  router.get("/auth/me", auth(), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ message: "Ekki innskráður" });
-      }
-
-      let store = req.user.storeId
-        ? await storage.getStoreById(req.user.storeId)
-        : null;
-
-      let storePayload: any = null;
-
-      if (store) {
-        storePayload = {
-          id: store.id,
-          name: store.name,
-          plan: (store as any).plan ?? "basic",
-          trialEndsAt: (store as any).trialEndsAt ?? null,
-          billingStatus: (store as any).billingStatus ?? "trial",
-        };
-      }
-
-      return res.json({
-        user: {
-          id: req.user.id,
-          email: req.user.email,
-          role: req.user.role,
-          isAdmin: (req.user as any).isAdmin === true,
-        },
-        store: storePayload,
-      });
-    } catch (err) {
-      console.error("auth/me error", err);
-      return res.status(500).json({ message: "Villa kom upp" });
+      console.error("LOGIN ERROR:", err);
+      return res.status(500).json({ message: "Villa við innskráningu" });
     }
   });
 
@@ -647,6 +538,75 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ------------------ STORES: REGISTER (PUBLIC) ------------------
+  router.post("/stores/register", async (req, res) => {
+    try {
+      const { storeName, email, password, address, phone, website } = req.body;
+
+      if (!storeName || !email || !password) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      const store = await storage.createStore({
+        storeName: storeName.trim(),
+        email: normalizedEmail,
+        password,
+        address: address?.trim() || "",
+        phone: phone?.trim() || "",
+        website: website?.trim() || "",
+      });
+
+      return res.status(201).json({
+        success: true,
+        storeId: store.id,
+        email: normalizedEmail,
+      });
+    } catch (err) {
+      console.error("[stores/register] error:", err);
+      return res.status(500).json({ error: "Failed to register store" });
+    }
+  });
+
+  // ------------------ STORES: SELECT PLAN (AUTH) ------------------
+  router.post(
+    "/stores/select-plan",
+    auth("store"),
+    async (req: AuthRequest, res) => {
+      try {
+        const { plan } = req.body as { plan?: string };
+
+        if (!plan || !["basic", "pro", "premium"].includes(plan)) {
+          return res.status(400).json({ error: "Invalid plan" });
+        }
+
+        if (!req.user?.storeId) {
+          return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        const updated = await storage.updateStore(req.user.storeId, {
+          plan,
+          billingStatus: "pending",
+          planSelectedAt: new Date().toISOString(),
+        } as any);
+
+        if (!updated) {
+          return res.status(500).json({ error: "Failed to update store" });
+        }
+
+        return res.json({
+          success: true,
+          plan: (updated as any).plan,
+          billingStatus: (updated as any).billingStatus,
+        });
+      } catch (err) {
+        console.error("[stores/select-plan] error:", err);
+        return res.status(500).json({ error: "Server error" });
+      }
+    },
+  );
+
   // ------------------ STORES: POSTS FOR ONE STORE (PROFILE) ------------------
   router.get("/stores/:storeId/posts", async (req, res) => {
     try {
@@ -742,68 +702,60 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // ------------------ POSTS: CREATE ------------------
-  router.post("/posts", auth("store"), async (req: AuthRequest, res) => {
-    try {
-      const storeId = req.user?.storeId;
+  router.post(
+    "/posts",
+    auth("store"),
+    requirePlanSelected,
+    async (req: AuthRequest, res) => {
+      try {
+        const storeId = req.user?.storeId;
 
-      if (!storeId) {
-        return res.status(401).json({ message: "Ekki innskráð verslun" });
+        if (!storeId) {
+          return res.status(401).json({ message: "Ekki innskráð verslun" });
+        }
+
+        const {
+          title,
+          description,
+          category,
+          priceOriginal,
+          priceSale,
+          buyUrl,
+          startsAt,
+          endsAt,
+          images,
+        } = req.body;
+
+        if (!title || priceOriginal == null || priceSale == null || !category) {
+          return res.status(400).json({ message: "Vantar upplýsingar" });
+        }
+
+        const imageUrl =
+          Array.isArray(images) && images.length > 0 ? images[0].url : "";
+
+        const newPost = await storage.createPost({
+          title,
+          description,
+          category,
+          price: Number(priceSale),
+          oldPrice: Number(priceOriginal),
+          imageUrl,
+          storeId,
+          buyUrl: buyUrl || null,
+          startsAt: startsAt || null,
+          endsAt: endsAt || null,
+          createdAt: new Date().toISOString(),
+          viewCount: 0,
+        } as any);
+
+        const mapped = await mapPostToFrontend(newPost);
+        return res.json(mapped);
+      } catch (err) {
+        console.error("create post error", err);
+        return res.status(500).json({ message: "Villa kom upp" });
       }
-
-      const store = await storage.getStoreById(storeId);
-      if (!store) {
-        return res.status(404).json({ message: "Verslun fannst ekki" });
-      }
-
-      // 🔒 AÐGANGSSTÝRING – SINGLE SOURCE OF TRUTH
-      if (!store.accessEndsAt || new Date(store.accessEndsAt) <= new Date()) {
-        return res.status(403).json({
-          message: "Aðgangur verslunar er útrunninn",
-          accessEndsAt: store.accessEndsAt ?? null,
-        });
-      }
-
-      const {
-        title,
-        description,
-        category,
-        priceOriginal,
-        priceSale,
-        buyUrl,
-        startsAt,
-        endsAt,
-        images,
-      } = req.body;
-
-      if (!title || priceOriginal == null || priceSale == null || !category) {
-        return res.status(400).json({ message: "Vantar upplýsingar" });
-      }
-
-      const imageUrl =
-        Array.isArray(images) && images.length > 0 ? images[0].url : "";
-
-      const newPost = await storage.createPost({
-        title,
-        description,
-        category,
-        price: Number(priceSale),
-        oldPrice: Number(priceOriginal),
-        imageUrl,
-        storeId,
-        buyUrl: buyUrl || null,
-        startsAt: startsAt || null,
-        endsAt: endsAt || null,
-        createdAt: new Date().toISOString(),
-        viewCount: 0,
-      } as any);
-
-      const mapped = await mapPostToFrontend(newPost);
-      res.json(mapped);
-    } catch (err) {
-      console.error("create post error", err);
-      res.status(500).json({ message: "Villa kom upp" });
-    }
-  });
+    },
+  );
 
   // ------------------ POSTS: UPDATE ------------------
   router.put(

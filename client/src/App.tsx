@@ -18,11 +18,13 @@ import NotFound from "./pages/not-found";
 import StorePage from "./pages/StorePage";
 import PricingPage from "./pages/PricingPage";
 
+/* 👉 NÝTT: Choose Plan */
+import ChoosePlanPage from "./pages/ChoosePlanPage";
+
 import BottomNav from "@/components/BottomNav";
 
 /* ======================================================
    GA4 – SPA route tracking (production-grade)
-   Skráir page_view við hverja route breytingu
 ====================================================== */
 function AnalyticsTracker() {
   const location = useLocation();
@@ -48,6 +50,7 @@ export default function App() {
         <AnalyticsTracker />
 
         <Routes>
+          {/* -------- PUBLIC -------- */}
           <Route path="/" element={<Home />} />
           <Route path="/leit" element={<SearchPage />} />
           <Route path="/flokkar" element={<CategoriesPage />} />
@@ -60,6 +63,10 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register-store" element={<RegisterStore />} />
 
+          {/* 👉 NÝTT SKREF Í ONBOARDING */}
+          <Route path="/choose-plan" element={<ChoosePlanPage />} />
+
+          {/* -------- AUTH / APP -------- */}
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/create-post" element={<CreatePost />} />

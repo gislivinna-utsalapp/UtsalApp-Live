@@ -32,6 +32,7 @@ export default function RegisterStore() {
   const [createdStoreId, setCreatedStoreId] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
+    console.log("HANDLE SUBMIT KEYRIR");
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -56,17 +57,22 @@ export default function RegisterStore() {
       // routes.ts → /api/v1/stores/register les storeName, email, password, address, phone, website
       const payload = {
         storeName: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password: password.trim(),
         address: address.trim() || "",
         phone: phone.trim() || "",
         website: website.trim() || "",
       };
 
-      const data = await apiFetch<RegisterResponse>("/api/v1/stores/register", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const data = await apiFetch<RegisterResponse>(
+        "/api/v1/auth/register-store",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          credentials: "include",
+        },
+      );
 
       setCreatedStoreId(data.storeId || data.id || null);
 
@@ -76,8 +82,9 @@ export default function RegisterStore() {
         // Gert ráð fyrir að login taki (email, password)
         await login(email.trim(), password.trim());
 
-        // Förum beint á prófíl verslunar
-        navigate("/profile", { replace: true });
+        // Förum í plan-val áður en aðgangur fæst
+        navigate("/choose-plan", { replace: true });
+
         return;
       } catch (loginErr) {
         console.error("Sjálfvirk innskráning tókst ekki", loginErr);

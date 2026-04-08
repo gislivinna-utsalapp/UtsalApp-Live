@@ -1,6 +1,6 @@
 // client/src/pages/PostDetail.tsx
 
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { SalePostWithDetails } from "@shared/schema";
@@ -111,7 +111,14 @@ export default function PostDetail() {
               <h2 className="text-xl font-semibold">{post.title}</h2>
               {post.store && (
                 <p className="text-sm text-neutral-600">
-                  {post.store.name} ·{" "}
+                  <Link
+                    to={`/store/${post.store.id}`}
+                    className="hover:underline text-primary font-medium"
+                    data-testid="link-store-name"
+                  >
+                    {post.store.name}
+                  </Link>
+                  {" · "}
                   {(post.store as any).location ||
                     (post.store as any).address ||
                     "Staðsetning vantar"}

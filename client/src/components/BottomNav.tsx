@@ -55,6 +55,15 @@ export default function BottomNav() {
         </Link>
 
         <Link
+          to="/stores"
+          className={`flex-1 text-center transition-opacity ${
+            tab === "/stores" || tab.startsWith("/store/") ? "opacity-100 font-semibold" : "opacity-70"
+          }`}
+        >
+          Verslanir
+        </Link>
+
+        <Link
           to="/profile"
           className={`flex-1 text-center transition-opacity ${
             tab === "/profile" ? "opacity-100 font-semibold" : "opacity-70"

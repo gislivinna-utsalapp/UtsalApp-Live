@@ -16,6 +16,7 @@ import Profile from "./pages/Profile";
 import About from "./pages/About";
 import NotFound from "./pages/not-found";
 import StorePage from "./pages/StorePage";
+import StoresPage from "./pages/StoresPage";
 import PricingPage from "./pages/PricingPage";
 
 /* 👉 NÝTT: Choose Plan */
@@ -58,6 +59,7 @@ export default function App() {
           <Route path="/pricing" element={<PricingPage />} />
 
           <Route path="/post/:id" element={<PostDetail />} />
+          <Route path="/stores" element={<StoresPage />} />
           <Route path="/store/:id" element={<StorePage />} />
 
           <Route path="/login" element={<Login />} />

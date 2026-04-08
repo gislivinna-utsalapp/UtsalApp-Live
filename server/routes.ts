@@ -73,6 +73,23 @@ function auth(requiredRole?: "store" | "admin") {
   };
 }
 
+function authAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Ekki innskráður" });
+  }
+  try {
+    const decoded = jwt.verify(header.substring(7), JWT_SECRET) as any;
+    if (!decoded.isAdmin) {
+      return res.status(403).json({ message: "Aðeins admin hefur heimild" });
+    }
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ message: "Ógildur token" });
+  }
+}
+
 function isTrialExpired(store: any): boolean {
   if (!store) return true;
   if (store.billingStatus === "active") return false;
@@ -925,6 +942,99 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
     },
   );
+
+  // ===================== ADMIN ROUTES =====================
+
+  // GET /admin/posts – allar auglýsingar
+  router.get("/admin/posts", authAdmin, async (req: AuthRequest, res) => {
+    try {
+      const posts = await storage.listPosts();
+      const stores = await storage.listStores();
+      const storeMap: Record<string, any> = {};
+      for (const s of stores as any[]) storeMap[s.id] = s;
+
+      const result = (posts as any[]).map((p) => ({
+        id: p.id,
+        title: p.title,
+        category: p.category ?? null,
+        price: p.price ?? p.priceSale ?? 0,
+        oldPrice: p.oldPrice ?? p.priceOriginal ?? 0,
+        imageUrl: p.imageUrl ?? null,
+        storeId: p.storeId ?? null,
+        storeName: p.storeId ? (storeMap[p.storeId]?.name ?? "Óþekkt") : "Óþekkt",
+        createdAt: p.createdAt ?? null,
+      }));
+
+      res.json(result);
+    } catch (err) {
+      console.error("admin/posts error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
+  // DELETE /admin/posts/:id – eyða hvaða auglýsingu sem er
+  router.delete("/admin/posts/:id", authAdmin, async (req: AuthRequest, res) => {
+    try {
+      const deleted = await storage.deletePost(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Auglýsing fannst ekki" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("admin/delete post error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
+  // GET /admin/stores – allar verslanir með notendaupplýsingar
+  router.get("/admin/stores", authAdmin, async (req: AuthRequest, res) => {
+    try {
+      const stores = await storage.listStores();
+      const users = await storage.listUsers();
+
+      const result = (stores as any[]).map((s) => {
+        const owner = users.find((u: any) => u.storeId === s.id);
+        return {
+          id: s.id,
+          name: s.name,
+          email: owner?.email ?? s.ownerEmail ?? null,
+          userId: owner?.id ?? null,
+          plan: s.plan ?? "basic",
+          billingStatus: s.billingStatus ?? "trial",
+          trialEndsAt: s.trialEndsAt ?? null,
+          createdAt: s.createdAt ?? null,
+        };
+      });
+
+      res.json(result);
+    } catch (err) {
+      console.error("admin/stores error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
+  // DELETE /admin/stores/:storeId – eyða verslun, notanda og öllum auglýsingum
+  router.delete("/admin/stores/:storeId", authAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { storeId } = req.params;
+
+      const posts = await storage.listPosts();
+      for (const p of posts as any[]) {
+        if (p.storeId === storeId) await storage.deletePost(p.id);
+      }
+
+      const users = await storage.listUsers();
+      const owner = users.find((u: any) => u.storeId === storeId);
+      if (owner) await storage.deleteUser(owner.id);
+
+      await storage.deleteStore(storeId);
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error("admin/delete store error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
 
   // ⬅️ MOUNT API ROUTER (EINU SINNI)
   app.use("/api/v1", router);

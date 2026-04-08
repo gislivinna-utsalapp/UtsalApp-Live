@@ -248,6 +248,40 @@ export class DbStorage {
     if (changed) saveDatabase(this.db);
     return changed;
   }
+
+  async updateUser(
+    userId: string,
+    updates: Record<string, any>,
+  ): Promise<(User & any) | null> {
+    const index = (this.db.users as any[]).findIndex((u) => u.id === userId);
+    if (index === -1) return null;
+    const updated = { ...this.db.users[index], ...updates };
+    this.db.users[index] = updated;
+    saveDatabase(this.db);
+    return updated;
+  }
+
+  async deleteUser(userId: string): Promise<boolean> {
+    const original = this.db.users.length;
+    this.db.users = this.db.users.filter((u) => u.id !== userId);
+    const changed = this.db.users.length !== original;
+    if (changed) saveDatabase(this.db);
+    return changed;
+  }
+
+  async deleteStore(storeId: string): Promise<boolean> {
+    const original = this.db.stores.length;
+    this.db.stores = (this.db.stores as any[]).filter(
+      (s) => s.id !== storeId,
+    );
+    const changed = this.db.stores.length !== original;
+    if (changed) saveDatabase(this.db);
+    return changed;
+  }
+
+  async listUsers(): Promise<(User & any)[]> {
+    return this.db.users as any;
+  }
 }
 
 export const storage = new DbStorage();

@@ -187,6 +187,33 @@ var DbStorage = class {
     if (changed) saveDatabase(this.db);
     return changed;
   }
+  async updateUser(userId, updates) {
+    const index = this.db.users.findIndex((u) => u.id === userId);
+    if (index === -1) return null;
+    const updated = { ...this.db.users[index], ...updates };
+    this.db.users[index] = updated;
+    saveDatabase(this.db);
+    return updated;
+  }
+  async deleteUser(userId) {
+    const original = this.db.users.length;
+    this.db.users = this.db.users.filter((u) => u.id !== userId);
+    const changed = this.db.users.length !== original;
+    if (changed) saveDatabase(this.db);
+    return changed;
+  }
+  async deleteStore(storeId) {
+    const original = this.db.stores.length;
+    this.db.stores = this.db.stores.filter(
+      (s) => s.id !== storeId
+    );
+    const changed = this.db.stores.length !== original;
+    if (changed) saveDatabase(this.db);
+    return changed;
+  }
+  async listUsers() {
+    return this.db.users;
+  }
 };
 var storage = new DbStorage();
 
@@ -240,6 +267,22 @@ function auth(requiredRole) {
       return res.status(401).json({ message: "\xD3gildur token" });
     }
   };
+}
+function authAdmin(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Ekki innskr\xE1\xF0ur" });
+  }
+  try {
+    const decoded = jwt.verify(header.substring(7), JWT_SECRET);
+    if (!decoded.isAdmin) {
+      return res.status(403).json({ message: "A\xF0eins admin hefur heimild" });
+    }
+    req.user = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ message: "\xD3gildur token" });
+  }
 }
 function isTrialExpired(store) {
   if (!store) return true;
@@ -878,6 +921,81 @@ async function registerRoutes(app) {
       }
     }
   );
+  router.get("/admin/posts", authAdmin, async (req, res) => {
+    try {
+      const posts = await storage.listPosts();
+      const stores = await storage.listStores();
+      const storeMap = {};
+      for (const s of stores) storeMap[s.id] = s;
+      const result = posts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        category: p.category ?? null,
+        price: p.price ?? p.priceSale ?? 0,
+        oldPrice: p.oldPrice ?? p.priceOriginal ?? 0,
+        imageUrl: p.imageUrl ?? null,
+        storeId: p.storeId ?? null,
+        storeName: p.storeId ? storeMap[p.storeId]?.name ?? "\xD3\xFEekkt" : "\xD3\xFEekkt",
+        createdAt: p.createdAt ?? null
+      }));
+      res.json(result);
+    } catch (err) {
+      console.error("admin/posts error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+  router.delete("/admin/posts/:id", authAdmin, async (req, res) => {
+    try {
+      const deleted = await storage.deletePost(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ message: "Augl\xFDsing fannst ekki" });
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error("admin/delete post error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+  router.get("/admin/stores", authAdmin, async (req, res) => {
+    try {
+      const stores = await storage.listStores();
+      const users = await storage.listUsers();
+      const result = stores.map((s) => {
+        const owner = users.find((u) => u.storeId === s.id);
+        return {
+          id: s.id,
+          name: s.name,
+          email: owner?.email ?? s.ownerEmail ?? null,
+          userId: owner?.id ?? null,
+          plan: s.plan ?? "basic",
+          billingStatus: s.billingStatus ?? "trial",
+          trialEndsAt: s.trialEndsAt ?? null,
+          createdAt: s.createdAt ?? null
+        };
+      });
+      res.json(result);
+    } catch (err) {
+      console.error("admin/stores error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+  router.delete("/admin/stores/:storeId", authAdmin, async (req, res) => {
+    try {
+      const { storeId } = req.params;
+      const posts = await storage.listPosts();
+      for (const p of posts) {
+        if (p.storeId === storeId) await storage.deletePost(p.id);
+      }
+      const users = await storage.listUsers();
+      const owner = users.find((u) => u.storeId === storeId);
+      if (owner) await storage.deleteUser(owner.id);
+      await storage.deleteStore(storeId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error("admin/delete store error", err);
+      res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
   app.use("/api/v1", router);
   const clientDistPath = path3.join(process.cwd(), "client", "dist");
   if (fs3.existsSync(clientDistPath)) {

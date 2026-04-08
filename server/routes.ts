@@ -504,6 +504,67 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // ------------------ STORES: EXTEND TRIAL BY 7 DAYS ------------------
+  router.post(
+    "/stores/me/extend-trial",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+
+        const EXTEND_MS = 7 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        const currentTrialEnds = (store as any).trialEndsAt
+          ? new Date((store as any).trialEndsAt).getTime()
+          : 0;
+
+        const baseTime = currentTrialEnds > now ? currentTrialEnds : now;
+        const newTrialEndsAt = new Date(baseTime + EXTEND_MS).toISOString();
+
+        const updated = await storage.updateStore(store.id, {
+          trialEndsAt: newTrialEndsAt,
+          billingStatus: "trial",
+        } as any);
+
+        if (!updated) {
+          return res.status(500).json({ message: "Tókst ekki að framlengja aðgang" });
+        }
+
+        const plan = (updated as any).plan ?? (updated as any).planType ?? "basic";
+        const billingStatus = (updated as any).billingStatus ?? "trial";
+        const trialEndsAt = (updated as any).trialEndsAt ?? null;
+
+        let daysLeft: number | null = null;
+        if (trialEndsAt) {
+          const endMs = new Date(trialEndsAt).getTime();
+          if (Number.isFinite(endMs)) {
+            daysLeft = Math.ceil((endMs - Date.now()) / (24 * 60 * 60 * 1000));
+          }
+        }
+
+        return res.json({
+          plan,
+          trialEndsAt,
+          billingStatus,
+          trialExpired: false,
+          daysLeft,
+          createdAt: (updated as any).createdAt ?? null,
+        });
+      } catch (err) {
+        console.error("extend-trial error:", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
   // ------------------ STORES: LIST ALL ------------------
   router.get("/stores", async (_req, res) => {
     try {

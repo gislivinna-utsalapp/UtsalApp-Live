@@ -15,7 +15,7 @@ export default function StorePage() {
     error: storeError,
   } = useQuery({
     queryKey: ["store", id],
-    queryFn: () => apiFetch(`/stores/${id}`),
+    queryFn: () => apiFetch(`/api/v1/stores/${id}`),
     enabled: !!id,
   });
 
@@ -26,7 +26,7 @@ export default function StorePage() {
     error: postsError,
   } = useQuery({
     queryKey: ["store-posts", id],
-    queryFn: () => apiFetch(`/stores/${id}/posts`),
+    queryFn: () => apiFetch(`/api/v1/stores/${id}/posts`),
     enabled: !!id,
   });
 

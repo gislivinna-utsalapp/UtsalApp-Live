@@ -165,6 +165,10 @@ export default function Profile() {
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  const [extendingTrial, setExtendingTrial] = useState(false);
+  const [extendSuccessMsg, setExtendSuccessMsg] = useState<string | null>(null);
+  const [extendErrorMsg, setExtendErrorMsg] = useState<string | null>(null);
+
   const {
     data: storePosts = [],
     isLoading: loadingPosts,
@@ -392,6 +396,39 @@ export default function Profile() {
       );
     } finally {
       setDeletingPostId(null);
+    }
+  }
+
+  async function handleExtendTrial() {
+    setExtendingTrial(true);
+    setExtendSuccessMsg(null);
+    setExtendErrorMsg(null);
+
+    try {
+      const data = await apiFetch<BillingInfo>("/api/v1/stores/me/extend-trial", {
+        method: "POST",
+      });
+      setBilling(data);
+      const days = data.daysLeft ?? 7;
+      setExtendSuccessMsg(`Aðgangur framlengdur um 7 daga. ${days} dagar eftir.`);
+    } catch (err) {
+      console.error("extend-trial error:", err);
+      let msg =
+        err instanceof Error
+          ? err.message
+          : "Tókst ekki að framlengja aðgang. Reyndu aftur síðar.";
+      const match = msg.match(/\{.*\}/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[0]);
+          if (parsed.message) msg = parsed.message;
+        } catch {
+          // no-op
+        }
+      }
+      setExtendErrorMsg(msg);
+    } finally {
+      setExtendingTrial(false);
     }
   }
 
@@ -972,6 +1009,34 @@ export default function Profile() {
               onClick={handleActivatePlan}
             >
               {mainButtonLabel}
+            </Button>
+          </div>
+
+          <div className="border-t border-border pt-3 space-y-2">
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Framlengja aðgang
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Smelltu hér til að framlengja aðgang þinn um 7 daga til viðbótar
+              við núverandi lok prufutímabils.
+            </p>
+
+            {extendSuccessMsg && (
+              <p className="text-xs text-green-600">{extendSuccessMsg}</p>
+            )}
+            {extendErrorMsg && (
+              <p className="text-xs text-red-600">{extendErrorMsg}</p>
+            )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={extendingTrial}
+              onClick={handleExtendTrial}
+              data-testid="button-extend-trial"
+            >
+              {extendingTrial ? "Framlengi aðgang…" : "Framlengja um 7 daga"}
             </Button>
           </div>
         </Card>

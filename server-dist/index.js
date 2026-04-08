@@ -541,6 +541,54 @@ async function registerRoutes(app) {
       }
     }
   );
+  router.post(
+    "/stores/me/extend-trial",
+    auth("store"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        const store = await storage.getStoreById(req.user.storeId);
+        if (!store) {
+          return res.status(404).json({ message: "Verslun fannst ekki" });
+        }
+        const EXTEND_MS = 7 * 24 * 60 * 60 * 1e3;
+        const now = Date.now();
+        const currentTrialEnds = store.trialEndsAt ? new Date(store.trialEndsAt).getTime() : 0;
+        const baseTime = currentTrialEnds > now ? currentTrialEnds : now;
+        const newTrialEndsAt = new Date(baseTime + EXTEND_MS).toISOString();
+        const updated = await storage.updateStore(store.id, {
+          trialEndsAt: newTrialEndsAt,
+          billingStatus: "trial"
+        });
+        if (!updated) {
+          return res.status(500).json({ message: "T\xF3kst ekki a\xF0 framlengja a\xF0gang" });
+        }
+        const plan = updated.plan ?? updated.planType ?? "basic";
+        const billingStatus = updated.billingStatus ?? "trial";
+        const trialEndsAt = updated.trialEndsAt ?? null;
+        let daysLeft = null;
+        if (trialEndsAt) {
+          const endMs = new Date(trialEndsAt).getTime();
+          if (Number.isFinite(endMs)) {
+            daysLeft = Math.ceil((endMs - Date.now()) / (24 * 60 * 60 * 1e3));
+          }
+        }
+        return res.json({
+          plan,
+          trialEndsAt,
+          billingStatus,
+          trialExpired: false,
+          daysLeft,
+          createdAt: updated.createdAt ?? null
+        });
+      } catch (err) {
+        console.error("extend-trial error:", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
   router.get("/stores", async (_req, res) => {
     try {
       const stores = await storage.listStores();

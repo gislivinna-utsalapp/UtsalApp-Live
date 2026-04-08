@@ -43,11 +43,12 @@ export default function StorePage() {
   const initials = store?.name
     ? store.name
         .split(" ")
+        .filter(Boolean)
         .map((w: string) => w[0])
         .join("")
         .slice(0, 2)
-        .toUpperCase()
-    : "";
+        .toUpperCase() || "?"
+    : "?";
 
   if (storeLoading || postsLoading) {
     return (

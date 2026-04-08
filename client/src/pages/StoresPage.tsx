@@ -16,12 +16,13 @@ type StoreItem = {
 };
 
 function StoreCard({ store }: { store: StoreItem }) {
-  const initials = store.name
+  const initials = (store.name || "")
     .split(" ")
+    .filter(Boolean)
     .map((w) => w[0])
     .join("")
     .slice(0, 2)
-    .toUpperCase();
+    .toUpperCase() || "?";
 
   return (
     <Link to={`/store/${store.id}`} data-testid={`card-store-${store.id}`}>
@@ -105,9 +106,11 @@ export default function StoresPage() {
 
       {!isLoading && stores.length > 0 && (
         <div className="space-y-2">
-          {stores.map((store) => (
-            <StoreCard key={store.id} store={store} />
-          ))}
+          {stores
+            .filter((s) => s.name)
+            .map((store) => (
+              <StoreCard key={store.id} store={store} />
+            ))}
         </div>
       )}
     </div>

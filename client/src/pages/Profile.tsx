@@ -169,6 +169,13 @@ export default function Profile() {
   const [extendSuccessMsg, setExtendSuccessMsg] = useState<string | null>(null);
   const [extendErrorMsg, setExtendErrorMsg] = useState<string | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState<string | null>(null);
+
   const {
     data: storePosts = [],
     isLoading: loadingPosts,

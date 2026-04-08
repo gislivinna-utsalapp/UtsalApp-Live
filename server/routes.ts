@@ -583,6 +583,56 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // ------------------ STORES: CHANGE PASSWORD ------------------
+  router.post(
+    "/stores/change-password",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        const userId = req.user?.id;
+        if (!userId) {
+          return res.status(401).json({ message: "Ekki innskráður" });
+        }
+
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+          return res
+            .status(400)
+            .json({ message: "Vantar núverandi og nýtt lykilorð" });
+        }
+
+        if (newPassword.length < 8) {
+          return res
+            .status(400)
+            .json({ message: "Nýtt lykilorð þarf að vera a.m.k. 8 stafir" });
+        }
+
+        const user = await storage.findUserById(userId);
+        if (!user) {
+          return res.status(404).json({ message: "Notandi fannst ekki" });
+        }
+
+        const valid = await bcrypt.compare(
+          currentPassword,
+          (user as any).passwordHash,
+        );
+        if (!valid) {
+          return res
+            .status(403)
+            .json({ message: "Núverandi lykilorð er rangt" });
+        }
+
+        const newHash = await bcrypt.hash(newPassword, 10);
+        await storage.updateUser(userId, { passwordHash: newHash });
+
+        res.json({ success: true, message: "Lykilorð uppfært" });
+      } catch (err) {
+        console.error("change-password error:", err);
+        res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
   // ------------------ STORES: LIST ALL ------------------
   router.get("/stores", async (_req, res) => {
     try {

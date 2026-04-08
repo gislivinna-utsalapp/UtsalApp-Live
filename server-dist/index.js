@@ -220,10 +220,33 @@ var storage = new DbStorage();
 // server/config/uploads.ts
 import path2 from "path";
 import fs2 from "fs";
-var isRender = process.env.RENDER === "true";
-var UPLOAD_DIR = isRender ? "/var/data/uploads" : path2.join(process.cwd(), "uploads");
-if (!fs2.existsSync(UPLOAD_DIR)) {
-  fs2.mkdirSync(UPLOAD_DIR, { recursive: true });
+function resolveUploadDir() {
+  const persistentDir = "/var/data/uploads";
+  try {
+    const parent = path2.dirname(persistentDir);
+    if (fs2.existsSync(parent)) {
+      if (!fs2.existsSync(persistentDir)) {
+        fs2.mkdirSync(persistentDir, { recursive: true });
+      }
+      return persistentDir;
+    }
+  } catch {
+  }
+  const localDir = path2.join(process.cwd(), "uploads");
+  if (!fs2.existsSync(localDir)) {
+    fs2.mkdirSync(localDir, { recursive: true });
+  }
+  return localDir;
+}
+var UPLOAD_DIR = resolveUploadDir();
+function toAbsoluteImageUrl(relativeUrl, req) {
+  if (!relativeUrl) return null;
+  if (relativeUrl.startsWith("http://") || relativeUrl.startsWith("https://")) {
+    return relativeUrl;
+  }
+  const host = req.get("host") ?? "localhost:5000";
+  const proto = req.get("x-forwarded-proto") ?? req.protocol ?? "https";
+  return `${proto}://${host}${relativeUrl.startsWith("/") ? "" : "/"}${relativeUrl}`;
 }
 
 // server/routes.ts
@@ -315,10 +338,11 @@ async function requirePlanSelected(req, res, next) {
     return res.status(500).json({ message: "Villa kom upp" });
   }
 }
-async function mapPostToFrontend(p) {
+async function mapPostToFrontend(p, req) {
   const store = p.storeId ? await storage.getStoreById(p.storeId) : null;
   const plan = store?.plan ?? store?.planType ?? "basic";
   const billingStatus = store?.billingStatus ?? (store?.billingActive ? "active" : "trial");
+  const resolvedImageUrl = req ? toAbsoluteImageUrl(p.imageUrl, req) : p.imageUrl ?? null;
   return {
     id: p.id,
     title: p.title,
@@ -326,9 +350,9 @@ async function mapPostToFrontend(p) {
     category: p.category,
     priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
     priceSale: Number(p.price ?? p.priceSale ?? 0),
-    images: p.imageUrl ? [
+    images: resolvedImageUrl ? [
       {
-        url: p.imageUrl,
+        url: resolvedImageUrl,
         alt: p.title
       }
     ] : [],
@@ -341,10 +365,8 @@ async function mapPostToFrontend(p) {
       name: store.name,
       plan,
       planType: plan,
-      // fyrir eldri client
       billingStatus,
       createdAt: store.createdAt ?? null
-      // BÆTT VIÐ
     } : null
   };
 }
@@ -359,7 +381,6 @@ async function registerRoutes(app) {
   const router = express.Router();
   router.use(cors());
   router.use(express.json());
-  app.use("/uploads", express.static(UPLOAD_DIR));
   router.post("/auth/register-store", async (req, res) => {
     try {
       const {
@@ -720,7 +741,7 @@ async function registerRoutes(app) {
     try {
       const storeId = req.params.storeId;
       const posts = await storage.getPostsByStore(storeId);
-      const mapped = await Promise.all(posts.map(mapPostToFrontend));
+      const mapped = await Promise.all(posts.map((p) => mapPostToFrontend(p, req)));
       res.json(mapped);
     } catch (err) {
       console.error("store posts error:", err);
@@ -747,7 +768,7 @@ async function registerRoutes(app) {
         const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bd - ad;
       });
-      const mapped = await Promise.all(filtered.map(mapPostToFrontend));
+      const mapped = await Promise.all(filtered.map((p) => mapPostToFrontend(p, req)));
       res.json(mapped);
     } catch (err) {
       console.error("list posts error", err);
@@ -777,7 +798,7 @@ async function registerRoutes(app) {
         }
         lastViewCache[key] = now;
       }
-      const mapped = await mapPostToFrontend(effective);
+      const mapped = await mapPostToFrontend(effective, req);
       res.json(mapped);
     } catch (err) {
       console.error("post detail error", err);
@@ -823,7 +844,7 @@ async function registerRoutes(app) {
           createdAt: (/* @__PURE__ */ new Date()).toISOString(),
           viewCount: 0
         });
-        const mapped = await mapPostToFrontend(newPost);
+        const mapped = await mapPostToFrontend(newPost, req);
         return res.json(mapped);
       } catch (err) {
         console.error("create post error", err);
@@ -873,7 +894,7 @@ async function registerRoutes(app) {
         if (!updated) {
           return res.status(500).json({ message: "T\xF3kst ekki a\xF0 uppf\xE6ra" });
         }
-        const mapped = await mapPostToFrontend(updated);
+        const mapped = await mapPostToFrontend(updated, req);
         res.json(mapped);
       } catch (err) {
         console.error("update post error", err);
@@ -912,8 +933,10 @@ async function registerRoutes(app) {
         if (!req.file) {
           return res.status(400).json({ message: "Engin mynd m\xF3ttekin" });
         }
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = toAbsoluteImageUrl(relativePath, req);
         return res.status(200).json({
-          imageUrl: `/uploads/${req.file.filename}`
+          imageUrl: absoluteUrl
         });
       } catch (err) {
         console.error("upload image error", err);
@@ -1046,7 +1069,13 @@ function main() {
   } catch (err) {
     console.error("[uploads] error reading upload dir", err);
   }
-  app.use("/uploads", express2.static(UPLOAD_DIR));
+  app.use(
+    "/uploads",
+    express2.static(UPLOAD_DIR, {
+      maxAge: "30d",
+      immutable: true
+    })
+  );
   app.use(express2.json());
   app.use(express2.urlencoded({ extended: true }));
   registerRoutes(app, "/api");

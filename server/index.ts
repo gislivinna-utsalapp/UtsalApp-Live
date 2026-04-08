@@ -60,7 +60,13 @@ function main() {
     console.error("[uploads] error reading upload dir", err);
   }
 
-  app.use("/uploads", express.static(UPLOAD_DIR));
+  app.use(
+    "/uploads",
+    express.static(UPLOAD_DIR, {
+      maxAge: "30d",
+      immutable: true,
+    }),
+  );
 
   /**
    * 3) Body parsers

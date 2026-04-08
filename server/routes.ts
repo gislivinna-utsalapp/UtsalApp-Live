@@ -10,7 +10,7 @@ import path from "path";
 import fs from "fs";
 
 import { storage } from "./storage-db";
-import { UPLOAD_DIR } from "./config/uploads";
+import { UPLOAD_DIR, toAbsoluteImageUrl } from "./config/uploads";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
@@ -136,13 +136,17 @@ async function requirePlanSelected(
 
 // ------------------------- MAPPA POST Í FRONTEND FORMAT -------------------------
 
-async function mapPostToFrontend(p: any) {
+async function mapPostToFrontend(p: any, req?: Request) {
   const store = p.storeId ? await storage.getStoreById(p.storeId) : null;
 
   const plan = (store as any)?.plan ?? (store as any)?.planType ?? "basic";
   const billingStatus =
     (store as any)?.billingStatus ??
     ((store as any)?.billingActive ? "active" : "trial");
+
+  const resolvedImageUrl = req
+    ? toAbsoluteImageUrl(p.imageUrl, req)
+    : p.imageUrl ?? null;
 
   return {
     id: p.id,
@@ -153,10 +157,10 @@ async function mapPostToFrontend(p: any) {
     priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
     priceSale: Number(p.price ?? p.priceSale ?? 0),
 
-    images: p.imageUrl
+    images: resolvedImageUrl
       ? [
           {
-            url: p.imageUrl,
+            url: resolvedImageUrl,
             alt: p.title,
           },
         ]
@@ -173,9 +177,9 @@ async function mapPostToFrontend(p: any) {
           id: store.id,
           name: store.name,
           plan,
-          planType: plan, // fyrir eldri client
+          planType: plan,
           billingStatus,
-          createdAt: (store as any).createdAt ?? null, // BÆTT VIÐ
+          createdAt: (store as any).createdAt ?? null,
         }
       : null,
   };
@@ -203,9 +207,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   // Grunn middleware
   router.use(cors());
   router.use(express.json());
-
-  // Static fyrir uploads
-  app.use("/uploads", express.static(UPLOAD_DIR));
 
   // ------------------ AUTH: REGISTER STORE (AUTO-LOGIN) ------------------
   router.post("/auth/register-store", async (req: Request, res: Response) => {
@@ -690,7 +691,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const storeId = req.params.storeId;
       const posts = await storage.getPostsByStore(storeId);
-      const mapped = await Promise.all(posts.map(mapPostToFrontend));
+      const mapped = await Promise.all(posts.map((p: any) => mapPostToFrontend(p, req)));
       res.json(mapped);
     } catch (err) {
       console.error("store posts error:", err);
@@ -729,7 +730,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         return bd - ad;
       });
 
-      const mapped = await Promise.all(filtered.map(mapPostToFrontend));
+      const mapped = await Promise.all(filtered.map((p: any) => mapPostToFrontend(p, req)));
       res.json(mapped);
     } catch (err) {
       console.error("list posts error", err);
@@ -771,7 +772,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         lastViewCache[key] = now;
       }
 
-      const mapped = await mapPostToFrontend(effective);
+      const mapped = await mapPostToFrontend(effective, req);
       res.json(mapped);
     } catch (err) {
       console.error("post detail error", err);
@@ -826,7 +827,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           viewCount: 0,
         } as any);
 
-        const mapped = await mapPostToFrontend(newPost);
+        const mapped = await mapPostToFrontend(newPost, req);
         return res.json(mapped);
       } catch (err) {
         console.error("create post error", err);
@@ -886,7 +887,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(500).json({ message: "Tókst ekki að uppfæra" });
         }
 
-        const mapped = await mapPostToFrontend(updated);
+        const mapped = await mapPostToFrontend(updated, req);
         res.json(mapped);
       } catch (err) {
         console.error("update post error", err);
@@ -933,8 +934,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           return res.status(400).json({ message: "Engin mynd móttekin" });
         }
 
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = toAbsoluteImageUrl(relativePath, req);
+
         return res.status(200).json({
-          imageUrl: `/uploads/${req.file.filename}`,
+          imageUrl: absoluteUrl,
         });
       } catch (err) {
         console.error("upload image error", err);

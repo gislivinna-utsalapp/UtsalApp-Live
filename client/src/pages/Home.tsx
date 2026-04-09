@@ -4,7 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
 import { SalePostCard } from "@/components/SalePostCard";
+import { PromoBanner } from "@/components/PromoBanner";
 import { Card } from "@/components/ui/card";
+
+const BANNER_INTERVAL = 8;
 
 async function fetchPosts(): Promise<SalePostWithDetails[]> {
   return apiFetch<SalePostWithDetails[]>("/api/v1/posts");
@@ -19,6 +22,17 @@ export default function Home() {
     queryKey: ["posts", "home"],
     queryFn: fetchPosts,
   });
+
+  const feedItems: Array<{ type: "post"; post: SalePostWithDetails } | { type: "banner"; key: string }> = [];
+
+  if (Array.isArray(posts)) {
+    posts.forEach((post, index) => {
+      feedItems.push({ type: "post", post });
+      if ((index + 1) % BANNER_INTERVAL === 0 && index + 1 < posts.length) {
+        feedItems.push({ type: "banner", key: `banner-${index}` });
+      }
+    });
+  }
 
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
@@ -54,14 +68,16 @@ export default function Home() {
         </Card>
       )}
 
-      {!isLoading && !error && Array.isArray(posts) && posts.length > 0 && (
+      {!isLoading && !error && feedItems.length > 0 && (
         <section>
-          {/* HÉR er nýja grid-ið:
-              2 dálkar, minni gap => nettari og jafnari gluggar */}
           <div className="grid grid-cols-2 gap-3">
-            {posts.map((post) => (
-              <SalePostCard key={post.id} post={post} />
-            ))}
+            {feedItems.map((item) =>
+              item.type === "banner" ? (
+                <PromoBanner key={item.key} />
+              ) : (
+                <SalePostCard key={item.post.id} post={item.post} />
+              )
+            )}
           </div>
         </section>
       )}

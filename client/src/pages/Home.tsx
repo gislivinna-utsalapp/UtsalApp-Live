@@ -23,13 +23,19 @@ export default function Home() {
     queryFn: fetchPosts,
   });
 
-  const feedItems: Array<{ type: "post"; post: SalePostWithDetails } | { type: "banner"; key: string }> = [];
+  const feedItems: Array<
+    | { type: "post"; post: SalePostWithDetails }
+    | { type: "banner"; key: string; variant: "fermingar" | "subscription" }
+  > = [];
 
   if (Array.isArray(posts)) {
+    let bannerCount = 0;
     posts.forEach((post, index) => {
       feedItems.push({ type: "post", post });
       if ((index + 1) % BANNER_INTERVAL === 0 && index + 1 < posts.length) {
-        feedItems.push({ type: "banner", key: `banner-${index}` });
+        const variant = bannerCount % 2 === 0 ? "fermingar" : "subscription";
+        feedItems.push({ type: "banner", key: `banner-${index}`, variant });
+        bannerCount++;
       }
     });
   }
@@ -73,7 +79,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             {feedItems.map((item) =>
               item.type === "banner" ? (
-                <PromoBanner key={item.key} />
+                <PromoBanner key={item.key} variant={item.variant} />
               ) : (
                 <SalePostCard key={item.post.id} post={item.post} />
               )

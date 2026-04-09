@@ -882,8 +882,13 @@ async function registerRoutes(app) {
         const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bd - ad;
       });
-      const mapped = await Promise.all(filtered.map((p) => mapPostToFrontend(p, req)));
-      res.json(mapped);
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 40));
+      const total = filtered.length;
+      const totalPages = Math.ceil(total / limit);
+      const paginated = filtered.slice((page - 1) * limit, page * limit);
+      const mapped = await Promise.all(paginated.map((p) => mapPostToFrontend(p, req)));
+      res.json({ posts: mapped, total, page, totalPages });
     } catch (err) {
       console.error("list posts error", err);
       res.status(500).json({ message: "Villa kom upp" });

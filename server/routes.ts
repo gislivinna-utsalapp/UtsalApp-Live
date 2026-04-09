@@ -869,8 +869,14 @@ export async function registerRoutes(app: Express): Promise<void> {
         return bd - ad;
       });
 
-      const mapped = await Promise.all(filtered.map((p: any) => mapPostToFrontend(p, req)));
-      res.json(mapped);
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 40));
+      const total = filtered.length;
+      const totalPages = Math.ceil(total / limit);
+      const paginated = filtered.slice((page - 1) * limit, page * limit);
+
+      const mapped = await Promise.all(paginated.map((p: any) => mapPostToFrontend(p, req)));
+      res.json({ posts: mapped, total, page, totalPages });
     } catch (err) {
       console.error("list posts error", err);
       res.status(500).json({ message: "Villa kom upp" });

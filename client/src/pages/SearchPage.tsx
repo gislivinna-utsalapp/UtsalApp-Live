@@ -12,9 +12,10 @@ import { Input } from "@/components/ui/input";
 async function searchPosts(term: string): Promise<SalePostWithDetails[]> {
   const q = term.trim();
   if (!q) return [];
-  return apiFetch<SalePostWithDetails[]>(
-    `/api/v1/posts?q=${encodeURIComponent(q)}`,
+  const res = await apiFetch<{ posts: SalePostWithDetails[] }>(
+    `/api/v1/posts?q=${encodeURIComponent(q)}&limit=100`,
   );
+  return res.posts ?? [];
 }
 
 export default function SearchPage() {

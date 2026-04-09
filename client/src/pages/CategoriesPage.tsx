@@ -10,7 +10,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
 async function fetchPosts(): Promise<SalePostWithDetails[]> {
-  return apiFetch<SalePostWithDetails[]>("/api/v1/posts");
+  const res = await apiFetch<{ posts: SalePostWithDetails[] }>(
+    "/api/v1/posts?limit=1000",
+  );
+  return res.posts ?? [];
 }
 
 // Grunnflokkar

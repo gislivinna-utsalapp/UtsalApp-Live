@@ -2,7 +2,7 @@
 
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ShoppingCart, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
 import type { SalePostWithDetails } from "@shared/schema";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
@@ -278,25 +278,14 @@ export default function PostDetail() {
   const navigate = useNavigate();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  const openLightbox = useCallback((index: number) => {
-    window.history.pushState({ lightbox: true }, "");
-    setLightboxIndex(index);
-  }, []);
-
-  const closeLightbox = useCallback(() => {
-    setLightboxIndex(null);
-  }, []);
-
   useEffect(() => {
-    const onPopState = () => {
-      setLightboxIndex((current) => {
-        if (current !== null) return null;
-        return current;
-      });
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightboxIndex(null);
     };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex]);
 
   const { data: post, isLoading, error } = useQuery({
     queryKey: ["post", id],
@@ -342,7 +331,7 @@ export default function PostDetail() {
             <ImageCarousel
               images={images}
               title={post.title}
-              onTap={(i) => openLightbox(i)}
+              onTap={(i) => setLightboxIndex(i)}
             />
           )}
 
@@ -421,10 +410,7 @@ export default function PostDetail() {
           images={images}
           title={post.title}
           startIndex={lightboxIndex}
-          onClose={() => {
-            window.history.back();
-            closeLightbox();
-          }}
+          onClose={() => setLightboxIndex(null)}
         />
       )}
     </div>

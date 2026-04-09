@@ -18,6 +18,7 @@ import NotFound from "./pages/not-found";
 import StorePage from "./pages/StorePage";
 import StoresPage from "./pages/StoresPage";
 import PricingPage from "./pages/PricingPage";
+import CartPage from "./pages/CartPage";
 
 /* 👉 NÝTT: Choose Plan */
 import ChoosePlanPage from "./pages/ChoosePlanPage";
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="/post/:id" element={<PostDetail />} />
           <Route path="/stores" element={<StoresPage />} />
           <Route path="/store/:id" element={<StorePage />} />
+          <Route path="/karfa" element={<CartPage />} />
 
           <Route path="/login" element={<Login />} />
           <Route path="/register-store" element={<RegisterStore />} />

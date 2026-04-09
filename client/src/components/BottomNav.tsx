@@ -1,11 +1,12 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useCart } from "@/hooks/useCart";
 
 export default function BottomNav() {
   const location = useLocation();
   const tab = location.pathname;
-
   const { isAdmin, loading } = useAuth();
+  const { cartCount } = useCart();
 
   return (
     <nav
@@ -24,7 +25,7 @@ export default function BottomNav() {
           font-medium
         "
         style={{
-          minHeight: "64px", // ≈ 1/3 minna en áður
+          minHeight: "64px",
         }}
       >
         <Link
@@ -52,6 +53,21 @@ export default function BottomNav() {
           }`}
         >
           Flokkar
+        </Link>
+
+        <Link
+          to="/karfa"
+          className={`flex-1 text-center transition-opacity relative ${
+            tab === "/karfa" ? "opacity-100 font-semibold" : "opacity-70"
+          }`}
+          data-testid="nav-cart"
+        >
+          Karfa
+          {cartCount > 0 && (
+            <span className="absolute -top-1.5 right-1/2 translate-x-4 min-w-[16px] h-4 px-1 rounded-full bg-white text-primary text-[10px] font-bold flex items-center justify-center leading-none">
+              {cartCount}
+            </span>
+          )}
         </Link>
 
         <Link

@@ -3,11 +3,13 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { ShoppingCart, Check } from "lucide-react";
 import type { SalePostWithDetails } from "@shared/schema";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { formatPrice, calculateDiscount, getTimeRemaining } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useCart } from "@/hooks/useCart";
 
 // SAMA myndarökfræði og í SalePostCard
 function buildImageUrl(rawUrl?: string | null): string | null {
@@ -168,6 +170,8 @@ export default function PostDetail() {
               </p>
             )}
 
+            <CartButton postId={post.id} />
+
             {post.buyUrl && (
               <Button
                 asChild
@@ -182,5 +186,32 @@ export default function PostDetail() {
         </Card>
       </main>
     </div>
+  );
+}
+
+function CartButton({ postId }: { postId: string }) {
+  const { isInCart, toggleCart } = useCart();
+  const saved = isInCart(postId);
+
+  return (
+    <Button
+      type="button"
+      variant={saved ? "default" : "outline"}
+      className="w-full rounded-xl"
+      onClick={() => toggleCart(postId)}
+      data-testid="button-cart-detail"
+    >
+      {saved ? (
+        <>
+          <Check className="w-4 h-4 mr-2" />
+          Vistað í körfu
+        </>
+      ) : (
+        <>
+          <ShoppingCart className="w-4 h-4 mr-2" />
+          Vista í körfu
+        </>
+      )}
+    </Button>
   );
 }

@@ -342,7 +342,19 @@ async function mapPostToFrontend(p, req) {
   const store = p.storeId ? await storage.getStoreById(p.storeId) : null;
   const plan = store?.plan ?? store?.planType ?? "basic";
   const billingStatus = store?.billingStatus ?? (store?.billingActive ? "active" : "trial");
-  const resolvedImageUrl = req ? toAbsoluteImageUrl(p.imageUrl, req) : p.imageUrl ?? null;
+  const allUrls = [];
+  if (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
+    for (const u of p.imageUrls) {
+      if (typeof u === "string" && u.trim()) {
+        const resolved = req ? toAbsoluteImageUrl(u, req) : u;
+        if (resolved) allUrls.push(resolved);
+      }
+    }
+  }
+  if (allUrls.length === 0 && p.imageUrl) {
+    const resolved = req ? toAbsoluteImageUrl(p.imageUrl, req) : p.imageUrl;
+    if (resolved) allUrls.push(resolved);
+  }
   return {
     id: p.id,
     title: p.title,
@@ -350,12 +362,7 @@ async function mapPostToFrontend(p, req) {
     category: p.category,
     priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
     priceSale: Number(p.price ?? p.priceSale ?? 0),
-    images: resolvedImageUrl ? [
-      {
-        url: resolvedImageUrl,
-        alt: p.title
-      }
-    ] : [],
+    images: allUrls.map((url) => ({ url, alt: p.title })),
     startsAt: p.startsAt ?? null,
     endsAt: p.endsAt ?? null,
     buyUrl: p.buyUrl ?? null,
@@ -949,6 +956,7 @@ async function registerRoutes(app) {
           return res.status(400).json({ message: "Vantar uppl\xFDsingar" });
         }
         const imageUrl = Array.isArray(images) && images.length > 0 ? images[0].url : "";
+        const imageUrls = Array.isArray(images) ? images.map((img) => img.url).filter((u) => typeof u === "string" && u.trim()) : [];
         const newPost = await storage.createPost({
           title,
           description,
@@ -956,6 +964,7 @@ async function registerRoutes(app) {
           price: Number(priceSale),
           oldPrice: Number(priceOriginal),
           imageUrl,
+          imageUrls,
           storeId,
           buyUrl: buyUrl || null,
           startsAt: startsAt || null,
@@ -1008,6 +1017,7 @@ async function registerRoutes(app) {
         if (endsAt !== void 0) updates.endsAt = endsAt || null;
         if (Array.isArray(images) && images.length > 0 && images[0].url) {
           updates.imageUrl = images[0].url;
+          updates.imageUrls = images.map((img) => img.url).filter((u) => typeof u === "string" && u.trim());
         }
         const updated = await storage.updatePost(postId, updates);
         if (!updated) {

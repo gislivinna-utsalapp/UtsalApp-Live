@@ -144,9 +144,19 @@ async function mapPostToFrontend(p: any, req?: Request) {
     (store as any)?.billingStatus ??
     ((store as any)?.billingActive ? "active" : "trial");
 
-  const resolvedImageUrl = req
-    ? toAbsoluteImageUrl(p.imageUrl, req)
-    : p.imageUrl ?? null;
+  const allUrls: string[] = [];
+  if (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
+    for (const u of p.imageUrls) {
+      if (typeof u === "string" && u.trim()) {
+        const resolved = req ? toAbsoluteImageUrl(u, req) : u;
+        if (resolved) allUrls.push(resolved);
+      }
+    }
+  }
+  if (allUrls.length === 0 && p.imageUrl) {
+    const resolved = req ? toAbsoluteImageUrl(p.imageUrl, req) : p.imageUrl;
+    if (resolved) allUrls.push(resolved);
+  }
 
   return {
     id: p.id,
@@ -157,14 +167,7 @@ async function mapPostToFrontend(p: any, req?: Request) {
     priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
     priceSale: Number(p.price ?? p.priceSale ?? 0),
 
-    images: resolvedImageUrl
-      ? [
-          {
-            url: resolvedImageUrl,
-            alt: p.title,
-          },
-        ]
-      : [],
+    images: allUrls.map((url) => ({ url, alt: p.title })),
 
     startsAt: p.startsAt ?? null,
     endsAt: p.endsAt ?? null,
@@ -956,6 +959,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         const imageUrl =
           Array.isArray(images) && images.length > 0 ? images[0].url : "";
+        const imageUrls: string[] = Array.isArray(images)
+          ? images.map((img: any) => img.url).filter((u: any) => typeof u === "string" && u.trim())
+          : [];
 
         const newPost = await storage.createPost({
           title,
@@ -964,6 +970,7 @@ export async function registerRoutes(app: Express): Promise<void> {
           price: Number(priceSale),
           oldPrice: Number(priceOriginal),
           imageUrl,
+          imageUrls,
           storeId,
           buyUrl: buyUrl || null,
           startsAt: startsAt || null,
@@ -1025,6 +1032,9 @@ export async function registerRoutes(app: Express): Promise<void> {
 
         if (Array.isArray(images) && images.length > 0 && images[0].url) {
           updates.imageUrl = images[0].url;
+          updates.imageUrls = images
+            .map((img: any) => img.url)
+            .filter((u: any) => typeof u === "string" && u.trim());
         }
 
         const updated = await storage.updatePost(postId, updates);

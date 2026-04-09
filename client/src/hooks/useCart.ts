@@ -5,17 +5,29 @@ const STORAGE_KEY = "utsalapp_cart";
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
+let cachedIds: string[] = [];
+let cachedRaw: string | null = null;
+
 function emitChange() {
+  cachedRaw = null;
   listeners.forEach((l) => l());
 }
 
 function getSnapshot(): string[] {
+  const raw = localStorage.getItem(STORAGE_KEY) ?? "";
+  if (raw === cachedRaw) return cachedIds;
+  cachedRaw = raw;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    cachedIds = raw ? JSON.parse(raw) : [];
   } catch {
-    return [];
+    cachedIds = [];
   }
+  return cachedIds;
+}
+
+const EMPTY: string[] = [];
+function getServerSnapshot(): string[] {
+  return EMPTY;
 }
 
 function subscribe(listener: Listener) {
@@ -24,7 +36,7 @@ function subscribe(listener: Listener) {
 }
 
 export function useCart() {
-  const ids = useSyncExternalStore(subscribe, getSnapshot, () => []);
+  const ids = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const addToCart = useCallback((postId: string) => {
     const current = getSnapshot();

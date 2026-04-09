@@ -10,6 +10,7 @@ import { formatPrice, calculateDiscount, getTimeRemaining } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useCart } from "@/hooks/useCart";
+import { useToast } from "@/hooks/use-toast";
 
 function buildImageUrl(rawUrl?: string | null): string | null {
   if (!rawUrl) return null;
@@ -26,25 +27,22 @@ async function fetchPost(id: string): Promise<SalePostWithDetails> {
   return apiFetch<SalePostWithDetails>(`/api/v1/posts/${id}`);
 }
 
-// ── Image carousel ────────────────────────────────────────────────────────────
+// ── Image carousel ─────────────────────────────────────────────────────────────
 
 function ImageCarousel({
   images,
   title,
   onTap,
-  activeIndex,
-  setActiveIndex,
 }: {
   images: string[];
   title: string;
   onTap: (index: number) => void;
-  activeIndex: number;
-  setActiveIndex: (i: number) => void;
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
   const touchStartX = useRef<number | null>(null);
 
-  const prev = () => setActiveIndex(Math.max(0, activeIndex - 1));
-  const next = () => setActiveIndex(Math.min(images.length - 1, activeIndex + 1));
+  const prev = () => setActiveIndex((i) => Math.max(0, i - 1));
+  const next = () => setActiveIndex((i) => Math.min(images.length - 1, i + 1));
 
   const onTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
@@ -53,8 +51,7 @@ function ImageCarousel({
     if (touchStartX.current === null) return;
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 40) {
-      if (diff > 0) next();
-      else prev();
+      diff > 0 ? next() : prev();
     }
     touchStartX.current = null;
   };
@@ -62,58 +59,58 @@ function ImageCarousel({
   if (images.length === 0) return null;
 
   return (
-    <div className="relative w-full aspect-[4/5] overflow-hidden bg-neutral-900 cursor-zoom-in select-none">
-      {/* Slides */}
-      <div
-        className="flex h-full transition-transform duration-300 ease-in-out"
-        style={{ transform: `translateX(-${activeIndex * 100}%)`, width: `${images.length * 100}%` }}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
-        onClick={() => onTap(activeIndex)}
-      >
-        {images.map((src, i) => (
-          <div
-            key={i}
-            className="h-full flex-shrink-0"
-            style={{ width: `${100 / images.length}%` }}
-          >
-            <img
-              src={src}
-              alt={`${title} - mynd ${i + 1}`}
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-          </div>
-        ))}
-      </div>
+    <div
+      className="relative w-full overflow-hidden bg-neutral-900 select-none"
+      style={{ aspectRatio: "4/5" }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Slides — each absolutely fills the container, offset by index */}
+      {images.map((src, i) => (
+        <div
+          key={i}
+          className="absolute inset-0 transition-transform duration-300 ease-in-out cursor-zoom-in"
+          style={{ transform: `translateX(${(i - activeIndex) * 100}%)` }}
+          onClick={() => onTap(i)}
+        >
+          <img
+            src={src}
+            alt={`${title} - mynd ${i + 1}`}
+            className="w-full h-full object-cover"
+            draggable={false}
+          />
+        </div>
+      ))}
 
-      {/* Prev / Next arrows — only shown when multiple images */}
       {images.length > 1 && (
         <>
+          {/* Prev arrow */}
           <button
             onClick={(e) => { e.stopPropagation(); prev(); }}
             disabled={activeIndex === 0}
-            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 rounded-full p-1.5 text-white disabled:opacity-20 transition-opacity"
+            className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 text-white disabled:opacity-25 transition-opacity"
             data-testid="button-carousel-prev"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
+
+          {/* Next arrow */}
           <button
             onClick={(e) => { e.stopPropagation(); next(); }}
             disabled={activeIndex === images.length - 1}
-            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 rounded-full p-1.5 text-white disabled:opacity-20 transition-opacity"
+            className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 rounded-full p-1.5 text-white disabled:opacity-25 transition-opacity"
             data-testid="button-carousel-next"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
 
-          {/* Dots */}
-          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+          {/* Dot indicators */}
+          <div className="absolute bottom-3 left-0 right-0 z-10 flex justify-center gap-1.5">
             {images.map((_, i) => (
               <button
                 key={i}
                 onClick={(e) => { e.stopPropagation(); setActiveIndex(i); }}
-                className="rounded-full transition-all"
+                className="rounded-full transition-all duration-200"
                 style={{
                   width: i === activeIndex ? "20px" : "8px",
                   height: "8px",
@@ -124,8 +121,8 @@ function ImageCarousel({
             ))}
           </div>
 
-          {/* Counter */}
-          <div className="absolute top-3 right-3 bg-black/50 rounded-full px-2 py-0.5 text-xs text-white">
+          {/* Counter badge */}
+          <div className="absolute top-3 right-3 z-10 bg-black/50 rounded-full px-2 py-0.5 text-xs text-white">
             {activeIndex + 1} / {images.length}
           </div>
         </>
@@ -134,7 +131,7 @@ function ImageCarousel({
   );
 }
 
-// ── Lightbox ──────────────────────────────────────────────────────────────────
+// ── Fullscreen lightbox ────────────────────────────────────────────────────────
 
 function Lightbox({
   images,
@@ -159,10 +156,7 @@ function Lightbox({
   const onTouchEnd = (e: React.TouchEvent) => {
     if (touchStartX.current === null) return;
     const diff = touchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 40) {
-      if (diff > 0) next();
-      else prev();
-    }
+    if (Math.abs(diff) > 40) diff > 0 ? next() : prev();
     touchStartX.current = null;
   };
 
@@ -173,52 +167,43 @@ function Lightbox({
       onTouchEnd={onTouchEnd}
     >
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
         <span className="text-white text-sm">{current + 1} / {images.length}</span>
-        <button
-          onClick={onClose}
-          className="text-white p-1"
-          data-testid="button-lightbox-close"
-        >
+        <button onClick={onClose} className="text-white p-1" data-testid="button-lightbox-close">
           <X className="w-6 h-6" />
         </button>
       </div>
 
-      {/* Image */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-        <div
-          className="flex h-full items-center transition-transform duration-300 ease-in-out"
-          style={{ transform: `translateX(-${current * 100}%)`, width: `${images.length * 100}%` }}
-        >
-          {images.map((src, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 flex items-center justify-center px-2"
-              style={{ width: `${100 / images.length}%` }}
-            >
-              <img
-                src={src}
-                alt={`${title} - mynd ${i + 1}`}
-                className="max-w-full max-h-full object-contain"
-                draggable={false}
-              />
-            </div>
-          ))}
-        </div>
+      {/* Image area */}
+      <div className="flex-1 relative overflow-hidden flex items-center">
+        {images.map((src, i) => (
+          <div
+            key={i}
+            className="absolute inset-0 flex items-center justify-center px-2 transition-transform duration-300 ease-in-out"
+            style={{ transform: `translateX(${(i - current) * 100}%)` }}
+          >
+            <img
+              src={src}
+              alt={`${title} - mynd ${i + 1}`}
+              className="max-w-full max-h-full object-contain"
+              draggable={false}
+            />
+          </div>
+        ))}
 
         {images.length > 1 && (
           <>
             <button
               onClick={prev}
               disabled={current === 0}
-              className="absolute left-2 bg-white/10 rounded-full p-2 text-white disabled:opacity-20"
+              className="absolute left-2 z-10 bg-white/10 hover:bg-white/20 rounded-full p-2 text-white disabled:opacity-20"
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
             <button
               onClick={next}
               disabled={current === images.length - 1}
-              className="absolute right-2 bg-white/10 rounded-full p-2 text-white disabled:opacity-20"
+              className="absolute right-2 z-10 bg-white/10 hover:bg-white/20 rounded-full p-2 text-white disabled:opacity-20"
             >
               <ChevronRight className="w-6 h-6" />
             </button>
@@ -228,7 +213,7 @@ function Lightbox({
 
       {/* Thumbnail strip */}
       {images.length > 1 && (
-        <div className="flex gap-2 px-4 py-3 overflow-x-auto justify-center">
+        <div className="flex gap-2 px-4 py-3 overflow-x-auto justify-center flex-shrink-0">
           {images.map((src, i) => (
             <button
               key={i}
@@ -246,19 +231,54 @@ function Lightbox({
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Cart button ────────────────────────────────────────────────────────────────
+
+function CartButton({ postId }: { postId: string }) {
+  const { isInCart, addToCart, removeFromCart } = useCart();
+  const { toast } = useToast();
+  const saved = isInCart(postId);
+
+  const handleClick = () => {
+    if (saved) {
+      removeFromCart(postId);
+      toast({ title: "Fjarlægt úr körfu" });
+    } else {
+      addToCart(postId);
+      toast({ title: "Vistað í körfu" });
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant={saved ? "default" : "outline"}
+      className="w-full rounded-xl"
+      onClick={handleClick}
+      data-testid="button-cart-detail"
+    >
+      {saved ? (
+        <>
+          <Check className="w-4 h-4 mr-2" />
+          Vistað í körfu
+        </>
+      ) : (
+        <>
+          <ShoppingCart className="w-4 h-4 mr-2" />
+          Vista í körfu
+        </>
+      )}
+    </Button>
+  );
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function PostDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [carouselIndex, setCarouselIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  const {
-    data: post,
-    isLoading,
-    error,
-  } = useQuery({
+  const { data: post, isLoading, error } = useQuery({
     queryKey: ["post", id],
     enabled: !!id,
     queryFn: () => fetchPost(id as string),
@@ -276,7 +296,9 @@ export default function PostDetail() {
   const remainingRaw = post.endsAt ? getTimeRemaining(post.endsAt) : null;
 
   const images: string[] = Array.isArray(post.images)
-    ? post.images.map((img: any) => buildImageUrl(img.url) ?? "").filter(Boolean)
+    ? (post.images as any[])
+        .map((img) => buildImageUrl(img?.url))
+        .filter((u): u is string => !!u)
     : [];
 
   return (
@@ -295,13 +317,12 @@ export default function PostDetail() {
 
       <main className="px-4 py-4 space-y-4">
         <Card className="overflow-hidden bg-white text-black border border-neutral-200 rounded-2xl shadow-md">
+
           {images.length > 0 && (
             <ImageCarousel
               images={images}
               title={post.title}
               onTap={(i) => setLightboxIndex(i)}
-              activeIndex={carouselIndex}
-              setActiveIndex={setCarouselIndex}
             />
           )}
 
@@ -332,9 +353,7 @@ export default function PostDetail() {
                 </div>
               )}
               <div className="flex items-baseline gap-3">
-                <div className="text-2xl font-bold">
-                  {formatPrice(post.priceSale)}
-                </div>
+                <div className="text-2xl font-bold">{formatPrice(post.priceSale)}</div>
                 {post.priceOriginal && post.priceOriginal > post.priceSale && (
                   <div className="text-sm line-through text-neutral-500">
                     {formatPrice(post.priceOriginal)}
@@ -386,32 +405,5 @@ export default function PostDetail() {
         />
       )}
     </div>
-  );
-}
-
-function CartButton({ postId }: { postId: string }) {
-  const { isInCart, toggleCart } = useCart();
-  const saved = isInCart(postId);
-
-  return (
-    <Button
-      type="button"
-      variant={saved ? "default" : "outline"}
-      className="w-full rounded-xl"
-      onClick={() => toggleCart(postId)}
-      data-testid="button-cart-detail"
-    >
-      {saved ? (
-        <>
-          <Check className="w-4 h-4 mr-2" />
-          Vistað í körfu
-        </>
-      ) : (
-        <>
-          <ShoppingCart className="w-4 h-4 mr-2" />
-          Vista í körfu
-        </>
-      )}
-    </Button>
   );
 }

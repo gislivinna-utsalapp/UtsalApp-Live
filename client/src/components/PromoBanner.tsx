@@ -146,7 +146,7 @@ export function PromoBanner() {
 
         {/* CTA */}
         <a
-          href="mailto:auglysingar@utsalapp.is"
+          href="mailto:utsalapp@utsalapp.is"
           className="inline-block rounded-md font-semibold text-sm px-5 py-2"
           style={{
             background: "#d91e5b",

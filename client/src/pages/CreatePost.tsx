@@ -1,7 +1,7 @@
-// client/src/pages/CreatePost.tsx
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { Plus, X } from "lucide-react";
 
 import { apiFetch } from "@/lib/api";
 
@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+const MAX_IMAGES = 4;
 
 const CATEGORY_OPTIONS = [
   "Fatnaður - Konur",
@@ -44,17 +46,18 @@ type CreatePostPayload = {
   buyUrl?: string | null;
   startsAt?: string | null;
   endsAt?: string | null;
-  images: {
-    url: string;
-    alt?: string;
-  }[];
+  images: { url: string; alt?: string }[];
+};
+
+type ImageSlot = {
+  localPreview: string;
+  uploadedUrl: string | null;
+  uploading: boolean;
+  error: string | null;
 };
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
-// ====================
-// Upload helper
-// ====================
 async function uploadImage(file: File): Promise<string> {
   const token =
     localStorage.getItem("utsalapp_token") || localStorage.getItem("token");
@@ -72,9 +75,7 @@ async function uploadImage(file: File): Promise<string> {
 
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 
@@ -83,7 +84,6 @@ async function uploadImage(file: File): Promise<string> {
   }
 
   const data = (await res.json()) as { imageUrl?: string };
-
   if (!data?.imageUrl) {
     throw new Error("Server skilaði ekki myndaslóð.");
   }
@@ -91,12 +91,10 @@ async function uploadImage(file: File): Promise<string> {
   return data.imageUrl;
 }
 
-// ====================
-// Component
-// ====================
 export default function CreatePost() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -107,34 +105,70 @@ export default function CreatePost() {
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [images, setImages] = useState<ImageSlot[]>([]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  async function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setImageFile(null);
-      setImageUrl(null);
-      return;
+  function handleAddClick() {
+    if (images.length >= MAX_IMAGES) return;
+    fileInputRef.current?.click();
+  }
+
+  async function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = MAX_IMAGES - images.length;
+    const toAdd = Array.from(files).slice(0, remaining);
+
+    for (const file of toAdd) {
+      const localPreview = URL.createObjectURL(file);
+      const slot: ImageSlot = {
+        localPreview,
+        uploadedUrl: null,
+        uploading: true,
+        error: null,
+      };
+
+      setImages((prev) => [...prev, slot]);
+      const idx = images.length + toAdd.indexOf(file);
+
+      try {
+        const uploadedUrl = await uploadImage(file);
+        setImages((prev) =>
+          prev.map((s, i) =>
+            i === idx ? { ...s, uploadedUrl, uploading: false } : s,
+          ),
+        );
+      } catch (err) {
+        setImages((prev) =>
+          prev.map((s, i) =>
+            i === idx
+              ? {
+                  ...s,
+                  uploading: false,
+                  error:
+                    err instanceof Error
+                      ? err.message
+                      : "Upphleðsla mistókst",
+                }
+              : s,
+          ),
+        );
+      }
     }
 
-    setErrorMsg(null);
-    setImageFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
-    try {
-      const uploadedUrl = await uploadImage(file);
-      setImageUrl(uploadedUrl);
-    } catch (err: any) {
-      setImageFile(null);
-      setImageUrl(null);
-      setErrorMsg(
-        err instanceof Error ? err.message : "Tókst ekki að hlaða upp mynd.",
-      );
-    }
+  function handleRemoveImage(idx: number) {
+    setImages((prev) => {
+      const removed = prev[idx];
+      if (removed?.localPreview) URL.revokeObjectURL(removed.localPreview);
+      return prev.filter((_, i) => i !== idx);
+    });
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -160,8 +194,15 @@ export default function CreatePost() {
       return;
     }
 
-    if (!imageUrl) {
-      setErrorMsg("Mynd er ekki tilbúin.");
+    const uploadedImages = images.filter((s) => s.uploadedUrl && !s.error);
+    if (uploadedImages.length === 0) {
+      setErrorMsg("Bættu við að minnsta kosti einni mynd.");
+      return;
+    }
+
+    const stillUploading = images.some((s) => s.uploading);
+    if (stillUploading) {
+      setErrorMsg("Myndir eru enn að hlaðast upp. Bíddu augnablik.");
       return;
     }
 
@@ -177,7 +218,10 @@ export default function CreatePost() {
         buyUrl: buyUrl.trim() || null,
         startsAt: startsAt || null,
         endsAt: endsAt || null,
-        images: [{ url: imageUrl, alt: title.trim() }],
+        images: uploadedImages.map((s) => ({
+          url: s.uploadedUrl!,
+          alt: title.trim(),
+        })),
       };
 
       await apiFetch("/api/v1/posts", {
@@ -212,72 +256,167 @@ export default function CreatePost() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <Label>Titill</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <div>
+            <Label>Titill</Label>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              data-testid="input-post-title"
+            />
+          </div>
 
-          <Label>Lýsing</Label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full border rounded-md p-2 text-sm"
-          />
+          <div>
+            <Label>Lýsing</Label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full border rounded-md p-2 text-sm"
+              data-testid="input-post-description"
+            />
+          </div>
 
-          <Label>Flokkur</Label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="w-full border rounded-md p-2 text-sm"
+          <div>
+            <Label>Flokkur</Label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full border rounded-md p-2 text-sm"
+              data-testid="select-post-category"
+            >
+              <option value="">Veldu flokk</option>
+              {CATEGORY_OPTIONS.map((opt) => (
+                <option key={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label>Verð áður</Label>
+              <Input
+                placeholder="t.d. 9990"
+                value={priceOriginal}
+                onChange={(e) => setPriceOriginal(e.target.value)}
+                data-testid="input-price-original"
+              />
+            </div>
+            <div>
+              <Label>Tilboðsverð</Label>
+              <Input
+                placeholder="t.d. 4990"
+                value={priceSale}
+                onChange={(e) => setPriceSale(e.target.value)}
+                data-testid="input-price-sale"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label>Kauplinkur (valfrjálst)</Label>
+            <Input
+              placeholder="https://..."
+              value={buyUrl}
+              onChange={(e) => setBuyUrl(e.target.value)}
+              data-testid="input-buy-url"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label>Byrjar</Label>
+              <Input
+                type="date"
+                value={startsAt}
+                onChange={(e) => setStartsAt(e.target.value)}
+                data-testid="input-starts-at"
+              />
+            </div>
+            <div>
+              <Label>Endar</Label>
+              <Input
+                type="date"
+                value={endsAt}
+                onChange={(e) => setEndsAt(e.target.value)}
+                data-testid="input-ends-at"
+              />
+            </div>
+          </div>
+
+          <div>
+            <Label className="mb-2 block">
+              Myndir ({images.length}/{MAX_IMAGES})
+            </Label>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleFilesSelected}
+              data-testid="input-images-hidden"
+            />
+
+            <div className="grid grid-cols-4 gap-2">
+              {images.map((slot, idx) => (
+                <div
+                  key={idx}
+                  className="relative aspect-square rounded-lg border border-border overflow-hidden bg-muted"
+                  data-testid={`img-slot-${idx}`}
+                >
+                  <img
+                    src={slot.localPreview}
+                    alt={`Mynd ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+
+                  {slot.uploading && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+
+                  {slot.error && (
+                    <div className="absolute inset-0 bg-red-500/60 flex items-center justify-center">
+                      <p className="text-[9px] text-white text-center px-1">
+                        {slot.error}
+                      </p>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80 transition-colors"
+                    data-testid={`button-remove-image-${idx}`}
+                  >
+                    <X className="w-3 h-3 text-white" />
+                  </button>
+                </div>
+              ))}
+
+              {images.length < MAX_IMAGES && (
+                <button
+                  type="button"
+                  onClick={handleAddClick}
+                  className="aspect-square rounded-lg border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                  data-testid="button-add-image"
+                >
+                  <Plus className="w-6 h-6 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground">
+                    Bæta við
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full"
+            data-testid="button-submit-post"
           >
-            <option value="">Veldu flokk</option>
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option key={opt}>{opt}</option>
-            ))}
-          </select>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              placeholder="Verð áður"
-              value={priceOriginal}
-              onChange={(e) => setPriceOriginal(e.target.value)}
-            />
-            <Input
-              placeholder="Tilboðsverð"
-              value={priceSale}
-              onChange={(e) => setPriceSale(e.target.value)}
-            />
-          </div>
-
-          <Input
-            placeholder="Kauplinkur"
-            value={buyUrl}
-            onChange={(e) => setBuyUrl(e.target.value)}
-          />
-
-          {/* ✅ TIMABUNDIN TILBOD */}
-          <div className="grid grid-cols-2 gap-2">
-            <Input
-              type="date"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-            />
-            <Input
-              type="date"
-              value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)}
-            />
-          </div>
-
-          <Input type="file" accept="image/*" onChange={handleImageChange} />
-
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt="Preview"
-              className="max-h-64 object-contain"
-            />
-          )}
-
-          <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Bý til..." : "Búa til tilboð"}
           </Button>
         </form>

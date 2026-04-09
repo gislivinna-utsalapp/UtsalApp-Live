@@ -31,6 +31,8 @@ const CATEGORY_OPTIONS = [
   "Heilsa og útlit",
   "Hljóðfæri",
   "Gjafaleikur",
+  "Fermingargjafir",
+  "Fermingartilboð",
   "Opnunartilboð",
   "Upplifun",
   "Annað",

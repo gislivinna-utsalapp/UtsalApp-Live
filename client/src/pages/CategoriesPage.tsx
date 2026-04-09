@@ -33,8 +33,10 @@ const BASE_CATEGORIES = [
   "Heilsa og útlit",
   "Hljóðfæri",
   "Gjafaleikur",
+  "Fermingargjafir",
+  "Fermingartilboð",
   "Opnunartilboð",
-  "Upplifun", // ✅ NÝR FLOKKUR
+  "Upplifun",
   "Annað",
   "Viðburðir",
 ];

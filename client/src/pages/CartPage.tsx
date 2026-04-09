@@ -36,14 +36,18 @@ function pickFirstImageUrl(images: unknown): string {
 export default function CartPage() {
   const { cartIds, removeFromCart } = useCart();
 
-  const { data: allPosts = [], isLoading } = useQuery<any[]>({
-    queryKey: ["posts"],
-    queryFn: () => apiFetch("/api/v1/posts"),
+  const { data: rawData, isLoading } = useQuery<any>({
+    queryKey: ["posts", "cart"],
+    queryFn: () => apiFetch("/api/v1/posts?limit=1000"),
   });
 
-  const cartPosts = Array.isArray(allPosts)
-    ? allPosts.filter((p: any) => cartIds.includes(p.id))
-    : [];
+  const allPosts: any[] = Array.isArray(rawData)
+    ? rawData
+    : Array.isArray(rawData?.posts)
+      ? rawData.posts
+      : [];
+
+  const cartPosts = allPosts.filter((p: any) => cartIds.includes(p.id));
 
   return (
     <div className="space-y-4">

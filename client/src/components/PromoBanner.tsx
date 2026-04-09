@@ -141,7 +141,7 @@ export function PromoBanner() {
 
         {/* Subtext */}
         <p className="text-sm mb-4" style={{ color: "#c8f0d8" }}>
-          Náðu til þína viðskiptavina um fermingartímann
+          Náðu til þinna viðskiptavina um fermingartímann
         </p>
 
         {/* CTA */}

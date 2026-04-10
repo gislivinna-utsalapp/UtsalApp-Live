@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, Check } from "lucide-react";
 import type { SalePostWithDetails } from "@shared/schema";
 import { API_BASE_URL } from "@/lib/api";
@@ -56,6 +56,7 @@ export function SalePostCard({ post }: Props) {
   );
   const imageUrl = buildImageUrl(rawImage);
   const { isInCart, toggleCart } = useCart();
+  const navigate = useNavigate();
   const saved = isInCart(post.id);
 
   const discountPercent =
@@ -99,7 +100,7 @@ export function SalePostCard({ post }: Props) {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                window.location.href = `/store/${post.store!.id}`;
+                navigate(`/store/${post.store!.id}`);
               }}
               className="inline-block text-[10px] uppercase tracking-wide text-neutral-500 hover:underline cursor-pointer"
             >

@@ -84,7 +84,21 @@ export default function CartPage() {
         </Card>
       )}
 
-      {!isLoading && cartPosts.length > 0 && (
+      {!isLoading && cartPosts.length > 0 && (() => {
+        const totalSale = cartPosts.reduce(
+          (sum: number, p: any) =>
+            sum + (typeof p.priceSale === "number" ? p.priceSale : 0),
+          0,
+        );
+        const totalOriginal = cartPosts.reduce(
+          (sum: number, p: any) =>
+            sum + (typeof p.priceOriginal === "number" ? p.priceOriginal : 0),
+          0,
+        );
+        const hasPrices = cartPosts.some(
+          (p: any) => typeof p.priceSale === "number",
+        );
+        return (
         <div className="space-y-2">
           {cartPosts.map((post: any) => {
             const rawImg = pickFirstImageUrl(post.images);
@@ -165,8 +179,41 @@ export default function CartPage() {
               </Card>
             );
           })}
+
+          {hasPrices && (
+            <Card className="p-4 mt-2" data-testid="cart-total">
+              <div className="space-y-1.5">
+                {totalOriginal > totalSale && (
+                  <div className="flex justify-between items-center text-sm text-muted-foreground">
+                    <span>Upprunalegt verð</span>
+                    <span className="line-through">
+                      {totalOriginal.toLocaleString("is-IS")} kr
+                    </span>
+                  </div>
+                )}
+                {totalOriginal > totalSale && (
+                  <div className="flex justify-between items-center text-sm text-green-600 font-medium">
+                    <span>Sparnaður</span>
+                    <span>
+                      -{(totalOriginal - totalSale).toLocaleString("is-IS")} kr
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-1 border-t border-border">
+                  <span className="font-semibold text-base">Samtals</span>
+                  <span
+                    className="font-bold text-lg text-primary"
+                    data-testid="text-cart-total"
+                  >
+                    {totalSale.toLocaleString("is-IS")} kr
+                  </span>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

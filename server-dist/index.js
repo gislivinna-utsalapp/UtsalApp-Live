@@ -384,6 +384,101 @@ function getPlanRankForPost(post, storesById) {
   if (plan === "pro") return 2;
   return 1;
 }
+function seededRandom(seed) {
+  let s = seed >>> 0;
+  return () => {
+    s += 1831565813;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t ^= t + Math.imul(t ^ t >>> 7, 61 | t);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffleArr(arr, rand) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function buildDiscoveryFeed(posts, storesById) {
+  const seed = Math.floor(Date.now() / (1e3 * 60 * 30));
+  const rand = seededRandom(seed);
+  const now = Date.now();
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1e3;
+  const tiers = { 3: [], 2: [], 1: [] };
+  for (const p of posts) {
+    const r = getPlanRankForPost(p, storesById);
+    tiers[r].push(p);
+  }
+  const result = [];
+  for (const rank of [3, 2, 1]) {
+    const group = tiers[rank];
+    if (!group.length) continue;
+    const isNew = (p) => p.createdAt && now - new Date(p.createdAt).getTime() < WEEK_MS;
+    const discountPct = (p) => typeof p.priceOriginal === "number" && typeof p.priceSale === "number" && p.priceOriginal > 0 ? (p.priceOriginal - p.priceSale) / p.priceOriginal : 0;
+    const newPosts = group.filter(isNew);
+    const oldPosts = group.filter((p) => !isNew(p));
+    const highDiscount = oldPosts.filter((p) => discountPct(p) >= 0.25);
+    const regular = oldPosts.filter((p) => discountPct(p) < 0.25);
+    const byCategory = {};
+    for (const p of shuffleArr(regular, rand)) {
+      const cat = p.category || "other";
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(p);
+    }
+    const catQueues = Object.values(byCategory);
+    const catPicks = [];
+    while (catQueues.some((q) => q.length > 0)) {
+      for (const q of catQueues) {
+        if (q.length) catPicks.push(q.shift());
+      }
+    }
+    const n = group.length;
+    const wantNew = Math.round(n * 0.4);
+    const wantCat = Math.round(n * 0.3);
+    const seen = /* @__PURE__ */ new Set();
+    const pick = (arr, max) => {
+      const out = [];
+      for (const p of arr) {
+        if (out.length >= max) break;
+        if (!seen.has(p.id)) {
+          seen.add(p.id);
+          out.push(p);
+        }
+      }
+      return out;
+    };
+    const newSlice = pick(shuffleArr(newPosts, rand), wantNew);
+    const catSlice = pick(
+      [...shuffleArr(highDiscount, rand), ...catPicks],
+      wantCat
+    );
+    const randSlice = pick(
+      shuffleArr([...newPosts, ...highDiscount, ...regular], rand),
+      n
+    );
+    const qN = [...newSlice];
+    const qC = [...catSlice];
+    const qR = [...randSlice];
+    const merged = [];
+    while (qN.length || qC.length || qR.length) {
+      if (qN.length) merged.push(qN.shift());
+      if (qC.length) merged.push(qC.shift());
+      if (qR.length) merged.push(qR.shift());
+      if (qR.length) merged.push(qR.shift());
+    }
+    const dedupSeen = /* @__PURE__ */ new Set();
+    result.push(
+      ...merged.filter((p) => {
+        if (dedupSeen.has(p.id)) return false;
+        dedupSeen.add(p.id);
+        return true;
+      })
+    );
+  }
+  return result;
+}
 async function registerRoutes(app) {
   const router = express.Router();
   router.use(cors());
@@ -881,19 +976,24 @@ async function registerRoutes(app) {
         storesById[s.id] = s;
       }
       const filtered = q ? posts.filter((p) => (p.title || "").toLowerCase().includes(q)) : posts;
-      filtered.sort((a, b) => {
-        const pa = getPlanRankForPost(a, storesById);
-        const pb = getPlanRankForPost(b, storesById);
-        if (pb !== pa) return pb - pa;
-        const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return bd - ad;
-      });
+      let ordered;
+      if (q) {
+        ordered = [...filtered].sort((a, b) => {
+          const pa = getPlanRankForPost(a, storesById);
+          const pb = getPlanRankForPost(b, storesById);
+          if (pb !== pa) return pb - pa;
+          const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bd - ad;
+        });
+      } else {
+        ordered = buildDiscoveryFeed(filtered, storesById);
+      }
       const page = Math.max(1, parseInt(req.query.page) || 1);
       const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 40));
-      const total = filtered.length;
+      const total = ordered.length;
       const totalPages = Math.ceil(total / limit);
-      const paginated = filtered.slice((page - 1) * limit, page * limit);
+      const paginated = ordered.slice((page - 1) * limit, page * limit);
       const mapped = await Promise.all(paginated.map((p) => mapPostToFrontend(p, req)));
       res.json({ posts: mapped, total, page, totalPages });
     } catch (err) {

@@ -202,6 +202,147 @@ function getPlanRankForPost(
   return 1; // basic eða ekkert skilgreint
 }
 
+// ─── Discovery feed helpers ───────────────────────────────────────────────────
+
+/** Fast, seedable pseudo-random number generator (mulberry32). */
+function seededRandom(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s += 0x6d2b79f5;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
+    return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
+  };
+}
+
+/** Fisher-Yates shuffle using the supplied rand function. */
+function shuffleArr<T>(arr: T[], rand: () => number): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Builds a discovery feed ordered by:
+ *  1. Plan tier (premium > pro > basic) — paid visibility is preserved.
+ *  2. Within each tier: 40 % new offers, 30 % category-diverse, 30 % random.
+ *
+ * Seed rotates every 30 minutes so pagination is consistent within a session
+ * but the order feels fresh on each new visit.
+ */
+function buildDiscoveryFeed(
+  posts: any[],
+  storesById: Record<string, any>,
+): any[] {
+  const seed = Math.floor(Date.now() / (1000 * 60 * 30));
+  const rand = seededRandom(seed);
+
+  const now = Date.now();
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+  // ── 1. Split by plan tier ────────────────────────────────────────────────
+  const tiers: Record<number, any[]> = { 3: [], 2: [], 1: [] };
+  for (const p of posts) {
+    const r = getPlanRankForPost(p, storesById);
+    tiers[r].push(p);
+  }
+
+  const result: any[] = [];
+
+  for (const rank of [3, 2, 1]) {
+    const group = tiers[rank];
+    if (!group.length) continue;
+
+    // ── 2. Classify posts within the tier ──────────────────────────────────
+    const isNew = (p: any) =>
+      p.createdAt && now - new Date(p.createdAt).getTime() < WEEK_MS;
+
+    const discountPct = (p: any) =>
+      typeof p.priceOriginal === "number" &&
+      typeof p.priceSale === "number" &&
+      p.priceOriginal > 0
+        ? (p.priceOriginal - p.priceSale) / p.priceOriginal
+        : 0;
+
+    const newPosts = group.filter(isNew);
+    const oldPosts = group.filter((p) => !isNew(p));
+    const highDiscount = oldPosts.filter((p) => discountPct(p) >= 0.25);
+    const regular = oldPosts.filter((p) => discountPct(p) < 0.25);
+
+    // ── 3. Category-diverse picks (round-robin across categories) ──────────
+    const byCategory: Record<string, any[]> = {};
+    for (const p of shuffleArr(regular, rand)) {
+      const cat = (p.category as string) || "other";
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(p);
+    }
+    const catQueues = Object.values(byCategory);
+    const catPicks: any[] = [];
+    while (catQueues.some((q) => q.length > 0)) {
+      for (const q of catQueues) {
+        if (q.length) catPicks.push(q.shift()!);
+      }
+    }
+
+    // ── 4. Slot counts ────────────────────────────────────────────────────
+    const n = group.length;
+    const wantNew = Math.round(n * 0.4);
+    const wantCat = Math.round(n * 0.3);
+
+    const seen = new Set<string>();
+    const pick = (arr: any[], max: number): any[] => {
+      const out: any[] = [];
+      for (const p of arr) {
+        if (out.length >= max) break;
+        if (!seen.has(p.id)) {
+          seen.add(p.id);
+          out.push(p);
+        }
+      }
+      return out;
+    };
+
+    const newSlice = pick(shuffleArr(newPosts, rand), wantNew);
+    const catSlice = pick(
+      [...shuffleArr(highDiscount, rand), ...catPicks],
+      wantCat,
+    );
+    // "Random" fills whatever slots remain
+    const randSlice = pick(
+      shuffleArr([...newPosts, ...highDiscount, ...regular], rand),
+      n,
+    );
+
+    // ── 5. Interleave: new / category / random in 4-item stride ───────────
+    //    Pattern per stride: [new, cat, rand, rand] → slight random weight
+    const qN = [...newSlice];
+    const qC = [...catSlice];
+    const qR = [...randSlice];
+    const merged: any[] = [];
+    while (qN.length || qC.length || qR.length) {
+      if (qN.length) merged.push(qN.shift()!);
+      if (qC.length) merged.push(qC.shift()!);
+      if (qR.length) merged.push(qR.shift()!);
+      if (qR.length) merged.push(qR.shift()!);
+    }
+
+    // ── 6. Final dedup safety pass ────────────────────────────────────────
+    const dedupSeen = new Set<string>();
+    result.push(
+      ...merged.filter((p) => {
+        if (dedupSeen.has(p.id)) return false;
+        dedupSeen.add(p.id);
+        return true;
+      }),
+    );
+  }
+
+  return result;
+}
+
 // ------------------------- ROUTES START -------------------------
 
 export async function registerRoutes(app: Express): Promise<void> {
@@ -860,23 +1001,28 @@ export async function registerRoutes(app: Express): Promise<void> {
         ? posts.filter((p: any) => (p.title || "").toLowerCase().includes(q))
         : posts;
 
-      filtered.sort((a: any, b: any) => {
-        const pa = getPlanRankForPost(a, storesById);
-        const pb = getPlanRankForPost(b, storesById);
-
-        if (pb !== pa) return pb - pa;
-
-        const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-
-        return bd - ad;
-      });
+      // Search results stay chronological; the main feed uses discovery ordering.
+      let ordered: any[];
+      if (q) {
+        // Search: sort by plan rank then newest first (intent-driven)
+        ordered = [...filtered].sort((a: any, b: any) => {
+          const pa = getPlanRankForPost(a, storesById);
+          const pb = getPlanRankForPost(b, storesById);
+          if (pb !== pa) return pb - pa;
+          const ad = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bd = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bd - ad;
+        });
+      } else {
+        // Discovery feed: 40% new, 30% category-diverse, 30% random (per plan tier)
+        ordered = buildDiscoveryFeed(filtered, storesById);
+      }
 
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const limit = Math.max(1, Math.min(100, parseInt(req.query.limit as string) || 40));
-      const total = filtered.length;
+      const total = ordered.length;
       const totalPages = Math.ceil(total / limit);
-      const paginated = filtered.slice((page - 1) * limit, page * limit);
+      const paginated = ordered.slice((page - 1) * limit, page * limit);
 
       const mapped = await Promise.all(paginated.map((p: any) => mapPostToFrontend(p, req)));
       res.json({ posts: mapped, total, page, totalPages });

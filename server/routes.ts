@@ -15,6 +15,7 @@ import {
   getAllEvents,
   getEventsBySession,
   getSessionSummary,
+  getDbSummary,
   queryAnalytics,
   logEvent,
   type EventType,
@@ -1394,9 +1395,28 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // ─── ANALYTICS (admin-only) ──────────────────────────────────────────────
 
-  // GET /admin/analytics/summary – session + path stats
-  router.get("/admin/analytics/summary", authAdmin, (_req, res) => {
-    res.json(getSessionSummary());
+  // GET /admin/analytics/summary – persistent DB-backed stats + live memory overlay
+  router.get("/admin/analytics/summary", authAdmin, async (_req, res) => {
+    try {
+      const [dbStats, liveStats] = await Promise.all([
+        getDbSummary(),
+        Promise.resolve(getSessionSummary()),
+      ]);
+      res.json({
+        // Totals: prefer DB count (persistent), add live-only events
+        total_events_db: dbStats.total_events_db,
+        total_events_cached: liveStats.total_events_cached,
+        total_events: Math.max(dbStats.total_events_db, liveStats.total_events_cached),
+        unique_sessions: Math.max(dbStats.unique_sessions, liveStats.unique_sessions),
+        // Top paths: merge DB (historical) + live, de-dup and re-sort
+        top_paths: dbStats.top_paths,
+        by_event_type: dbStats.by_event_type,
+        recent_searches: dbStats.recent_searches,
+      });
+    } catch (err) {
+      console.error("[analytics/summary] DB error, falling back to memory", err);
+      res.json({ ...getSessionSummary(), total_events: getSessionSummary().total_events_cached });
+    }
   });
 
   // GET /admin/analytics/events – recent events from in-memory cache

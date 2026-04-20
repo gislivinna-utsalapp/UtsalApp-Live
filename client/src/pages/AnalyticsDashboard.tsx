@@ -21,9 +21,13 @@ import { Button } from "@/components/ui/button";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Summary = {
+  total_events: number;
+  total_events_db: number;
   total_events_cached: number;
   unique_sessions: number;
   top_paths: { path: string; count: number }[];
+  by_event_type: { event_type: string; count: number }[];
+  recent_searches: { q: string; count: number }[];
 };
 
 type Event = {
@@ -284,13 +288,13 @@ export default function AnalyticsDashboard() {
               icon={Users}
               label="Einstakar lotur"
               value={summary?.unique_sessions ?? 0}
-              sub="síðan server byrjaði"
+              sub="allt frá upphafi"
             />
             <StatCard
               icon={Eye}
-              label="Atburðir í minni"
-              value={summary?.total_events_cached ?? 0}
-              sub="síðustu 1.000"
+              label="Atburðir (heildarfjöldi)"
+              value={summary?.total_events ?? summary?.total_events_cached ?? 0}
+              sub="í gagnagrunni"
             />
             <StatCard
               icon={TrendingUp}
@@ -328,28 +332,77 @@ export default function AnalyticsDashboard() {
 
         {/* ── OVERVIEW TAB ─────────────────────────────────────────────── */}
         {tab === "overview" && (
-          <Card className="p-4 space-y-3">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-primary" />
-              Vinsælustu slóðirnar
-            </h2>
-            {summaryLoading ? (
-              <div className="space-y-2">
-                {[...Array(6)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-5 rounded bg-muted animate-pulse"
-                  />
-                ))}
-              </div>
-            ) : summary?.top_paths.length ? (
-              <TopPathsTable paths={summary.top_paths} />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Engin gögn enn.
-              </p>
-            )}
-          </Card>
+          <div className="space-y-3">
+            <Card className="p-4 space-y-3">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <BarChart2 className="w-4 h-4 text-primary" />
+                Vinsælustu slóðirnar
+              </h2>
+              {summaryLoading ? (
+                <div className="space-y-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-5 rounded bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : summary?.top_paths.length ? (
+                <TopPathsTable paths={summary.top_paths} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Engin gögn enn.</p>
+              )}
+            </Card>
+
+            {/* Event type breakdown */}
+            {summary?.by_event_type?.length ? (
+              <Card className="p-4 space-y-2">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <MousePointerClick className="w-4 h-4 text-primary" />
+                  Atburðir eftir tegund
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {summary.by_event_type.map((et) => (
+                    <div
+                      key={et.event_type}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${eventTypeBadgeClass(et.event_type)}`}
+                    >
+                      {eventTypeLabel(et.event_type)}
+                      <span className="font-bold">{et.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ) : null}
+
+            {/* Recent search terms */}
+            {summary?.recent_searches?.length ? (
+              <Card className="p-4 space-y-2">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Search className="w-4 h-4 text-primary" />
+                  Vinsælustu leitarorðin
+                </h2>
+                <div className="space-y-1.5">
+                  {summary.recent_searches.map((s) => {
+                    const max = summary.recent_searches[0]?.count ?? 1;
+                    return (
+                      <div key={s.q} className="flex items-center gap-2">
+                        <span className="text-xs truncate w-40 flex-shrink-0 font-medium">
+                          "{s.q}"
+                        </span>
+                        <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${(s.count / max) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs font-semibold w-6 text-right flex-shrink-0">
+                          {s.count}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            ) : null}
+          </div>
         )}
 
         {/* ── EVENTS TAB ───────────────────────────────────────────────── */}

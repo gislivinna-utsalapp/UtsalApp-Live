@@ -242,7 +242,7 @@ export function getEventsBySession(sessionId: string): InteractionEvent[] {
   return cache.filter((e) => e.session_id === sessionId);
 }
 
-/** Session summary built from the in-memory cache. */
+/** Session summary built from the in-memory cache (fast, used for live count). */
 export function getSessionSummary() {
   const bySession: Record<string, number> = {};
   for (const e of cache) {
@@ -259,6 +259,64 @@ export function getSessionSummary() {
     total_events_cached: cache.length,
     unique_sessions: Object.keys(bySession).length,
     top_paths,
+  };
+}
+
+/**
+ * DB-backed summary — persistent across server restarts.
+ * Combines live in-memory stats with DB aggregates.
+ */
+export async function getDbSummary(): Promise<{
+  total_events_db: number;
+  unique_sessions: number;
+  top_paths: { path: string; count: number }[];
+  by_event_type: { event_type: string; count: number }[];
+  recent_searches: { q: string; count: number }[];
+}> {
+  const [totalRes, sessionsRes, pathsRes, typesRes, searchesRes] =
+    await Promise.all([
+      pool.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM interactions"),
+      pool.query<{ count: string }>(
+        "SELECT COUNT(DISTINCT session_id)::text AS count FROM interactions",
+      ),
+      pool.query<{ path: string; count: string }>(
+        `SELECT path, COUNT(*)::text AS count
+           FROM interactions
+          GROUP BY path
+          ORDER BY count DESC
+          LIMIT 20`,
+      ),
+      pool.query<{ event_type: string; count: string }>(
+        `SELECT event_type, COUNT(*)::text AS count
+           FROM interactions
+          GROUP BY event_type
+          ORDER BY count DESC`,
+      ),
+      pool.query<{ q: string; count: string }>(
+        `SELECT meta->>'q' AS q, COUNT(*)::text AS count
+           FROM interactions
+          WHERE event_type = 'search' AND meta->>'q' IS NOT NULL
+          GROUP BY meta->>'q'
+          ORDER BY count DESC
+          LIMIT 20`,
+      ),
+    ]);
+
+  return {
+    total_events_db: parseInt(totalRes.rows[0]?.count ?? "0"),
+    unique_sessions: parseInt(sessionsRes.rows[0]?.count ?? "0"),
+    top_paths: pathsRes.rows.map((r) => ({
+      path: r.path,
+      count: parseInt(r.count),
+    })),
+    by_event_type: typesRes.rows.map((r) => ({
+      event_type: r.event_type,
+      count: parseInt(r.count),
+    })),
+    recent_searches: searchesRes.rows.map((r) => ({
+      q: r.q,
+      count: parseInt(r.count),
+    })),
   };
 }
 

@@ -385,6 +385,51 @@ function getSessionSummary() {
     top_paths
   };
 }
+async function getDbSummary() {
+  const [totalRes, sessionsRes, pathsRes, typesRes, searchesRes] = await Promise.all([
+    pool.query("SELECT COUNT(*)::text AS count FROM interactions"),
+    pool.query(
+      "SELECT COUNT(DISTINCT session_id)::text AS count FROM interactions"
+    ),
+    pool.query(
+      `SELECT path, COUNT(*)::text AS count
+           FROM interactions
+          GROUP BY path
+          ORDER BY count DESC
+          LIMIT 20`
+    ),
+    pool.query(
+      `SELECT event_type, COUNT(*)::text AS count
+           FROM interactions
+          GROUP BY event_type
+          ORDER BY count DESC`
+    ),
+    pool.query(
+      `SELECT meta->>'q' AS q, COUNT(*)::text AS count
+           FROM interactions
+          WHERE event_type = 'search' AND meta->>'q' IS NOT NULL
+          GROUP BY meta->>'q'
+          ORDER BY count DESC
+          LIMIT 20`
+    )
+  ]);
+  return {
+    total_events_db: parseInt(totalRes.rows[0]?.count ?? "0"),
+    unique_sessions: parseInt(sessionsRes.rows[0]?.count ?? "0"),
+    top_paths: pathsRes.rows.map((r) => ({
+      path: r.path,
+      count: parseInt(r.count)
+    })),
+    by_event_type: typesRes.rows.map((r) => ({
+      event_type: r.event_type,
+      count: parseInt(r.count)
+    })),
+    recent_searches: searchesRes.rows.map((r) => ({
+      q: r.q,
+      count: parseInt(r.count)
+    }))
+  };
+}
 async function queryAnalytics(opts) {
   const conditions = [];
   const values = [];
@@ -1921,8 +1966,27 @@ async function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  router.get("/admin/analytics/summary", authAdmin, (_req, res) => {
-    res.json(getSessionSummary());
+  router.get("/admin/analytics/summary", authAdmin, async (_req, res) => {
+    try {
+      const [dbStats, liveStats] = await Promise.all([
+        getDbSummary(),
+        Promise.resolve(getSessionSummary())
+      ]);
+      res.json({
+        // Totals: prefer DB count (persistent), add live-only events
+        total_events_db: dbStats.total_events_db,
+        total_events_cached: liveStats.total_events_cached,
+        total_events: Math.max(dbStats.total_events_db, liveStats.total_events_cached),
+        unique_sessions: Math.max(dbStats.unique_sessions, liveStats.unique_sessions),
+        // Top paths: merge DB (historical) + live, de-dup and re-sort
+        top_paths: dbStats.top_paths,
+        by_event_type: dbStats.by_event_type,
+        recent_searches: dbStats.recent_searches
+      });
+    } catch (err) {
+      console.error("[analytics/summary] DB error, falling back to memory", err);
+      res.json({ ...getSessionSummary(), total_events: getSessionSummary().total_events_cached });
+    }
   });
   router.get("/admin/analytics/events", authAdmin, (req, res) => {
     const limit = Math.min(500, parseInt(req.query.limit) || 100);

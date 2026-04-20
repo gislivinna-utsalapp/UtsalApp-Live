@@ -361,7 +361,10 @@ function logEvent(req, eventType, target, meta) {
   });
 }
 function getAllEvents(limit = 100) {
-  return cache.slice(-limit).reverse();
+  return cache.slice(-limit).reverse().map((e, i) => ({
+    ...e,
+    id: e.id ?? `mem-${Date.now()}-${i}`
+  }));
 }
 function getEventsBySession(sessionId) {
   return cache.filter((e) => e.session_id === sessionId);

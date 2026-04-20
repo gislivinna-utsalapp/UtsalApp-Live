@@ -229,7 +229,10 @@ export function logEvent(
 
 /** Latest N events from the in-memory cache (fast). */
 export function getAllEvents(limit = 100): InteractionEvent[] {
-  return cache.slice(-limit).reverse();
+  return cache.slice(-limit).reverse().map((e, i) => ({
+    ...e,
+    id: e.id ?? `mem-${Date.now()}-${i}`,
+  }));
 }
 
 /** All cached events for a specific session. */

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -27,7 +27,7 @@ type Summary = {
 };
 
 type Event = {
-  id: number;
+  id: string | number;
   session_id: string;
   event_type: string;
   path: string;
@@ -156,29 +156,24 @@ export default function AnalyticsDashboard() {
   const {
     data: events = [],
     isLoading: eventsLoading,
+    isError: eventsError,
     refetch: refetchEvents,
   } = useQuery<Event[]>({
     queryKey: ["analytics-events"],
-    enabled: isAdmin && tab === "events",
+    enabled: isAdmin && (tab === "events" || tab === "searches"),
+    refetchInterval: 30_000,
     queryFn: () =>
-      apiFetch<Event[]>("/api/v1/admin/analytics/db?limit=200", {
+      apiFetch<Event[]>("/api/v1/admin/analytics/events?limit=500", {
         headers: authHeader,
       }),
   });
 
-  const {
-    data: searches = [],
-    isLoading: searchesLoading,
-    refetch: refetchSearches,
-  } = useQuery<Event[]>({
-    queryKey: ["analytics-searches"],
-    enabled: isAdmin && tab === "searches",
-    queryFn: () =>
-      apiFetch<Event[]>(
-        "/api/v1/admin/analytics/db?event_type=search&limit=200",
-        { headers: authHeader },
-      ),
-  });
+  const searches = useMemo(
+    () => events.filter((e) => e.event_type === "search"),
+    [events],
+  );
+  const searchesLoading = eventsLoading;
+  const refetchSearches = refetchEvents;
 
   if (loading) {
     return (
@@ -334,6 +329,10 @@ export default function AnalyticsDashboard() {
               [...Array(6)].map((_, i) => (
                 <Card key={i} className="h-14 animate-pulse bg-muted" />
               ))
+            ) : eventsError ? (
+              <Card className="p-6 text-center text-sm text-destructive">
+                Villa við að sækja gögn. Reyndu að uppfæra.
+              </Card>
             ) : events.length === 0 ? (
               <Card className="p-6 text-center text-sm text-muted-foreground">
                 Engir atburðir skráðir enn.
@@ -341,7 +340,7 @@ export default function AnalyticsDashboard() {
             ) : (
               events.map((ev) => (
                 <Card
-                  key={ev.id}
+                  key={String(ev.id)}
                   className="px-3 py-2 flex items-start gap-3"
                   data-testid={`event-row-${ev.id}`}
                 >
@@ -379,6 +378,10 @@ export default function AnalyticsDashboard() {
               [...Array(6)].map((_, i) => (
                 <Card key={i} className="h-14 animate-pulse bg-muted" />
               ))
+            ) : eventsError ? (
+              <Card className="p-6 text-center text-sm text-destructive">
+                Villa við að sækja gögn. Reyndu að uppfæra.
+              </Card>
             ) : searches.length === 0 ? (
               <Card className="p-6 text-center text-sm text-muted-foreground">
                 Engar leitir skráðar enn.
@@ -413,7 +416,7 @@ export default function AnalyticsDashboard() {
 
                 {searches.map((ev) => (
                   <Card
-                    key={ev.id}
+                    key={String(ev.id)}
                     className="px-3 py-2.5 space-y-1"
                     data-testid={`search-row-${ev.id}`}
                   >

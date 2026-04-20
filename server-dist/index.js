@@ -1040,7 +1040,16 @@ async function mapPostToFrontend(p, req) {
   const plan = store?.plan ?? store?.planType ?? "basic";
   const billingStatus = store?.billingStatus ?? (store?.billingActive ? "active" : "trial");
   const allUrls = [];
-  if (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
+  if (Array.isArray(p.images) && p.images.length > 0) {
+    for (const img of p.images) {
+      const u = typeof img === "string" ? img : img?.url;
+      if (u && typeof u === "string" && u.trim()) {
+        const resolved = req ? toAbsoluteImageUrl(u, req) : u;
+        if (resolved) allUrls.push(resolved);
+      }
+    }
+  }
+  if (allUrls.length === 0 && Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
     for (const u of p.imageUrls) {
       if (typeof u === "string" && u.trim()) {
         const resolved = req ? toAbsoluteImageUrl(u, req) : u;
@@ -1059,7 +1068,10 @@ async function mapPostToFrontend(p, req) {
     category: p.category,
     priceOriginal: Number(p.oldPrice ?? p.priceOriginal ?? 0),
     priceSale: Number(p.price ?? p.priceSale ?? 0),
-    images: allUrls.map((url) => ({ url, alt: p.title })),
+    images: allUrls.map((url, i) => ({
+      url,
+      alt: Array.isArray(p.images) && p.images[i]?.alt ? p.images[i].alt : p.title
+    })),
     startsAt: p.startsAt ?? null,
     endsAt: p.endsAt ?? null,
     buyUrl: p.buyUrl ?? null,

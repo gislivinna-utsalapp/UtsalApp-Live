@@ -11,6 +11,10 @@ import {
   Clock,
   ArrowLeft,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Globe,
+  Filter,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
@@ -75,6 +79,24 @@ function eventTypeBadgeClass(t: string) {
   return map[t] ?? "bg-gray-100 text-gray-600";
 }
 
+/** Convert raw API path → human-readable Icelandic label */
+function pathLabel(path: string): string {
+  const clean = path.replace(/^\/api\/v1/, "");
+  if (/^\/posts\/[^/]+$/.test(clean)) return "Opnaði tilboð";
+  if (/^\/posts/.test(clean)) return "Skoðaði tilboðalista";
+  if (/^\/stores\/[^/]+\/posts/.test(clean)) return "Verslunarfærslur";
+  if (/^\/stores\/[^/]+$/.test(clean)) return "Opnaði verslun";
+  if (/^\/stores/.test(clean)) return "Verslunaryfirlit";
+  if (/^\/admin\/posts/.test(clean)) return "Admin: tilboðalistinn";
+  if (/^\/admin\/stores/.test(clean)) return "Admin: verslunarlistinn";
+  if (/^\/admin\/analytics/.test(clean)) return "Admin: greiningar";
+  if (/^\/auth\/login/.test(clean)) return "Innskráning";
+  if (/^\/auth\/register/.test(clean)) return "Nýskráning";
+  if (/analyze-search/.test(path)) return "Leitargreining (NLP)";
+  if (/^\/uploads/.test(path)) return "Myndasækja";
+  return clean || path;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function StatCard({
@@ -135,6 +157,8 @@ export default function AnalyticsDashboard() {
   const { isAdmin, loading } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("overview");
+  const [eventFilter, setEventFilter] = useState<string>("all");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const token =
     typeof window !== "undefined"
@@ -206,6 +230,12 @@ export default function AnalyticsDashboard() {
     () => events.filter((e) => e.event_type === "search"),
     [events],
   );
+
+  const filteredEvents = useMemo(
+    () => eventFilter === "all" ? events : events.filter((e) => e.event_type === eventFilter),
+    [events, eventFilter],
+  );
+
   const searchesLoading = eventsLoading;
   const refetchEvents = () => { refetchDb(); refetchMem(); };
   const refetchSearches = refetchEvents;
@@ -407,49 +437,121 @@ export default function AnalyticsDashboard() {
 
         {/* ── EVENTS TAB ───────────────────────────────────────────────── */}
         {tab === "events" && (
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {/* Filter bar */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Filter className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              {(["all", "page_view", "search", "api_request"] as const).map((f) => {
+                const labels: Record<string, string> = {
+                  all: "Allt",
+                  page_view: "Síðuskoðun",
+                  search: "Leit",
+                  api_request: "API",
+                };
+                const active = eventFilter === f;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setEventFilter(f)}
+                    data-testid={`filter-${f}`}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {labels[f]}
+                    {f === "all" && events.length > 0 && (
+                      <span className="ml-1 opacity-70">{events.length}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             {eventsLoading ? (
-              [...Array(6)].map((_, i) => (
+              [...Array(5)].map((_, i) => (
                 <Card key={i} className="h-14 animate-pulse bg-muted" />
               ))
             ) : eventsError ? (
               <Card className="p-6 text-center text-sm text-destructive">
                 Villa við að sækja gögn. Reyndu að uppfæra.
               </Card>
-            ) : events.length === 0 ? (
+            ) : filteredEvents.length === 0 ? (
               <Card className="p-6 text-center text-sm text-muted-foreground">
-                Engir atburðir skráðir enn.
+                {eventFilter === "all" ? "Engir atburðir skráðir enn." : `Engir „${eventFilter}" atburðir.`}
               </Card>
             ) : (
-              events.map((ev) => (
-                <Card
-                  key={String(ev.id)}
-                  className="px-3 py-2 flex items-start gap-3"
-                  data-testid={`event-row-${ev.id}`}
-                >
-                  <span
-                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5 ${eventTypeBadgeClass(ev.event_type)}`}
+              filteredEvents.map((ev) => {
+                const id = String(ev.id);
+                const isOpen = expandedId === id;
+                const label = pathLabel(ev.path);
+                const query = ev.meta?.q ?? ev.target;
+                return (
+                  <Card
+                    key={id}
+                    data-testid={`event-row-${ev.id}`}
+                    className="overflow-hidden cursor-pointer hover-elevate"
+                    onClick={() => setExpandedId(isOpen ? null : id)}
                   >
-                    {eventTypeLabel(ev.event_type)}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-mono truncate text-foreground">
-                      {ev.path}
-                    </p>
-                    {(ev.meta?.q || ev.target) && (
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        "{ev.meta?.q ?? ev.target}"
-                      </p>
+                    {/* Collapsed row */}
+                    <div className="px-3 py-2.5 flex items-center gap-3">
+                      <span
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${eventTypeBadgeClass(ev.event_type)}`}
+                      >
+                        {eventTypeLabel(ev.event_type)}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{label}</p>
+                        {query && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            Leitarorð: „{query}"
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap hidden sm:block">
+                          {formatTime(ev.timestamp)}
+                        </span>
+                        {isOpen
+                          ? <ChevronUp className="w-3.5 h-3.5 text-muted-foreground" />
+                          : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                        }
+                      </div>
+                    </div>
+
+                    {/* Expanded detail panel */}
+                    {isOpen && (
+                      <div className="border-t bg-muted/40 px-3 py-3 space-y-2 text-xs">
+                        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                          <span className="text-muted-foreground">Tími</span>
+                          <span className="font-mono">{new Date(ev.timestamp).toLocaleString("is-IS")}</span>
+                          <span className="text-muted-foreground">Slóð</span>
+                          <span className="font-mono break-all">{ev.path}</span>
+                          <span className="text-muted-foreground">Aðferð</span>
+                          <span className="font-mono">{ev.method}</span>
+                          <span className="text-muted-foreground">Lota</span>
+                          <span className="font-mono break-all">{ev.session_id}</span>
+                          {ev.target && (
+                            <>
+                              <span className="text-muted-foreground">Markmið</span>
+                              <span className="font-mono break-all">{ev.target}</span>
+                            </>
+                          )}
+                          {ev.meta && Object.keys(ev.meta).length > 0 && (
+                            <>
+                              <span className="text-muted-foreground">Meta</span>
+                              <span className="font-mono break-all">
+                                {JSON.stringify(ev.meta)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     )}
-                    <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
-                      {ev.session_id.slice(0, 8)}…
-                    </p>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground flex-shrink-0 whitespace-nowrap">
-                    {formatTime(ev.timestamp)}
-                  </span>
-                </Card>
-              ))
+                  </Card>
+                );
+              })
             )}
           </div>
         )}

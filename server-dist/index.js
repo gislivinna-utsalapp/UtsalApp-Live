@@ -348,6 +348,18 @@ var sessionTracker = (req, res, next) => {
   }
   next();
 };
+function logEvent(req, eventType, target, meta) {
+  const sessionId = req.sessionId ?? readSessionId(req) ?? "unknown";
+  storeEvent({
+    session_id: sessionId,
+    event_type: eventType,
+    target: target ?? null,
+    path: req.path,
+    method: req.method,
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    meta
+  });
+}
 function getAllEvents(limit = 100) {
   return cache.slice(-limit).reverse();
 }
@@ -392,6 +404,496 @@ async function queryAnalytics(opts) {
     [...values, limit]
   );
   return rows;
+}
+
+// server/search-analyzer.ts
+var STOPWORDS = /* @__PURE__ */ new Set([
+  "\xE1",
+  "\xED",
+  "og",
+  "e\xF0a",
+  "vi\xF0",
+  "um",
+  "af",
+  "til",
+  "fr\xE1",
+  "me\xF0",
+  "\xE1n",
+  "sem",
+  "er",
+  "var",
+  "ver\xF0",
+  "ver\xF0ur",
+  "get",
+  "m\xE1",
+  "vera",
+  "eru",
+  "\xFEetta",
+  "\xFEessir",
+  "\xFEessar",
+  "h\xE9r",
+  "\xFEar",
+  "\xFEegar",
+  "hva\xF0",
+  "hvar",
+  "leit",
+  "leita",
+  "finna",
+  "finn",
+  "vil",
+  "vil",
+  "mig",
+  "m\xE9r",
+  "m\xE9r",
+  "bestu",
+  "besta",
+  "besti",
+  "g\xF3\xF0",
+  "gott",
+  "g\xF3\xF0ur",
+  "st\xF3r",
+  "l\xEDtill",
+  "billig",
+  "\xF3d\xFDr",
+  "\xF3d\xFDrt",
+  "\xF3d\xFDrir",
+  "kaupa",
+  "kaup",
+  "versla",
+  "sko\xF0a",
+  "gefa",
+  "f\xE1",
+  "f\xE6r",
+  "f\xE6"
+]);
+var LOCATIONS = {
+  "Reykjav\xEDk": [
+    "reykjav\xEDk",
+    "reykjavik",
+    "rvk",
+    "reykjav\xEDkur",
+    "reykjav\xEDkurborg",
+    "h\xF6fu\xF0borgin",
+    "hofudborginn"
+  ],
+  "K\xF3pavogur": ["k\xF3pavogur", "kopavogur", "k\xF3pavogi", "k\xF3pavogs"],
+  "Hafnarfj\xF6r\xF0ur": [
+    "hafnarfj\xF6r\xF0ur",
+    "hafnarfjordur",
+    "hafnarfir\xF0i",
+    "hafnarfjar\xF0ar"
+  ],
+  "Gar\xF0ab\xE6r": ["gar\xF0ab\xE6r", "gardabaer", "gar\xF0ab\xE6", "gar\xF0ab\xE6jar"],
+  "Mosfellsb\xE6r": [
+    "mosfellsb\xE6r",
+    "mosfellsbaer",
+    "mosfellsb\xE6",
+    "mosfellsb\xE6jar"
+  ],
+  "Seltjarnarnes": ["seltjarnarnes", "seltjarnarnesi", "selnes"],
+  "Akureyri": ["akureyri", "akureyrar", "akureyringar", "akureyrar"],
+  "Selfoss": ["selfoss", "selfossi", "selfoss"],
+  "Akranes": ["akranes", "akranesi", "akranesb\xE6r"],
+  "\xCDsafj\xF6r\xF0ur": ["\xEDsafj\xF6r\xF0ur", "isafjordur", "\xEDsafir\xF0i"],
+  "Egilssta\xF0ir": ["egilssta\xF0ir", "egilssta\xF0a", "egilssta\xF0ir"],
+  "H\xF6fn": ["h\xF6fn", "hofn", "hafnar"],
+  "Vestmannaeyjar": [
+    "vestmannaeyjar",
+    "vestmannaeyjum",
+    "eyjar",
+    "hei\xF0m\xF6rk"
+  ],
+  "Keflav\xEDk": [
+    "keflav\xEDk",
+    "keflavik",
+    "keflav\xEDkur",
+    "keflav\xEDkurflugv\xF6llur",
+    "reykjanesb\xE6r"
+  ],
+  "Grindav\xEDk": ["grindav\xEDk", "grindavik", "grindav\xEDkur"],
+  "Borgarnes": ["borgarnes", "borgarnesi"],
+  "H\xFAsav\xEDk": ["h\xFAsav\xEDk", "husavik", "h\xFAsav\xEDkur"],
+  "Dalv\xEDk": ["dalv\xEDk", "dalvik", "dalv\xEDkur"],
+  "Siglufj\xF6r\xF0ur": ["siglufj\xF6r\xF0ur", "siglufjordur", "siglfir\xF0i"],
+  "\xD3lafsv\xEDk": ["\xF3lafsv\xEDk", "olafsv\xEDk"],
+  "Stykkish\xF3lmur": ["stykkish\xF3lmur", "stykkisholmur"],
+  "Laugardalur": ["laugardalur", "laugardal", "laugardalnum"],
+  "Brei\xF0holt": ["brei\xF0holt", "breidholt", "brei\xF0holti"],
+  "Grafarvogur": ["grafarvogur", "grafarvogi"],
+  "Hl\xED\xF0ar": ["hl\xED\xF0ar", "hl\xED\xF0um"],
+  "Mi\xF0borg": ["mi\xF0borg", "mi\xF0borgin", "midborg", "mi\xF0b\xE6", "mi\xF0b\xE6r"],
+  "\xC1rborg": ["\xE1rborg", "arborg", "selfossi"],
+  "Su\xF0urnes": ["su\xF0urnes", "sudurnes", "su\xF0urnesjum"],
+  "Fjar\xF0abygg\xF0": ["fjar\xF0abygg\xF0", "fjar\xF0abygg\xF0ar"]
+};
+var locationIndex = /* @__PURE__ */ new Map();
+for (const [canonical, forms] of Object.entries(LOCATIONS)) {
+  for (const form of forms) {
+    locationIndex.set(form.toLowerCase(), canonical);
+  }
+}
+var CATEGORY_RULES = [
+  {
+    canonical: "Fatna\xF0ur - Konur",
+    stems: ["kvenna", "kven", "d\xF6mur", "dam", "konur", "konu"],
+    exact: ["dame", "d\xF6mum"]
+  },
+  {
+    canonical: "Fatna\xF0ur - Karlar",
+    stems: ["karla", "herr", "herra", "karl"],
+    exact: ["karlar", "karlmanns"]
+  },
+  {
+    canonical: "Fatna\xF0ur - B\xF6rn",
+    stems: ["barn", "barna", "b\xF6rn", "krakk", "leiksk\xF3l"],
+    exact: ["krakkar", "b\xF6rnin"]
+  },
+  {
+    canonical: "Fatna\xF0ur",
+    stems: [
+      "fatna\xF0u",
+      "fatna\xF0",
+      "f\xF6t",
+      "fata",
+      "sk\xF3r",
+      "sk\xF3a",
+      "sk\xF3",
+      "jakk",
+      "peys",
+      "bux",
+      "kj\xF3l",
+      "bl\xFAs",
+      "shirt",
+      "tr\xF6nn",
+      "stutterm",
+      "\xFAlp",
+      "st\xEDgv\xE9l",
+      "sandal",
+      "hanska"
+    ],
+    exact: ["f\xF6t", "kl\xE6\xF0i", "kl\xE6\xF0na\xF0ur"]
+  },
+  {
+    canonical: "H\xFAsg\xF6gn",
+    stems: [
+      "h\xFAsg\xF6gn",
+      "h\xFAsgagna",
+      "h\xFAsb\xFAn",
+      "s\xF3f",
+      "bor\xF0",
+      "st\xF3l",
+      "r\xFAm",
+      "sk\xE1p",
+      "hillur",
+      "hill",
+      "lamp",
+      "glugga",
+      "gard\xEDn",
+      "teppi",
+      "matsal",
+      "eldh\xFAs",
+      "svefn"
+    ],
+    exact: ["h\xFAsg\xF6gn", "st\xF3lar", "bor\xF0in"]
+  },
+  {
+    canonical: "Raft\xE6ki",
+    stems: [
+      "raft\xE6k",
+      "rafmagna",
+      "rafmagns",
+      "t\xF6lv",
+      "fars\xEDm",
+      "s\xEDm",
+      "spjaldt\xF6lv",
+      "\xFEvottav\xE9l",
+      "upp\xFEvottav\xE9l",
+      "k\xE6l",
+      "ofn",
+      "leikt\xF6lv",
+      "sj\xF3nvarp",
+      "sj\xF3n",
+      "hlj\xF3\xF0",
+      "hlj\xF3\xF0nema",
+      "\xFEurrkara",
+      "\xEDssk\xE1p",
+      "\xEDsbakk",
+      "stereo",
+      "headphone"
+    ],
+    exact: ["tv", "pc", "mac", "ipad", "iphone", "android"]
+  },
+  {
+    canonical: "Matv\xF6rur",
+    stems: [
+      "matv\xF6r",
+      "matarv",
+      "matur",
+      "matar",
+      "drykkj",
+      "drykkur",
+      "kaffi",
+      "te ",
+      "brau\xF0",
+      "mj\xF3lk",
+      "ost",
+      "kj\xF6t",
+      "fisk",
+      "gr\xE6nmet",
+      "\xE1v\xF6xt",
+      "s\xFAkk",
+      "cand\xED",
+      "nammi",
+      "go\xF0",
+      "safi",
+      "v\xEDn",
+      "bj\xF3r",
+      "\xE1feng"
+    ],
+    exact: ["matur", "gr\xE6nmeti", "\xE1vextir", "drykkur"]
+  },
+  {
+    canonical: "Heilsa og \xFAtlit",
+    stems: [
+      "heilsa",
+      "lyfj",
+      "v\xEDtam\xEDn",
+      "f\xE6\xF0ub\xF3t",
+      "skinn",
+      "h\xFA\xF0r",
+      "snyrtiv\xF6r",
+      "snyrti",
+      "parfem",
+      "ilmvatn",
+      "makeupp",
+      "make\xFApp",
+      "h\xE1rs",
+      "h\xE1rgrei\xF0sl",
+      "nagla",
+      "gels",
+      "krem",
+      "l\xEDkamsr\xE6kt",
+      "l\xEDkams"
+    ],
+    exact: ["lyfjar", "serum", "spf"]
+  },
+  {
+    canonical: "\xCD\xFEr\xF3ttav\xF6rur",
+    stems: [
+      "\xED\xFEr\xF3tt",
+      "l\xEDkamsr\xE6kt",
+      "\xFEj\xE1lfun",
+      "r\xE6kt",
+      "hj\xF3l",
+      "sund",
+      "golf",
+      "f\xF3tbol",
+      "k\xF6rfubol",
+      "handbol",
+      "tennis",
+      "badminton",
+      "yoga",
+      "j\xF3ga",
+      "\xFAtivist",
+      "fjallg\xF6ng",
+      "j\xF6kulg",
+      "sk\xED\xF0",
+      "snj\xF3brett",
+      "skri\xF0sk\xF3"
+    ],
+    exact: ["fit", "gym", "sport"]
+  },
+  {
+    canonical: "Leikf\xF6ng & b\xF6rn",
+    stems: [
+      "leikfang",
+      "leikf\xF6n",
+      "leik",
+      "b\xF6rn",
+      "barnav",
+      "krakk",
+      "p\xFAsl",
+      "mynd",
+      "b\xF3k",
+      "kynning",
+      "barnavagn"
+    ],
+    exact: ["lego", "barbie", "gaming"]
+  },
+  {
+    canonical: "B\xEDlar & akstur",
+    stems: [
+      "b\xEDl",
+      "bifr",
+      "bifrei\xF0a",
+      "hj\xF3l",
+      "dekk",
+      "m\xF3torhj\xF3l",
+      "ol\xEDa",
+      "varahlut",
+      "b\xEDlvarahlut"
+    ],
+    exact: ["bmw", "toyota", "ford", "tesla", "jeep", "suv"]
+  },
+  {
+    canonical: "Fermingargjafir",
+    stems: ["ferminar", "ferminga", "ferming", "konfirm"],
+    exact: ["fermingagj\xF6f", "ferming"]
+  },
+  {
+    canonical: "Fermingartilbo\xF0",
+    stems: ["fermingartilbo\xF0", "fermingartilb"]
+  }
+];
+function buildCategoryIndex() {
+  return CATEGORY_RULES.map((r) => ({
+    stems: r.stems,
+    exact: new Set((r.exact ?? []).map((e) => e.toLowerCase())),
+    canonical: r.canonical
+  }));
+}
+var categoryIndex = buildCategoryIndex();
+var DISCOUNT_SIGNALS = /* @__PURE__ */ new Set([
+  "tilbo\xF0",
+  "tilbo\xF0s",
+  "\xFAtsala",
+  "\xFAts\xF6lu",
+  "afsl\xE1ttur",
+  "afsl\xE1tt",
+  "afsl\xE6tti",
+  "afsl",
+  "\xF3d\xFDr",
+  "\xF3d\xFDrt",
+  "\xF3d\xFDrast",
+  "billig",
+  "cheap",
+  "sparna\xF0ur",
+  "spara",
+  "spar",
+  "l\xE6gra",
+  "l\xE6gst",
+  "l\xE6gur",
+  "l\xE6gast",
+  "kr\xF6pp",
+  "hagst\xE6\xF0",
+  "hagst\xE6tt",
+  "ver\xF0l\xE6kkun",
+  "l\xE6gra ver\xF0",
+  "%",
+  "off",
+  "sale"
+]);
+var NEW_SIGNALS = /* @__PURE__ */ new Set([
+  "n\xFDtt",
+  "n\xFDr",
+  "n\xFD",
+  "n\xFDjast",
+  "n\xFDjustu",
+  "n\xFDleg",
+  "n\xFDlega",
+  "n\xFDkomi\xF0",
+  "fresh",
+  "brand",
+  "n\xFDtt"
+]);
+var ACCENT_MAP = {
+  \u00E1: "a",
+  \u00E9: "e",
+  \u00ED: "i",
+  \u00F3: "o",
+  \u00FA: "u",
+  \u00FD: "y",
+  \u00F0: "d",
+  \u00FE: "th",
+  \u00E6: "ae",
+  \u00F6: "o"
+};
+function foldAccents(s) {
+  return s.replace(/[áéíóúýðþæö]/g, (c) => ACCENT_MAP[c] ?? c);
+}
+function normalize(raw) {
+  return raw.toLowerCase().replace(/[.,!?;:"""''()\[\]{}]/g, " ").replace(/\s+/g, " ").trim();
+}
+function tokenize(normalized) {
+  return normalized.split(" ").map((t) => t.trim()).filter((t) => t.length > 1 && !STOPWORDS.has(t));
+}
+function matchLocation(token) {
+  return locationIndex.get(token) ?? locationIndex.get(foldAccents(token)) ?? null;
+}
+function matchCategory(token) {
+  const folded = foldAccents(token);
+  for (const rule of categoryIndex) {
+    if (rule.exact.has(token) || rule.exact.has(folded)) return rule.canonical;
+    for (const stem of rule.stems) {
+      if (token.startsWith(stem) || folded.startsWith(foldAccents(stem))) {
+        return rule.canonical;
+      }
+    }
+  }
+  return null;
+}
+var DISCOUNT_SIGNALS_FOLDED = new Set(
+  [...DISCOUNT_SIGNALS].map(foldAccents)
+);
+var NEW_SIGNALS_FOLDED = new Set([...NEW_SIGNALS].map(foldAccents));
+function isDiscountSignal(token) {
+  return DISCOUNT_SIGNALS.has(token) || DISCOUNT_SIGNALS_FOLDED.has(token) || DISCOUNT_SIGNALS_FOLDED.has(foldAccents(token));
+}
+function isNewSignal(token) {
+  return NEW_SIGNALS.has(token) || NEW_SIGNALS_FOLDED.has(token) || NEW_SIGNALS_FOLDED.has(foldAccents(token));
+}
+function detectIntent(tokens, raw) {
+  const joined = raw.toLowerCase();
+  for (const t of tokens) {
+    if (isDiscountSignal(t)) return "discount";
+    if (isNewSignal(t)) return "new";
+  }
+  if (joined.includes("%") || joined.includes("afsl")) return "discount";
+  return tokens.length <= 1 ? "browse" : "search";
+}
+function computeConfidence(tokens, matchedCount) {
+  if (tokens.length === 0) return 0;
+  const base = matchedCount / tokens.length;
+  return Math.min(1, parseFloat(base.toFixed(2)));
+}
+function analyzeQuery(rawQuery) {
+  const normalized = normalize(rawQuery);
+  const tokens = tokenize(normalized);
+  let category = null;
+  let location = null;
+  let matchedCount = 0;
+  const keywords = [];
+  for (const token of tokens) {
+    const loc = matchLocation(token);
+    if (loc && !location) {
+      location = loc;
+      matchedCount++;
+      continue;
+    }
+    const cat = matchCategory(token);
+    if (cat && !category) {
+      category = cat;
+      matchedCount++;
+      continue;
+    }
+    if (isDiscountSignal(token) || isNewSignal(token)) {
+      matchedCount++;
+      continue;
+    }
+    if (!STOPWORDS.has(token)) {
+      keywords.push(token);
+    }
+  }
+  const intent = detectIntent(tokens, normalized);
+  const confidence = computeConfidence(tokens, matchedCount);
+  return {
+    category,
+    location,
+    intent,
+    keywords,
+    confidence,
+    raw_query: rawQuery.trim()
+  };
 }
 
 // server/routes.ts
@@ -1108,6 +1610,26 @@ async function registerRoutes(app) {
       console.error("store posts error:", err);
       res.status(500).json({ message: "Villa kom upp" });
     }
+  });
+  router.post("/analyze-search", (req, res) => {
+    const raw = req.body?.query;
+    if (typeof raw !== "string" || !raw.trim()) {
+      return res.status(400).json({ message: "Vantar 'query' reit \xED JSON l\xEDkama" });
+    }
+    const result = analyzeQuery(raw);
+    logEvent(req, "search", raw.trim(), {
+      category: result.category,
+      location: result.location,
+      intent: result.intent
+    });
+    return res.json(result);
+  });
+  router.get("/analyze-search", (req, res) => {
+    const raw = req.query.q?.trim();
+    if (!raw) {
+      return res.status(400).json({ message: "Vantar 'q' f\xE6ribreytu \xED sl\xF3\xF0" });
+    }
+    return res.json(analyzeQuery(raw));
   });
   router.get("/posts", async (req, res) => {
     try {

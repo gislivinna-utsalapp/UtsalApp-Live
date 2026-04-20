@@ -16,8 +16,10 @@ import {
   getEventsBySession,
   getSessionSummary,
   queryAnalytics,
+  logEvent,
   type EventType,
 } from "./session-tracker";
+import { analyzeQuery } from "./search-analyzer";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
@@ -987,6 +989,47 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.error("store posts error:", err);
       res.status(500).json({ message: "Villa kom upp" });
     }
+  });
+
+  // ─── SEARCH ANALYZER ─────────────────────────────────────────────────────
+  //
+  // POST /analyze-search
+  // Accepts: { "query": "tilboð á húsgögnum í Reykjavík" }
+  // Returns: { category, location, intent, keywords, confidence, raw_query }
+  //
+  // Designed to be called before or alongside the main search to enrich the
+  // query with structured entities. The result can later feed ML pipelines.
+  //
+  router.post("/analyze-search", (req: Request, res: Response) => {
+    const raw: unknown = req.body?.query;
+    if (typeof raw !== "string" || !raw.trim()) {
+      return res
+        .status(400)
+        .json({ message: "Vantar 'query' reit í JSON líkama" });
+    }
+
+    const result = analyzeQuery(raw);
+
+    // Log as a "search" interaction so analytics captures NLP queries too
+    logEvent(req as any, "search", raw.trim(), {
+      category: result.category,
+      location: result.location,
+      intent: result.intent,
+    });
+
+    return res.json(result);
+  });
+
+  // Also expose as GET for easy browser/Postman testing:
+  // GET /analyze-search?q=tilboð+á+húsgögnum+í+Reykjavík
+  router.get("/analyze-search", (req: Request, res: Response) => {
+    const raw = (req.query.q as string)?.trim();
+    if (!raw) {
+      return res
+        .status(400)
+        .json({ message: "Vantar 'q' færibreytu í slóð" });
+    }
+    return res.json(analyzeQuery(raw));
   });
 
   // ------------------ POSTS: LIST ALL (MEÐ PLAN RÖÐUN) ------------------

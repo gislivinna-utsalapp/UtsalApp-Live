@@ -3,18 +3,50 @@
  *
  * Drop-in Express middleware that:
  *  1. Reads (or creates) a persistent `utsalapp_sid` cookie for every visitor.
- *  2. Logs every request as an interaction event (path, method, timestamp,
- *     session_id, event_type).
- *  3. Exposes helper functions so route handlers can log richer events
- *     (page_view, search, click) without knowing about the store internals.
- *  4. Provides a read-only admin endpoint to inspect the collected data.
+ *  2. Logs every API request as an InteractionEvent.
+ *  3. Writes each event to the PostgreSQL `interactions` table.
+ *  4. Keeps a lightweight in-memory cache (latest 1 000 events) for fast
+ *     admin queries without hitting the DB on every read.
+ *  5. Exposes helper functions so route handlers can log richer events
+ *     (page_view, search, click) without knowing about the storage layer.
  *
- * Storage: in-memory ring-buffer (cap 10 000 events).
- * Swap `interactions` for a database call when you're ready to persist.
+ * Table schema (already created via psql):
+ *
+ *   CREATE TABLE interactions (
+ *     id          BIGSERIAL PRIMARY KEY,
+ *     session_id  TEXT        NOT NULL,
+ *     event_type  TEXT        NOT NULL,
+ *     target      TEXT,
+ *     path        TEXT        NOT NULL,
+ *     method      TEXT        NOT NULL DEFAULT 'GET',
+ *     timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+ *     meta        JSONB
+ *   );
  */
 
 import { randomUUID } from "crypto";
+import { Pool } from "pg";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
+
+// ─── PostgreSQL connection pool ───────────────────────────────────────────────
+
+const pool = new Pool({
+  host: process.env.PGHOST,
+  port: Number(process.env.PGPORT) || 5432,
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE,
+  max: 5,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 3_000,
+  ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
+    ? { rejectUnauthorized: false }
+    : false,
+});
+
+pool.on("error", (err) => {
+  console.error("[session-tracker] pg pool error:", err.message);
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,33 +58,60 @@ export type EventType =
   | "other";
 
 export interface InteractionEvent {
-  id: string;
+  id?: string | number;
   session_id: string;
   event_type: EventType;
+  target?: string | null;
   path: string;
   method: string;
   timestamp: string; // ISO-8601
-  meta?: Record<string, unknown>; // optional payload (search query, post id…)
+  meta?: Record<string, unknown> | null;
 }
 
-// ─── In-memory store (ring-buffer, max MAX_EVENTS entries) ────────────────────
+// ─── In-memory cache (latest MAX_CACHE events for fast admin reads) ────────────
 
-const MAX_EVENTS = 10_000;
-const interactions: InteractionEvent[] = [];
+const MAX_CACHE = 1_000;
+const cache: InteractionEvent[] = [];
 
-function storeEvent(event: InteractionEvent): void {
-  if (interactions.length >= MAX_EVENTS) {
-    interactions.shift(); // drop oldest
+function addToCache(event: InteractionEvent): void {
+  if (cache.length >= MAX_CACHE) cache.shift();
+  cache.push(event);
+}
+
+// ─── Database writer (fire-and-forget, never blocks a request) ────────────────
+
+async function persistEvent(event: InteractionEvent): Promise<void> {
+  try {
+    await pool.query(
+      `INSERT INTO interactions
+         (session_id, event_type, target, path, method, timestamp, meta)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        event.session_id,
+        event.event_type,
+        event.target ?? null,
+        event.path,
+        event.method,
+        event.timestamp,
+        event.meta ? JSON.stringify(event.meta) : null,
+      ],
+    );
+  } catch (err: any) {
+    console.error("[session-tracker] DB write failed:", err.message);
   }
-  interactions.push(event);
+}
+
+/** Store event in both cache and database (async, non-blocking). */
+function storeEvent(event: InteractionEvent): void {
+  addToCache(event);
+  persistEvent(event); // intentionally not awaited
 }
 
 // ─── Cookie helpers ───────────────────────────────────────────────────────────
 
 const COOKIE_NAME = "utsalapp_sid";
-const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365; // 1 year
+const COOKIE_MAX_AGE_MS = 1000 * 60 * 60 * 24 * 365; // 1 year
 
-/** Parse a raw Cookie header string into a key→value map. */
 function parseCookies(header: string | undefined): Record<string, string> {
   if (!header) return {};
   return Object.fromEntries(
@@ -64,24 +123,21 @@ function parseCookies(header: string | undefined): Record<string, string> {
   );
 }
 
-/** Read the session_id from the incoming cookies, or return null. */
 function readSessionId(req: Request): string | null {
-  const cookies = parseCookies(req.headers.cookie);
-  return cookies[COOKIE_NAME] || null;
+  return parseCookies(req.headers.cookie)[COOKIE_NAME] ?? null;
 }
 
-/** Set the session_id cookie on the response. */
 function writeSessionId(res: Response, sessionId: string): void {
   res.cookie(COOKIE_NAME, sessionId, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: COOKIE_MAX_AGE_SECONDS * 1000, // Express uses milliseconds
+    maxAge: COOKIE_MAX_AGE_MS,
     path: "/",
   });
 }
 
-// ─── Classify request paths into event types ──────────────────────────────────
+// ─── Path classifier ──────────────────────────────────────────────────────────
 
 function classifyPath(method: string, path: string): EventType {
   if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path))
@@ -97,29 +153,25 @@ function classifyPath(method: string, path: string): EventType {
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 /**
- * `sessionTracker` — attach this with `app.use(sessionTracker)` **before**
- * your route registrations.
+ * `sessionTracker` — register with `app.use(sessionTracker)` **before**
+ * your route handlers.
  *
- * - Creates a `utsalapp_sid` UUID cookie if the visitor doesn't have one.
- * - Attaches `req.sessionId` so route handlers can read it.
- * - Logs every API request as an InteractionEvent.
+ * - Creates an `utsalapp_sid` UUID cookie for first-time visitors.
+ * - Attaches `req.sessionId` for downstream use.
+ * - Persists every API request to the `interactions` PostgreSQL table.
  */
 export const sessionTracker: RequestHandler = (
   req: Request,
   res: Response,
   next: NextFunction,
 ): void => {
-  // 1. Resolve or create session_id
   let sessionId = readSessionId(req);
   if (!sessionId) {
     sessionId = randomUUID();
     writeSessionId(res, sessionId);
   }
-
-  // Attach to request so downstream handlers can reference it
   (req as any).sessionId = sessionId;
 
-  // 2. Log API requests (skip static assets & health checks)
   const path = req.path;
   const skip =
     path.startsWith("/uploads/") ||
@@ -127,41 +179,45 @@ export const sessionTracker: RequestHandler = (
     !path.startsWith("/api/");
 
   if (!skip) {
+    const meta: Record<string, unknown> | undefined = req.query.q
+      ? { q: req.query.q }
+      : undefined;
+
     storeEvent({
-      id: randomUUID(),
       session_id: sessionId,
       event_type: classifyPath(req.method, path),
       path,
       method: req.method,
       timestamp: new Date().toISOString(),
-      meta: req.query.q ? { q: req.query.q } : undefined,
+      meta,
     });
   }
 
   next();
 };
 
-// ─── Manual event logger (call from route handlers) ──────────────────────────
+// ─── Manual event logger (call from any route handler) ───────────────────────
 
 /**
- * Log a custom interaction from inside a route handler.
+ * Log a richer interaction from inside a route handler.
  *
  * @example
  * router.get("/posts/:id", (req, res) => {
- *   logEvent(req, "page_view", { postId: req.params.id });
- *   …
+ *   logEvent(req, "page_view", `/post/${req.params.id}`, { postId: req.params.id });
  * });
  */
 export function logEvent(
   req: Request,
   eventType: EventType,
+  target?: string,
   meta?: Record<string, unknown>,
 ): void {
-  const sessionId = (req as any).sessionId ?? readSessionId(req) ?? "unknown";
+  const sessionId =
+    (req as any).sessionId ?? readSessionId(req) ?? "unknown";
   storeEvent({
-    id: randomUUID(),
     session_id: sessionId,
     event_type: eventType,
+    target: target ?? null,
     path: req.path,
     method: req.method,
     timestamp: new Date().toISOString(),
@@ -169,35 +225,71 @@ export function logEvent(
   });
 }
 
-// ─── Read-only query helpers ──────────────────────────────────────────────────
+// ─── Query helpers (admin endpoints call these) ───────────────────────────────
 
-export function getAllEvents(): InteractionEvent[] {
-  return [...interactions];
+/** Latest N events from the in-memory cache (fast). */
+export function getAllEvents(limit = 100): InteractionEvent[] {
+  return cache.slice(-limit).reverse();
 }
 
+/** All cached events for a specific session. */
 export function getEventsBySession(sessionId: string): InteractionEvent[] {
-  return interactions.filter((e) => e.session_id === sessionId);
+  return cache.filter((e) => e.session_id === sessionId);
 }
 
+/** Session summary built from the in-memory cache. */
 export function getSessionSummary() {
   const bySession: Record<string, number> = {};
-  for (const e of interactions) {
+  for (const e of cache) {
     bySession[e.session_id] = (bySession[e.session_id] ?? 0) + 1;
   }
+  const counts: Record<string, number> = {};
+  for (const e of cache) counts[e.path] = (counts[e.path] ?? 0) + 1;
+  const top_paths = Object.entries(counts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 20)
+    .map(([path, count]) => ({ path, count }));
+
   return {
-    total_events: interactions.length,
+    total_events_cached: cache.length,
     unique_sessions: Object.keys(bySession).length,
-    top_paths: topPaths(20),
+    top_paths,
   };
 }
 
-function topPaths(n: number) {
-  const counts: Record<string, number> = {};
-  for (const e of interactions) {
-    counts[e.path] = (counts[e.path] ?? 0) + 1;
+/**
+ * Query the DB directly for aggregate stats — used by AI/analytics modules.
+ * Returns data beyond what fits in the in-memory cache.
+ */
+export async function queryAnalytics(opts?: {
+  limit?: number;
+  event_type?: EventType;
+  since?: Date;
+}): Promise<InteractionEvent[]> {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+  let i = 1;
+
+  if (opts?.event_type) {
+    conditions.push(`event_type = $${i++}`);
+    values.push(opts.event_type);
   }
-  return Object.entries(counts)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, n)
-    .map(([path, count]) => ({ path, count }));
+  if (opts?.since) {
+    conditions.push(`timestamp >= $${i++}`);
+    values.push(opts.since.toISOString());
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const limit = opts?.limit ?? 500;
+
+  const { rows } = await pool.query<InteractionEvent>(
+    `SELECT id, session_id, event_type, target, path, method,
+            timestamp, meta
+       FROM interactions
+       ${where}
+       ORDER BY timestamp DESC
+       LIMIT $${i}`,
+    [...values, limit],
+  );
+  return rows;
 }

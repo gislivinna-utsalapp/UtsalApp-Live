@@ -251,16 +251,53 @@ function toAbsoluteImageUrl(relativeUrl, req) {
 
 // server/session-tracker.ts
 import { randomUUID } from "crypto";
-var MAX_EVENTS = 1e4;
-var interactions = [];
-function storeEvent(event) {
-  if (interactions.length >= MAX_EVENTS) {
-    interactions.shift();
+import { Pool } from "pg";
+var pool = new Pool({
+  host: process.env.PGHOST,
+  port: Number(process.env.PGPORT) || 5432,
+  user: process.env.PGUSER,
+  password: process.env.PGPASSWORD,
+  database: process.env.PGDATABASE,
+  max: 5,
+  idleTimeoutMillis: 3e4,
+  connectionTimeoutMillis: 3e3,
+  ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
+});
+pool.on("error", (err) => {
+  console.error("[session-tracker] pg pool error:", err.message);
+});
+var MAX_CACHE = 1e3;
+var cache = [];
+function addToCache(event) {
+  if (cache.length >= MAX_CACHE) cache.shift();
+  cache.push(event);
+}
+async function persistEvent(event) {
+  try {
+    await pool.query(
+      `INSERT INTO interactions
+         (session_id, event_type, target, path, method, timestamp, meta)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        event.session_id,
+        event.event_type,
+        event.target ?? null,
+        event.path,
+        event.method,
+        event.timestamp,
+        event.meta ? JSON.stringify(event.meta) : null
+      ]
+    );
+  } catch (err) {
+    console.error("[session-tracker] DB write failed:", err.message);
   }
-  interactions.push(event);
+}
+function storeEvent(event) {
+  addToCache(event);
+  persistEvent(event);
 }
 var COOKIE_NAME = "utsalapp_sid";
-var COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+var COOKIE_MAX_AGE_MS = 1e3 * 60 * 60 * 24 * 365;
 function parseCookies(header) {
   if (!header) return {};
   return Object.fromEntries(
@@ -268,16 +305,14 @@ function parseCookies(header) {
   );
 }
 function readSessionId(req) {
-  const cookies = parseCookies(req.headers.cookie);
-  return cookies[COOKIE_NAME] || null;
+  return parseCookies(req.headers.cookie)[COOKIE_NAME] ?? null;
 }
 function writeSessionId(res, sessionId) {
   res.cookie(COOKIE_NAME, sessionId, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
-    maxAge: COOKIE_MAX_AGE_SECONDS * 1e3,
-    // Express uses milliseconds
+    maxAge: COOKIE_MAX_AGE_MS,
     path: "/"
   });
 }
@@ -301,41 +336,62 @@ var sessionTracker = (req, res, next) => {
   const path4 = req.path;
   const skip = path4.startsWith("/uploads/") || path4 === "/health" || !path4.startsWith("/api/");
   if (!skip) {
+    const meta = req.query.q ? { q: req.query.q } : void 0;
     storeEvent({
-      id: randomUUID(),
       session_id: sessionId,
       event_type: classifyPath(req.method, path4),
       path: path4,
       method: req.method,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
-      meta: req.query.q ? { q: req.query.q } : void 0
+      meta
     });
   }
   next();
 };
-function getAllEvents() {
-  return [...interactions];
+function getAllEvents(limit = 100) {
+  return cache.slice(-limit).reverse();
 }
 function getEventsBySession(sessionId) {
-  return interactions.filter((e) => e.session_id === sessionId);
+  return cache.filter((e) => e.session_id === sessionId);
 }
 function getSessionSummary() {
   const bySession = {};
-  for (const e of interactions) {
+  for (const e of cache) {
     bySession[e.session_id] = (bySession[e.session_id] ?? 0) + 1;
   }
+  const counts = {};
+  for (const e of cache) counts[e.path] = (counts[e.path] ?? 0) + 1;
+  const top_paths = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 20).map(([path4, count]) => ({ path: path4, count }));
   return {
-    total_events: interactions.length,
+    total_events_cached: cache.length,
     unique_sessions: Object.keys(bySession).length,
-    top_paths: topPaths(20)
+    top_paths
   };
 }
-function topPaths(n) {
-  const counts = {};
-  for (const e of interactions) {
-    counts[e.path] = (counts[e.path] ?? 0) + 1;
+async function queryAnalytics(opts) {
+  const conditions = [];
+  const values = [];
+  let i = 1;
+  if (opts?.event_type) {
+    conditions.push(`event_type = $${i++}`);
+    values.push(opts.event_type);
   }
-  return Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, n).map(([path4, count]) => ({ path: path4, count }));
+  if (opts?.since) {
+    conditions.push(`timestamp >= $${i++}`);
+    values.push(opts.since.toISOString());
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const limit = opts?.limit ?? 500;
+  const { rows } = await pool.query(
+    `SELECT id, session_id, event_type, target, path, method,
+            timestamp, meta
+       FROM interactions
+       ${where}
+       ORDER BY timestamp DESC
+       LIMIT $${i}`,
+    [...values, limit]
+  );
+  return rows;
 }
 
 // server/routes.ts
@@ -1341,9 +1397,8 @@ async function registerRoutes(app) {
     res.json(getSessionSummary());
   });
   router.get("/admin/analytics/events", authAdmin, (req, res) => {
-    const all = getAllEvents();
     const limit = Math.min(500, parseInt(req.query.limit) || 100);
-    res.json(all.slice(-limit).reverse());
+    res.json(getAllEvents(limit));
   });
   router.get(
     "/admin/analytics/session/:id",
@@ -1352,6 +1407,18 @@ async function registerRoutes(app) {
       res.json(getEventsBySession(req.params.id));
     }
   );
+  router.get("/admin/analytics/db", authAdmin, async (req, res) => {
+    try {
+      const limit = Math.min(1e3, parseInt(req.query.limit) || 200);
+      const event_type = req.query.event_type;
+      const since = req.query.since ? new Date(req.query.since) : void 0;
+      const rows = await queryAnalytics({ limit, event_type, since });
+      res.json(rows);
+    } catch (err) {
+      console.error("analytics/db error", err);
+      res.status(500).json({ message: "Villa kom upp vi\xF0 DB fyrirspurn" });
+    }
+  });
   router.post("/promote-admin", async (req, res) => {
     try {
       const { email, secret } = req.body;

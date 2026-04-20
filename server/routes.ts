@@ -15,6 +15,8 @@ import {
   getAllEvents,
   getEventsBySession,
   getSessionSummary,
+  queryAnalytics,
+  type EventType,
 } from "./session-tracker";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
@@ -1353,14 +1355,13 @@ export async function registerRoutes(app: Express): Promise<void> {
     res.json(getSessionSummary());
   });
 
-  // GET /admin/analytics/events – raw event log (last 500)
+  // GET /admin/analytics/events – recent events from in-memory cache
   router.get("/admin/analytics/events", authAdmin, (req, res) => {
-    const all = getAllEvents();
     const limit = Math.min(500, parseInt(req.query.limit as string) || 100);
-    res.json(all.slice(-limit).reverse()); // newest first
+    res.json(getAllEvents(limit));
   });
 
-  // GET /admin/analytics/session/:id – events for one session
+  // GET /admin/analytics/session/:id – events for one session (cache)
   router.get(
     "/admin/analytics/session/:id",
     authAdmin,
@@ -1368,6 +1369,23 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.json(getEventsBySession(req.params.id));
     },
   );
+
+  // GET /admin/analytics/db – database-backed query (full history)
+  // ?limit=200&event_type=search&since=2025-01-01
+  router.get("/admin/analytics/db", authAdmin, async (req, res) => {
+    try {
+      const limit = Math.min(1000, parseInt(req.query.limit as string) || 200);
+      const event_type = req.query.event_type as EventType | undefined;
+      const since = req.query.since
+        ? new Date(req.query.since as string)
+        : undefined;
+      const rows = await queryAnalytics({ limit, event_type, since });
+      res.json(rows);
+    } catch (err) {
+      console.error("analytics/db error", err);
+      res.status(500).json({ message: "Villa kom upp við DB fyrirspurn" });
+    }
+  });
 
   // ------------------ ONE-TIME ADMIN PROMOTION ------------------
   router.post("/promote-admin", async (req: Request, res: Response) => {

@@ -7,6 +7,7 @@ import session from "express-session";
 
 import { registerRoutes } from "./routes";
 import { UPLOAD_DIR } from "./config/uploads";
+import { sessionTracker } from "./session-tracker";
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -44,7 +45,14 @@ function main() {
   );
 
   /**
-   * 2) SERVE UPLOADS (GLOBAL, BEFORE EVERYTHING)
+   * 2) Session tracker — assigns a persistent UUID cookie to every visitor
+   *    and logs API requests into the in-memory interaction store.
+   *    Must be registered before routes so req.sessionId is always available.
+   */
+  app.use(sessionTracker);
+
+  /**
+   * 3) SERVE UPLOADS (GLOBAL, BEFORE EVERYTHING)
    */
   console.log("[uploads] UPLOAD_DIR =", UPLOAD_DIR);
   try {

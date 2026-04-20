@@ -11,6 +11,11 @@ import fs from "fs";
 
 import { storage } from "./storage-db";
 import { UPLOAD_DIR, toAbsoluteImageUrl } from "./config/uploads";
+import {
+  getAllEvents,
+  getEventsBySession,
+  getSessionSummary,
+} from "./session-tracker";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
@@ -1340,6 +1345,29 @@ export async function registerRoutes(app: Express): Promise<void> {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
+
+  // ─── ANALYTICS (admin-only) ──────────────────────────────────────────────
+
+  // GET /admin/analytics/summary – session + path stats
+  router.get("/admin/analytics/summary", authAdmin, (_req, res) => {
+    res.json(getSessionSummary());
+  });
+
+  // GET /admin/analytics/events – raw event log (last 500)
+  router.get("/admin/analytics/events", authAdmin, (req, res) => {
+    const all = getAllEvents();
+    const limit = Math.min(500, parseInt(req.query.limit as string) || 100);
+    res.json(all.slice(-limit).reverse()); // newest first
+  });
+
+  // GET /admin/analytics/session/:id – events for one session
+  router.get(
+    "/admin/analytics/session/:id",
+    authAdmin,
+    (req: Request, res) => {
+      res.json(getEventsBySession(req.params.id));
+    },
+  );
 
   // ------------------ ONE-TIME ADMIN PROMOTION ------------------
   router.post("/promote-admin", async (req: Request, res: Response) => {

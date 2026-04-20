@@ -249,6 +249,95 @@ function toAbsoluteImageUrl(relativeUrl, req) {
   return `${proto}://${host}${relativeUrl.startsWith("/") ? "" : "/"}${relativeUrl}`;
 }
 
+// server/session-tracker.ts
+import { randomUUID } from "crypto";
+var MAX_EVENTS = 1e4;
+var interactions = [];
+function storeEvent(event) {
+  if (interactions.length >= MAX_EVENTS) {
+    interactions.shift();
+  }
+  interactions.push(event);
+}
+var COOKIE_NAME = "utsalapp_sid";
+var COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+function parseCookies(header) {
+  if (!header) return {};
+  return Object.fromEntries(
+    header.split(";").map((pair) => pair.trim().split("=")).filter(([k]) => !!k).map(([k, ...v]) => [k.trim(), v.join("=").trim()])
+  );
+}
+function readSessionId(req) {
+  const cookies = parseCookies(req.headers.cookie);
+  return cookies[COOKIE_NAME] || null;
+}
+function writeSessionId(res, sessionId) {
+  res.cookie(COOKIE_NAME, sessionId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: COOKIE_MAX_AGE_SECONDS * 1e3,
+    // Express uses milliseconds
+    path: "/"
+  });
+}
+function classifyPath(method, path4) {
+  if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path4))
+    return "page_view";
+  if (method === "GET" && /\/posts/.test(path4) && path4.includes("q="))
+    return "search";
+  if (method === "GET" && /\/posts/.test(path4)) return "page_view";
+  if (method === "GET" && /\/stores/.test(path4)) return "page_view";
+  if (/^\/api\//.test(path4)) return "api_request";
+  return "other";
+}
+var sessionTracker = (req, res, next) => {
+  let sessionId = readSessionId(req);
+  if (!sessionId) {
+    sessionId = randomUUID();
+    writeSessionId(res, sessionId);
+  }
+  req.sessionId = sessionId;
+  const path4 = req.path;
+  const skip = path4.startsWith("/uploads/") || path4 === "/health" || !path4.startsWith("/api/");
+  if (!skip) {
+    storeEvent({
+      id: randomUUID(),
+      session_id: sessionId,
+      event_type: classifyPath(req.method, path4),
+      path: path4,
+      method: req.method,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+      meta: req.query.q ? { q: req.query.q } : void 0
+    });
+  }
+  next();
+};
+function getAllEvents() {
+  return [...interactions];
+}
+function getEventsBySession(sessionId) {
+  return interactions.filter((e) => e.session_id === sessionId);
+}
+function getSessionSummary() {
+  const bySession = {};
+  for (const e of interactions) {
+    bySession[e.session_id] = (bySession[e.session_id] ?? 0) + 1;
+  }
+  return {
+    total_events: interactions.length,
+    unique_sessions: Object.keys(bySession).length,
+    top_paths: topPaths(20)
+  };
+}
+function topPaths(n) {
+  const counts = {};
+  for (const e of interactions) {
+    counts[e.path] = (counts[e.path] ?? 0) + 1;
+  }
+  return Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, n).map(([path4, count]) => ({ path: path4, count }));
+}
+
 // server/routes.ts
 var JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 var upload = multer({
@@ -1248,6 +1337,21 @@ async function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
+  router.get("/admin/analytics/summary", authAdmin, (_req, res) => {
+    res.json(getSessionSummary());
+  });
+  router.get("/admin/analytics/events", authAdmin, (req, res) => {
+    const all = getAllEvents();
+    const limit = Math.min(500, parseInt(req.query.limit) || 100);
+    res.json(all.slice(-limit).reverse());
+  });
+  router.get(
+    "/admin/analytics/session/:id",
+    authAdmin,
+    (req, res) => {
+      res.json(getEventsBySession(req.params.id));
+    }
+  );
   router.post("/promote-admin", async (req, res) => {
     try {
       const { email, secret } = req.body;
@@ -1304,6 +1408,7 @@ function main() {
       }
     })
   );
+  app.use(sessionTracker);
   console.log("[uploads] UPLOAD_DIR =", UPLOAD_DIR);
   try {
     if (fs4.existsSync(UPLOAD_DIR)) {

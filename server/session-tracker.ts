@@ -139,13 +139,14 @@ function writeSessionId(res: Response, sessionId: string): void {
 
 // ─── Path classifier ──────────────────────────────────────────────────────────
 
-function classifyPath(method: string, path: string): EventType {
+function classifyPath(method: string, path: string, hasQuery = false): EventType {
   if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path))
     return "page_view";
-  if (method === "GET" && /\/posts/.test(path) && path.includes("q="))
+  if (method === "GET" && /\/posts/.test(path) && hasQuery)
     return "search";
   if (method === "GET" && /\/posts/.test(path)) return "page_view";
   if (method === "GET" && /\/stores/.test(path)) return "page_view";
+  if (/analyze-search/.test(path)) return "search";
   if (/^\/api\//.test(path)) return "api_request";
   return "other";
 }
@@ -179,13 +180,14 @@ export const sessionTracker: RequestHandler = (
     !path.startsWith("/api/");
 
   if (!skip) {
-    const meta: Record<string, unknown> | undefined = req.query.q
-      ? { q: req.query.q }
+    const qParam = req.query.q as string | undefined;
+    const meta: Record<string, unknown> | undefined = qParam
+      ? { q: qParam }
       : undefined;
 
     storeEvent({
       session_id: sessionId,
-      event_type: classifyPath(req.method, path),
+      event_type: classifyPath(req.method, path, !!qParam),
       path,
       method: req.method,
       timestamp: new Date().toISOString(),

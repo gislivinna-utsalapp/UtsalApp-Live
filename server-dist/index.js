@@ -316,13 +316,14 @@ function writeSessionId(res, sessionId) {
     path: "/"
   });
 }
-function classifyPath(method, path4) {
+function classifyPath(method, path4, hasQuery = false) {
   if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path4))
     return "page_view";
-  if (method === "GET" && /\/posts/.test(path4) && path4.includes("q="))
+  if (method === "GET" && /\/posts/.test(path4) && hasQuery)
     return "search";
   if (method === "GET" && /\/posts/.test(path4)) return "page_view";
   if (method === "GET" && /\/stores/.test(path4)) return "page_view";
+  if (/analyze-search/.test(path4)) return "search";
   if (/^\/api\//.test(path4)) return "api_request";
   return "other";
 }
@@ -336,10 +337,11 @@ var sessionTracker = (req, res, next) => {
   const path4 = req.path;
   const skip = path4.startsWith("/uploads/") || path4 === "/health" || !path4.startsWith("/api/");
   if (!skip) {
-    const meta = req.query.q ? { q: req.query.q } : void 0;
+    const qParam = req.query.q;
+    const meta = qParam ? { q: qParam } : void 0;
     storeEvent({
       session_id: sessionId,
-      event_type: classifyPath(req.method, path4),
+      event_type: classifyPath(req.method, path4, !!qParam),
       path: path4,
       method: req.method,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
@@ -1621,6 +1623,7 @@ async function registerRoutes(app) {
     }
     const result = analyzeQuery(raw);
     logEvent(req, "search", raw.trim(), {
+      q: raw.trim(),
       category: result.category,
       location: result.location,
       intent: result.intent

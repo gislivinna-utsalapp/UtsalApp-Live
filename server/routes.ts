@@ -1012,6 +1012,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
     // Log as a "search" interaction so analytics captures NLP queries too
     logEvent(req as any, "search", raw.trim(), {
+      q: raw.trim(),
       category: result.category,
       location: result.location,
       intent: result.intent,

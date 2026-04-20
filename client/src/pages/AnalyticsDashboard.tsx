@@ -30,6 +30,7 @@ type Event = {
   id: string | number;
   session_id: string;
   event_type: string;
+  target?: string | null;
   path: string;
   method: string;
   timestamp: string;
@@ -382,9 +383,9 @@ export default function AnalyticsDashboard() {
                     <p className="text-xs font-mono truncate text-foreground">
                       {ev.path}
                     </p>
-                    {ev.meta?.q && (
+                    {(ev.meta?.q || ev.target) && (
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        "{ev.meta.q}"
+                        "{ev.meta?.q ?? ev.target}"
                       </p>
                     )}
                     <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">
@@ -451,8 +452,8 @@ export default function AnalyticsDashboard() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium truncate">
-                        {ev.meta?.q
-                          ? `"${ev.meta.q}"`
+                        {ev.meta?.q || ev.target
+                          ? `"${ev.meta?.q ?? ev.target}"`
                           : ev.path}
                       </p>
                       <span className="text-[10px] text-muted-foreground whitespace-nowrap flex-shrink-0">

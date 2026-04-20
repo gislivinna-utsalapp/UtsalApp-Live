@@ -153,26 +153,56 @@ export default function AnalyticsDashboard() {
       }),
   });
 
+  // DB-backed query — persistent, full history
   const {
-    data: events = [],
-    isLoading: eventsLoading,
-    isError: eventsError,
-    refetch: refetchEvents,
+    data: dbEvents = [],
+    isLoading: dbLoading,
+    isError: dbError,
+    refetch: refetchDb,
   } = useQuery<Event[]>({
-    queryKey: ["analytics-events"],
-    enabled: isAdmin && (tab === "events" || tab === "searches"),
-    refetchInterval: 30_000,
+    queryKey: ["analytics-db-events"],
+    enabled: isAdmin,
+    refetchInterval: 60_000,
     queryFn: () =>
-      apiFetch<Event[]>("/api/v1/admin/analytics/events?limit=500", {
+      apiFetch<Event[]>("/api/v1/admin/analytics/db?limit=500", {
         headers: authHeader,
       }),
   });
+
+  // In-memory query — catches events from current server session not yet deduped
+  const {
+    data: memEvents = [],
+    isLoading: memLoading,
+    refetch: refetchMem,
+  } = useQuery<Event[]>({
+    queryKey: ["analytics-mem-events"],
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+    queryFn: () =>
+      apiFetch<Event[]>("/api/v1/admin/analytics/events?limit=200", {
+        headers: authHeader,
+      }),
+  });
+
+  // Merge: DB rows are authoritative; prepend any mem-only events (those without
+  // a numeric id are in-memory only and not yet confirmed to be in the DB)
+  const events = useMemo<Event[]>(() => {
+    const dbIds = new Set(dbEvents.map((e) => String(e.id)));
+    const memOnly = memEvents.filter(
+      (e) => String(e.id).startsWith("mem-") || !dbIds.has(String(e.id)),
+    );
+    return [...memOnly, ...dbEvents];
+  }, [dbEvents, memEvents]);
+
+  const eventsLoading = dbLoading && memLoading;
+  const eventsError = dbError;
 
   const searches = useMemo(
     () => events.filter((e) => e.event_type === "search"),
     [events],
   );
   const searchesLoading = eventsLoading;
+  const refetchEvents = () => { refetchDb(); refetchMem(); };
   const refetchSearches = refetchEvents;
 
   if (loading) {
@@ -194,8 +224,7 @@ export default function AnalyticsDashboard() {
 
   const refetchAll = () => {
     refetchSummary();
-    if (tab === "events") refetchEvents();
-    if (tab === "searches") refetchSearches();
+    refetchEvents();
   };
 
   // Derived stats from cached summary

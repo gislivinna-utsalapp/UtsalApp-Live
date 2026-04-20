@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, Store, FileText, LogOut } from "lucide-react";
+import { Trash2, Store, FileText, LogOut, BarChart2 } from "lucide-react";
 
 import { useAuth } from "../lib/auth";
 import { apiFetch } from "@/lib/api";
@@ -158,10 +158,21 @@ export default function AdminPage() {
             Innskráður sem {authUser.user.email}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          <LogOut className="w-3 h-3 mr-1" />
-          Útskrá
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/admin/analytics")}
+            data-testid="button-analytics"
+          >
+            <BarChart2 className="w-3 h-3 mr-1" />
+            Greiningar
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleLogout}>
+            <LogOut className="w-3 h-3 mr-1" />
+            Útskrá
+          </Button>
+        </div>
       </header>
 
       <div className="flex gap-2 flex-wrap">

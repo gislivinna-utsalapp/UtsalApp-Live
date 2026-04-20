@@ -3,6 +3,7 @@ import { Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
 import AdminPage from "@/pages/Admin";
+import AnalyticsDashboard from "@/pages/AnalyticsDashboard";
 
 import Home from "./pages/Home";
 import SearchPage from "./pages/SearchPage";
@@ -72,6 +73,7 @@ export default function App() {
 
           {/* -------- AUTH / APP -------- */}
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/analytics" element={<AnalyticsDashboard />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/create-post" element={<CreatePost />} />
           <Route path="/edit-post/:id" element={<EditPost />} />

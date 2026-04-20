@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart2,
@@ -95,6 +95,97 @@ function pathLabel(path: string): string {
   if (/analyze-search/.test(path)) return "Leitargreining (NLP)";
   if (/^\/uploads/.test(path)) return "Myndasækja";
   return clean || path;
+}
+
+/** Extract entity type + ID from an API path (null if not applicable) */
+function extractEntity(path: string): { type: "post" | "store"; id: string } | null {
+  const clean = path.replace(/^\/api\/v1/, "");
+  const postMatch = clean.match(/^\/posts\/([^/?#]+)$/);
+  if (postMatch) return { type: "post", id: postMatch[1] };
+  const storeMatch = clean.match(/^\/stores\/([^/?#]+)(?:\/posts)?$/);
+  if (storeMatch) return { type: "store", id: storeMatch[1] };
+  return null;
+}
+
+/** Convert API path → frontend URL (null if no direct page) */
+function pathToFrontendUrl(path: string): string | null {
+  const entity = extractEntity(path);
+  if (entity?.type === "post") return `/posts/${entity.id}`;
+  if (entity?.type === "store") return `/stores/${entity.id}`;
+  const clean = path.replace(/^\/api\/v1/, "");
+  if (/^\/admin\/analytics/.test(clean)) return "/admin/analytics";
+  if (/^\/admin/.test(clean)) return "/admin";
+  return null;
+}
+
+/** Small component that fetches + displays entity title when an event row is expanded */
+function EntityInfo({ path }: { path: string }) {
+  const entity = extractEntity(path);
+  const [info, setInfo] = useState<{ title: string; subtitle?: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!entity) return;
+    setLoading(true);
+    const url =
+      entity.type === "post"
+        ? `/api/v1/posts/${entity.id}`
+        : `/api/v1/stores/${entity.id}`;
+    fetch(url)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        if (entity.type === "post") {
+          setInfo({
+            title: data.title ?? "Óþekkt tilboð",
+            subtitle: data.store?.name ?? undefined,
+          });
+        } else {
+          setInfo({ title: data.name ?? "Óþekkt verslun" });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [path]);
+
+  const frontendUrl = pathToFrontendUrl(path);
+
+  if (!entity && !frontendUrl) return null;
+
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-md bg-background border mt-1">
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-0.5">
+          {entity?.type === "post" ? "Tilboð" : entity?.type === "store" ? "Verslun" : "Síða"}
+        </p>
+        {loading ? (
+          <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+        ) : info ? (
+          <>
+            <p className="text-sm font-semibold truncate">{info.title}</p>
+            {info.subtitle && (
+              <p className="text-xs text-muted-foreground">{info.subtitle}</p>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground font-mono truncate">
+            {entity?.id?.slice(0, 16)}…
+          </p>
+        )}
+      </div>
+      {frontendUrl && (
+        <Link to={frontendUrl}>
+          <button
+            className="flex items-center gap-1 text-xs font-medium text-primary border border-primary/30 rounded px-2 py-1 flex-shrink-0 hover:bg-primary/10 transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Globe className="w-3 h-3" />
+            Opna
+          </button>
+        </Link>
+      )}
+    </div>
+  );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -522,30 +613,33 @@ export default function AnalyticsDashboard() {
 
                     {/* Expanded detail panel */}
                     {isOpen && (
-                      <div className="border-t bg-muted/40 px-3 py-3 space-y-2 text-xs">
-                        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                      <div className="border-t bg-muted/40 px-3 py-3 space-y-3 text-xs">
+                        {/* Entity link card — fetches title automatically */}
+                        <EntityInfo path={ev.path} />
+
+                        {/* Search term highlight */}
+                        {(ev.meta?.q || ev.target) && (
+                          <div className="flex items-center gap-2 p-2 rounded-md bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                            <Search className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
+                            <span className="text-purple-800 dark:text-purple-200 font-medium">
+                              Leitarorð: „{ev.meta?.q ?? ev.target}"
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Metadata grid */}
+                        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
                           <span className="text-muted-foreground">Tími</span>
                           <span className="font-mono">{new Date(ev.timestamp).toLocaleString("is-IS")}</span>
-                          <span className="text-muted-foreground">Slóð</span>
-                          <span className="font-mono break-all">{ev.path}</span>
+
                           <span className="text-muted-foreground">Aðferð</span>
                           <span className="font-mono">{ev.method}</span>
+
                           <span className="text-muted-foreground">Lota</span>
-                          <span className="font-mono break-all">{ev.session_id}</span>
-                          {ev.target && (
-                            <>
-                              <span className="text-muted-foreground">Markmið</span>
-                              <span className="font-mono break-all">{ev.target}</span>
-                            </>
-                          )}
-                          {ev.meta && Object.keys(ev.meta).length > 0 && (
-                            <>
-                              <span className="text-muted-foreground">Meta</span>
-                              <span className="font-mono break-all">
-                                {JSON.stringify(ev.meta)}
-                              </span>
-                            </>
-                          )}
+                          <span className="font-mono text-[10px] opacity-70">{ev.session_id.slice(0, 18)}…</span>
+
+                          <span className="text-muted-foreground">Slóð</span>
+                          <span className="font-mono text-[10px] break-all opacity-70">{ev.path}</span>
                         </div>
                       </div>
                     )}

@@ -59,6 +59,15 @@ Mobile-first PWA á íslensku þar sem verslanir birta útsalur og notendur leit
 2. `imageUrls: [string]` — eldra format
 3. `imageUrl: string` — elsta format
 
+## Hönnun (SHEIN-stíll)
+
+- **Litatökkvar**: Primary = svartur (`#0a0a0a`), Accent = appelsínugulur (`#ff4d00`), Bakgrunnur = hvítur
+- **Heimasíða**: Dulfætt 2-dálka möskvagrið (masonry-grid), appelsínugular `-X%` merkingar efst til vinstri á kortum
+- **SalePostCard**: Hreinn kort-stíll, versnafn í litlu letri, titill, appelsínugulur verðsniðningur + yfirstrikað upprunaverð
+- **PostDetail**: Myndir efst, fast "Kaupa tilboð" takki neðst, hjartahnapppur til að vista
+- **BottomNav**: Hvítur bakgrunnur, Lucide táknmyndir, svartur virkur staður, 5 flipar: Heim/Leita/Flokkar/Karfa/Mín
+- **Engar bleikur**: Allar bleiku litir hafa verið fjarlægðar úr öllu UI
+
 ## Keyrsla
 
 Þjónustan þjónar bæði frontend og backend á port 5000 (Vite í þróun, `client/dist/` í framleiðslu). Keyra `npm run build` og endurræsa eftir frontend-breytingar.

@@ -47,8 +47,8 @@ function AnalyticsTracker() {
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-4xl mx-auto px-4 pt-4 pb-24 text-foreground [&_*]:text-foreground">
+    <div className="min-h-screen bg-white text-neutral-900">
+      <div className="max-w-lg mx-auto">
         {/* GA4 SPA tracking */}
         <AnalyticsTracker />
 

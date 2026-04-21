@@ -4,27 +4,121 @@
 
 @layer base {
   :root {
-    /* 🔹 Bakgrunnur = HVÍTT */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 0 0% 8%;
 
-    /* Kort */
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 0 0% 8%;
 
-    /* 🔥 Primary = BLEIKT (í stað appelsínuguls) */
-    --primary: 330 81% 60%;
+    /* Primary = svart (CTA-hnappar) */
+    --primary: 0 0% 10%;
     --primary-foreground: 0 0% 100%;
 
-    /* Borders & muted */
-    --border: 220 13% 91%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 8% 46%;
+    /* Secondary = mjög ljósgrátt */
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 10%;
+
+    /* Muted */
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 46%;
+
+    /* Accent = appelsínugult (verðmerki, afsláttur) */
+    --accent: 22 100% 52%;
+    --accent-foreground: 0 0% 100%;
+
+    /* Destructive */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders */
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 0 0% 10%;
+
+    /* Radius */
+    --radius: 0.375rem;
+
+    /* Sidebar (unchanged) */
+    --sidebar: 0 0% 98%;
+    --sidebar-foreground: 0 0% 8%;
+    --sidebar-primary: 0 0% 10%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 0 0% 92%;
+    --sidebar-ring: 0 0% 10%;
+  }
+
+  .dark {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 96%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 58%;
+    --accent: 22 100% 52%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 80%;
   }
 
   body {
     margin: 0;
     @apply bg-background text-foreground;
   }
+}
 
+/* ── Elevation utilities ── */
+@layer utilities {
+  .hover-elevate {
+    position: relative;
+    isolation: isolate;
+  }
+  .hover-elevate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: transparent;
+    transition: background 150ms ease;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .hover-elevate:hover::before {
+    background: rgba(0,0,0,0.05);
+  }
+  .dark .hover-elevate:hover::before {
+    background: rgba(255,255,255,0.07);
+  }
+
+  .active-elevate-2:active::before {
+    background: rgba(0,0,0,0.10) !important;
+  }
+  .dark .active-elevate-2:active::before {
+    background: rgba(255,255,255,0.12) !important;
+  }
+
+  .no-default-hover-elevate:hover::before { background: transparent !important; }
+  .no-default-active-elevate:active::before { background: transparent !important; }
+
+  .toggle-elevate { position: relative; isolation: isolate; }
+  .toggle-elevate::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: transparent;
+    pointer-events: none;
+    z-index: 1;
+    transition: background 150ms ease;
+  }
+  .toggle-elevate.toggle-elevated::before { background: rgba(0,0,0,0.08); }
+  .dark .toggle-elevate.toggle-elevated::before { background: rgba(255,255,255,0.10); }
 }

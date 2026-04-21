@@ -93,7 +93,7 @@ export default function Login() {
 
           <Button
             type="submit"
-            className="w-full bg-pink-500 hover:bg-pink-600 text-white border-none shadow-none ring-0 focus:ring-0"
+            className="w-full bg-neutral-900 text-white border-none shadow-none ring-0 focus:ring-0"
             disabled={isSubmitting}
           >
             {isSubmitting ? "Skrái inn..." : "Skrá inn"}

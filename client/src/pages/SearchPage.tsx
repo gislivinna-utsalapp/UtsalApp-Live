@@ -1,13 +1,10 @@
 // client/src/pages/SearchPage.tsx
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
-
+import { Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
 import { SalePostCard } from "@/components/SalePostCard";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 
 async function searchPosts(term: string): Promise<SalePostWithDetails[]> {
   const q = term.trim();
@@ -21,11 +18,7 @@ async function searchPosts(term: string): Promise<SalePostWithDetails[]> {
 export default function SearchPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
-  const {
-    data: results = [],
-    isLoading,
-    error,
-  } = useQuery({
+  const { data: results = [], isLoading, error } = useQuery({
     queryKey: ["posts", "search", searchTerm],
     enabled: searchTerm.trim().length > 0,
     queryFn: () => searchPosts(searchTerm),
@@ -34,67 +27,71 @@ export default function SearchPage() {
   const activeTerm = searchTerm.trim();
 
   return (
-    <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
-      <header className="space-y-2">
-        <h1 className="text-lg font-semibold text-white">Leit</h1>
-        <p className="text-xs text-neutral-400">
-          Niðurstöður uppfærast sjálfkrafa þegar þú skrifar.
-        </p>
-
-        <Input
-          type="search"
-          placeholder="Dæmi: kjóll, jakki, sófi…"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="text-sm mt-2 bg-white text-black border border-neutral-300"
-        />
+    <div className="bg-white min-h-screen pb-20">
+      {/* ── Sticky search bar ─────────────────────────────────── */}
+      <header className="sticky top-0 z-30 bg-white border-b border-neutral-100 px-3 py-2.5">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Leita að tilboðum…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            autoFocus
+            className="w-full pl-9 pr-3 py-2 bg-neutral-100 text-sm text-neutral-900 placeholder-neutral-400 rounded-sm outline-none focus:bg-neutral-50 focus:ring-1 focus:ring-neutral-300 transition-colors"
+            data-testid="input-search"
+          />
+        </div>
       </header>
 
-      {/* Stöður: ekkert leitarorð, er að leita, villa, niðurstaða */}
+      {/* ── States ────────────────────────────────────────────── */}
       {activeTerm.length === 0 && (
-        <p className="text-xs text-neutral-400">
-          Byrjaðu að skrifa til að sjá niðurstöður.
-        </p>
+        <div className="px-4 pt-16 text-center">
+          <Search className="w-10 h-10 text-neutral-200 mx-auto mb-3" />
+          <p className="text-sm text-neutral-400">Byrjaðu að skrifa til að leita</p>
+        </div>
       )}
 
       {activeTerm.length > 0 && isLoading && (
-        <p className="text-sm text-neutral-400">Leita að „{activeTerm}“…</p>
-      )}
-
-      {activeTerm.length > 0 && error && !isLoading && (
-        <p className="text-sm text-red-400">Tókst ekki að leita að tilboðum.</p>
-      )}
-
-      {activeTerm.length > 0 && !isLoading && !error && (
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">
-              Niðurstöður fyrir: {activeTerm}
-            </h2>
-            <p className="text-[11px] text-neutral-400">
-              {results.length} niðurstöður
-            </p>
-          </div>
-
-          {results.length === 0 && (
-            <Card className="p-4 bg-white text-black border border-neutral-200 rounded-2xl">
-              <p className="text-xs text-neutral-700">
-                Engin tilboð fundust fyrir „{activeTerm}“.
-              </p>
-            </Card>
-          )}
-
-          {results.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              {results.map((post) => (
-                <Link key={post.id} to={`/post/${post.id}`}>
-                  <SalePostCard post={post} />
-                </Link>
-              ))}
+        <div className="grid grid-cols-2 gap-px bg-neutral-100 p-px mt-px">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white">
+              <div className="w-full bg-neutral-100 animate-pulse" style={{ aspectRatio: "3/4" }} />
+              <div className="p-2 space-y-1">
+                <div className="h-2.5 bg-neutral-100 rounded animate-pulse w-3/4" />
+                <div className="h-2.5 bg-neutral-100 rounded animate-pulse w-1/2" />
+              </div>
             </div>
-          )}
-        </section>
+          ))}
+        </div>
       )}
-    </main>
+
+      {activeTerm.length > 0 && !isLoading && error && (
+        <p className="px-4 pt-8 text-sm text-center text-neutral-500">
+          Villa við leit. Reyndu aftur.
+        </p>
+      )}
+
+      {activeTerm.length > 0 && !isLoading && !error && results.length === 0 && (
+        <div className="px-4 pt-16 text-center">
+          <p className="text-sm text-neutral-500">
+            Engin tilboð fundust fyrir „{activeTerm}"
+          </p>
+        </div>
+      )}
+
+      {results.length > 0 && !isLoading && (
+        <>
+          <div className="px-3 py-2 text-xs text-neutral-400">
+            {results.length} tilboð fundust
+          </div>
+          <div className="grid grid-cols-2 gap-px bg-neutral-100">
+            {results.map((post) => (
+              <SalePostCard key={post.id} post={post} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }

@@ -108,7 +108,7 @@ export default function CategoriesPage() {
   return (
     <main className="max-w-4xl mx-auto px-3 pb-24 pt-4 space-y-4">
       <header>
-        <h1 className="text-lg font-semibold text-white">Flokkar</h1>
+        <h1 className="text-lg font-semibold text-neutral-900">Flokkar</h1>
         <p className="text-xs text-neutral-400">
           Veldu flokk til að sjá útsölutilboð í þeim flokki.
         </p>
@@ -128,7 +128,7 @@ export default function CategoriesPage() {
         <>
           {/* FLOKKADROPDOWN */}
           <section className="space-y-2">
-            <h2 className="text-sm font-semibold text-white">Flokkar</h2>
+            <h2 className="text-sm font-semibold text-neutral-700">Flokkar</h2>
 
             {categories.length === 0 && (
               <p className="text-xs text-neutral-500">
@@ -145,7 +145,7 @@ export default function CategoriesPage() {
                       e.target.value === "" ? null : e.target.value,
                     )
                   }
-                  className="w-full rounded-xl border border-neutral-300 bg-white px-4 py-2 text-sm text-black focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  className="w-full rounded-sm border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-400"
                 >
                   <option value="">Allt</option>
                   {categories.map((cat) => (
@@ -161,7 +161,7 @@ export default function CategoriesPage() {
           {/* TILBOÐ */}
           <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-white">
+              <h2 className="text-sm font-semibold text-neutral-800">
                 {selectedCategory
                   ? `Tilboð í flokki: ${selectedCategory}`
                   : "Öll tilboð"}

@@ -64,10 +64,10 @@ export default function ChoosePlanPage() {
           </p>
         </div>
 
-        <div className="border-2 border-pink-600 rounded-2xl p-6 bg-pink-50 space-y-4">
+        <div className="border-2 border-[#ff4d00] rounded-2xl p-6 bg-orange-50 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h2 className="text-xl font-bold">Ótakmarkaðar auglýsingar</h2>
-            <span className="text-xs bg-pink-600 text-white px-3 py-1 rounded-full font-medium">
+            <span className="text-xs bg-[#ff4d00] text-white px-3 py-1 rounded-full font-medium">
               7 daga frí prufuvika
             </span>
           </div>
@@ -86,7 +86,7 @@ export default function ChoosePlanPage() {
               "Hægt að hætta hvenær sem er",
             ].map((f) => (
               <li key={f} className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-pink-600 flex-shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-[#ff4d00] flex-shrink-0" />
                 {f}
               </li>
             ))}
@@ -98,7 +98,7 @@ export default function ChoosePlanPage() {
         <button
           onClick={handleContinue}
           disabled={loading}
-          className="w-full py-3 rounded-xl bg-pink-600 text-white font-semibold hover:bg-pink-700 disabled:opacity-50 transition-colors"
+          className="w-full py-3 rounded-sm bg-neutral-900 text-white font-semibold disabled:opacity-50"
           data-testid="button-choose-plan-continue"
         >
           {loading ? "Vinn..." : "Hefja 7 daga frí prufuviku"}

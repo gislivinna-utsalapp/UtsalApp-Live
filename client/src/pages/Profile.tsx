@@ -1,5 +1,5 @@
 // client/src/pages/Profile.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -181,6 +181,10 @@ export default function Profile() {
   const [logoUploading, setLogoUploading] = useState(false);
   const [coverUrl, setCoverUrl] = useState<string>("");
   const [coverUploading, setCoverUploading] = useState(false);
+  const [coverPositionY, setCoverPositionY] = useState(50);
+  const [isRepositioning, setIsRepositioning] = useState(false);
+  const [posSaving, setPosSaving] = useState(false);
+  const repoRef = useRef<{ startY: number; startPos: number } | null>(null);
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -274,6 +278,7 @@ export default function Profile() {
       .then((data) => {
         if (data.logoUrl) setLogoUrl(data.logoUrl);
         if (data.coverUrl) setCoverUrl(data.coverUrl);
+        if (typeof data.coverPositionY === "number") setCoverPositionY(data.coverPositionY);
       })
       .catch(() => {});
   }, [store?.id]);
@@ -630,10 +635,45 @@ export default function Profile() {
 
       const data = await res.json();
       setCoverUrl(data.coverUrl || "");
+      setIsRepositioning(true);
     } catch (err) {
       console.error("cover upload error:", err);
     } finally {
       setCoverUploading(false);
+    }
+  }
+
+  function handleRepoPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if (!isRepositioning) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    repoRef.current = { startY: e.clientY, startPos: coverPositionY };
+  }
+
+  function handleRepoPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!repoRef.current) return;
+    const deltaY = e.clientY - repoRef.current.startY;
+    const newPos = Math.min(100, Math.max(0, repoRef.current.startPos - deltaY * 0.5));
+    setCoverPositionY(newPos);
+  }
+
+  function handleRepoPointerUp() {
+    repoRef.current = null;
+  }
+
+  async function handleSaveCoverPosition() {
+    setPosSaving(true);
+    try {
+      const token = localStorage.getItem("utsalapp_token") || localStorage.getItem("token") || "";
+      const res = await fetch(`${API_BASE_URL || ""}/api/v1/stores/me/cover-position`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ positionY: Math.round(coverPositionY) }),
+      });
+      if (res.ok) setIsRepositioning(false);
+    } catch (err) {
+      console.error("save cover position error:", err);
+    } finally {
+      setPosSaving(false);
     }
   }
 
@@ -694,54 +734,107 @@ export default function Profile() {
   return (
     <div className="bg-white min-h-screen pb-24">
 
-      {/* ── Hero (cover image, clickable to upload) ───────────── */}
-      <label className="relative block h-36 bg-neutral-900 cursor-pointer group overflow-hidden" data-testid="label-upload-cover">
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleCoverUpload}
-          disabled={coverUploading}
-          data-testid="input-upload-cover"
-        />
+      {/* ── Hero (cover image) ────────────────────────────────── */}
+      <div
+        className={`relative h-36 bg-neutral-900 overflow-hidden ${isRepositioning ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+        onPointerDown={handleRepoPointerDown}
+        onPointerMove={handleRepoPointerMove}
+        onPointerUp={handleRepoPointerUp}
+        onPointerCancel={handleRepoPointerUp}
+        data-testid="div-hero-cover"
+      >
         {coverUrl ? (
-          <img src={coverUrl} alt="Forsíðumynd" className="absolute inset-0 w-full h-full object-cover" />
+          <img
+            src={coverUrl}
+            alt="Forsíðumynd"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            style={{ objectPosition: `50% ${coverPositionY}%` }}
+            draggable={false}
+          />
         ) : (
           <div className="absolute inset-0 opacity-10"
             style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "12px 12px" }}
           />
         )}
-        {/* Dark wash so buttons stay readable */}
+        {/* Dark wash */}
         <div className="absolute inset-0 bg-black/30" />
-        {/* Always-visible camera badge bottom-left (for mobile tap) */}
-        <div className="absolute bottom-2 left-3">
-          {coverUploading ? (
-            <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md">Hleð upp...</span>
-          ) : (
-            <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md flex items-center gap-1">
-              <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              Breyta forsíðumynd
-            </span>
-          )}
-        </div>
-        {/* Top-right buttons */}
-        <div className="absolute top-3 right-3 flex gap-2" onClick={(e) => e.preventDefault()}>
-          {isAdmin && (
-            <button
-              onClick={() => navigate("/admin")}
-              className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
-            >
-              Admin
-            </button>
-          )}
-          <button
-            onClick={handleLogout}
-            className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
-          >
-            Útskrá
-          </button>
-        </div>
-      </label>
+
+        {isRepositioning ? (
+          /* ── Reposition mode UI ── */
+          <>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-white text-xs bg-black/50 px-3 py-1.5 rounded-md flex items-center gap-1.5 pointer-events-none">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
+                Dragðu mynd upp/niður
+              </span>
+            </div>
+            <div className="absolute bottom-2 right-3 flex gap-2">
+              <button
+                onClick={() => setIsRepositioning(false)}
+                className="text-[11px] bg-white/20 text-white px-2.5 py-1.5 rounded-md"
+              >
+                Hætta við
+              </button>
+              <button
+                onClick={handleSaveCoverPosition}
+                disabled={posSaving}
+                className="text-[11px] bg-[#ff4d00] text-white px-2.5 py-1.5 rounded-md font-medium disabled:opacity-60"
+              >
+                {posSaving ? "Vista..." : "Vista stöðu"}
+              </button>
+            </div>
+          </>
+        ) : (
+          /* ── Normal mode: upload button ── */
+          <>
+            <label className="absolute bottom-2 left-3 cursor-pointer" data-testid="label-upload-cover">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverUpload}
+                disabled={coverUploading}
+                data-testid="input-upload-cover"
+              />
+              {coverUploading ? (
+                <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md">Hleð upp...</span>
+              ) : (
+                <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md flex items-center gap-1">
+                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  Breyta forsíðumynd
+                </span>
+              )}
+            </label>
+            {coverUrl && (
+              <button
+                onClick={() => setIsRepositioning(true)}
+                className="absolute bottom-2 right-3 text-[11px] bg-black/60 text-white px-2.5 py-1 rounded-md flex items-center gap-1"
+                data-testid="button-reposition-cover"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
+                Stilla staðsetningu
+              </button>
+            )}
+            {/* Top-right buttons */}
+            <div className="absolute top-3 right-3 flex gap-2">
+              {isAdmin && (
+                <button
+                  onClick={() => navigate("/admin")}
+                  className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
+                >
+                  Admin
+                </button>
+              )}
+              <button
+                onClick={handleLogout}
+                className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
+              >
+                Útskrá
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ── Logo + name ───────────────────────────────────────── */}
       <div className="px-4 -mt-10 mb-4">

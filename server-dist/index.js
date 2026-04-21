@@ -1522,6 +1522,27 @@ async function registerRoutes(app) {
     }
   );
   router.post(
+    "/stores/me/cover-position",
+    auth("store"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        const positionY = Number(req.body.positionY);
+        if (!Number.isFinite(positionY)) {
+          return res.status(400).json({ message: "\xD3gild sta\xF0setning" });
+        }
+        const clamped = Math.min(100, Math.max(0, positionY));
+        await storage.updateStore(req.user.storeId, { coverPositionY: clamped });
+        return res.json({ coverPositionY: clamped });
+      } catch (err) {
+        console.error("cover-position error:", err);
+        return res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
+  router.post(
     "/stores/me/update-info",
     auth("store"),
     async (req, res) => {
@@ -1615,6 +1636,7 @@ async function registerRoutes(app) {
         website: store.website ?? "",
         logoUrl: store.logoUrl ?? "",
         coverUrl: store.coverUrl ?? "",
+        coverPositionY: store.coverPositionY ?? 50,
         createdAt: store.createdAt ?? null
       });
     } catch (err) {

@@ -811,6 +811,29 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // ------------------ STORES: SAVE COVER POSITION ------------------
+  router.post(
+    "/stores/me/cover-position",
+    auth("store"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        const positionY = Number(req.body.positionY);
+        if (!Number.isFinite(positionY)) {
+          return res.status(400).json({ message: "Ógild staðsetning" });
+        }
+        const clamped = Math.min(100, Math.max(0, positionY));
+        await storage.updateStore(req.user.storeId, { coverPositionY: clamped } as any);
+        return res.json({ coverPositionY: clamped });
+      } catch (err) {
+        console.error("cover-position error:", err);
+        return res.status(500).json({ message: "Villa kom upp" });
+      }
+    },
+  );
+
   // ------------------ STORES: UPDATE PUBLIC INFO ------------------
   router.post(
     "/stores/me/update-info",
@@ -930,6 +953,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         website: (store as any).website ?? "",
         logoUrl: (store as any).logoUrl ?? "",
         coverUrl: (store as any).coverUrl ?? "",
+        coverPositionY: (store as any).coverPositionY ?? 50,
         createdAt: (store as any).createdAt ?? null,
       });
     } catch (err) {

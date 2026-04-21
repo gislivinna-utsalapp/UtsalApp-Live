@@ -13,6 +13,8 @@ type StoreDetail = {
   phone?: string | null;
   website?: string | null;
   logoUrl?: string | null;
+  coverUrl?: string | null;
+  coverPositionY?: number;
   billingStatus?: string;
   plan?: string | null;
   createdAt?: string | null;
@@ -54,6 +56,8 @@ export default function StorePage() {
 
   const posts = Array.isArray(postsRaw) ? postsRaw : [];
   const logoSrc = buildUrl(store?.logoUrl);
+  const coverSrc = buildUrl(store?.coverUrl);
+  const coverPosY = store?.coverPositionY ?? 50;
 
   /* ── Loading skeleton ─────────────────────────────────────── */
   if (storeLoading || postsLoading) {
@@ -103,11 +107,20 @@ export default function StorePage() {
     <div className="bg-white min-h-screen pb-24">
 
       {/* ── Hero banner ────────────────────────────────────────── */}
-      <div className="relative h-36 bg-neutral-900">
-        {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: "repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)", backgroundSize: "12px 12px" }}
-        />
+      <div className="relative h-36 bg-neutral-900 overflow-hidden">
+        {coverSrc ? (
+          <img
+            src={coverSrc}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            style={{ objectPosition: `50% ${coverPosY}%` }}
+          />
+        ) : (
+          <div className="absolute inset-0 opacity-10"
+            style={{ backgroundImage: "repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)", backgroundSize: "12px 12px" }}
+          />
+        )}
+        <div className="absolute inset-0 bg-black/25" />
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}

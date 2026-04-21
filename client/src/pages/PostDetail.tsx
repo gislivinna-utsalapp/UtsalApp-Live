@@ -3,7 +3,7 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, X, Heart, Share2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, Heart, Share2, ShoppingBag } from "lucide-react";
 import type { SalePostWithDetails } from "@shared/schema";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { getTimeRemaining } from "@/lib/utils";
@@ -371,24 +371,26 @@ export default function PostDetail() {
 
       {/* ── Sticky bottom buy bar ──────────────────────────────── */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-100 px-4 py-3 flex gap-2"
+        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-100 px-3 py-3 flex gap-2"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
       >
         <button
           onClick={handleSave}
-          className="flex-shrink-0 w-11 h-11 border border-neutral-200 rounded-sm flex items-center justify-center"
-          data-testid="button-save-bottom"
+          className={`flex-1 h-11 border rounded-sm flex items-center justify-center gap-2 text-sm font-semibold transition-colors
+            ${saved
+              ? "border-[#ff4d00] text-[#ff4d00] bg-orange-50"
+              : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"}`}
+          data-testid="button-add-to-cart"
         >
-          <Heart
-            className={`w-5 h-5 ${saved ? "fill-[#ff4d00] text-[#ff4d00]" : "text-neutral-500"}`}
-          />
+          <ShoppingBag className="w-4 h-4" />
+          {saved ? "Í körfu" : "Setja í körfu"}
         </button>
         <button
           onClick={handleBuy}
           className="flex-1 h-11 bg-neutral-900 text-white text-sm font-semibold rounded-sm flex items-center justify-center tracking-wide hover:bg-neutral-800 active:bg-neutral-700 transition-colors"
           data-testid="button-buy"
         >
-          Kaupa tilboð
+          Skoða tilboð
         </button>
       </div>
 

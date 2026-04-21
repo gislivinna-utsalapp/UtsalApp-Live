@@ -1,21 +1,30 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Search, Grid3x3, ShoppingBag, User } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useCart } from "@/hooks/useCart";
 
-const tabs = [
-  { to: "/", label: "Heim", Icon: Home },
-  { to: "/leit", label: "Leita", Icon: Search },
-  { to: "/flokkar", label: "Flokkar", Icon: Grid3x3 },
-  { to: "/karfa", label: "Karfa", Icon: ShoppingBag, cart: true },
-  { to: "/profile", label: "Mín", Icon: User },
-];
-
 export default function BottomNav() {
   const location = useLocation();
+  const navigate = useNavigate();
   const tab = location.pathname;
-  const { isAdmin, loading } = useAuth();
+  const { authUser, isAdmin, loading } = useAuth();
   const { cartCount } = useCart();
+
+  // Ákvarðar hvert "Mín" flipinn á að fara
+  const minTarget = !loading && authUser
+    ? isAdmin
+      ? "/admin"
+      : "/profile"
+    : "/login";
+
+  const staticTabs = [
+    { to: "/", label: "Heim", Icon: Home },
+    { to: "/leit", label: "Leita", Icon: Search },
+    { to: "/flokkar", label: "Flokkar", Icon: Grid3x3 },
+    { to: "/karfa", label: "Karfa", Icon: ShoppingBag, cart: true },
+  ];
+
+  const isMinActive = tab.startsWith("/profile") || tab.startsWith("/admin") || tab === "/login";
 
   return (
     <nav
@@ -23,7 +32,7 @@ export default function BottomNav() {
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
       <div className="max-w-lg mx-auto flex items-stretch">
-        {tabs.map(({ to, label, Icon, cart }) => {
+        {staticTabs.map(({ to, label, Icon, cart }) => {
           const active = to === "/" ? tab === "/" : tab.startsWith(to);
           return (
             <Link
@@ -57,24 +66,27 @@ export default function BottomNav() {
           );
         })}
 
-        {!loading && isAdmin && (
-          <Link
-            to="/admin"
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
+        {/* Mín / Admin flipi */}
+        <button
+          onClick={() => navigate(minTarget)}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 relative"
+          data-testid="nav-mín"
+        >
+          <User
+            className={`w-5 h-5 ${isMinActive ? "text-neutral-900" : "text-neutral-400"}`}
+            strokeWidth={isMinActive ? 2.5 : 1.5}
+          />
+          <span
+            className={`text-[10px] leading-none ${
+              isMinActive ? "font-semibold text-neutral-900" : "text-neutral-400"
+            }`}
           >
-            <Grid3x3
-              className={`w-5 h-5 ${tab === "/admin" ? "text-neutral-900" : "text-neutral-400"}`}
-              strokeWidth={tab === "/admin" ? 2.5 : 1.5}
-            />
-            <span
-              className={`text-[10px] leading-none ${
-                tab === "/admin" ? "font-semibold text-neutral-900" : "text-neutral-400"
-              }`}
-            >
-              Admin
-            </span>
-          </Link>
-        )}
+            {!loading && isAdmin ? "Admin" : "Mín"}
+          </span>
+          {isMinActive && (
+            <span className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-neutral-900 rounded-b-full" />
+          )}
+        </button>
       </div>
     </nav>
   );

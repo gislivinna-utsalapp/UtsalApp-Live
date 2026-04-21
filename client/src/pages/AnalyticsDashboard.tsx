@@ -162,8 +162,8 @@ function extractEntity(path: string): { type: "post" | "store"; id: string } | n
 /** Convert API path → frontend URL (null if no direct page) */
 function pathToFrontendUrl(path: string): string | null {
   const entity = extractEntity(path);
-  if (entity?.type === "post") return `/posts/${entity.id}`;
-  if (entity?.type === "store") return `/stores/${entity.id}`;
+  if (entity?.type === "post") return `/post/${entity.id}`;
+  if (entity?.type === "store") return `/store/${entity.id}`;
   const clean = path.replace(/^\/api\/v1/, "");
   if (/^\/admin\/analytics/.test(clean)) return "/admin/analytics";
   if (/^\/admin/.test(clean)) return "/admin";
@@ -1591,7 +1591,7 @@ export default function AnalyticsDashboard() {
                   )}
 
                   {/* Link to store page */}
-                  <Link to={`/stores/${selectedStoreId}`}>
+                  <Link to={`/store/${selectedStoreId}`}>
                     <button
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md border text-sm font-medium hover-elevate active-elevate-2"
                       onClick={() => setSelectedStoreId(null)}

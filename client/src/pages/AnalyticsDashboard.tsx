@@ -406,11 +406,14 @@ export default function AnalyticsDashboard() {
   const {
     data: adStats = [],
     isLoading: adStatsLoading,
+    isError: adStatsError,
     refetch: refetchAds,
   } = useQuery<AdStat[]>({
     queryKey: ["analytics-ads"],
     enabled: isAdmin,
     refetchInterval: 60_000,
+    retry: 8,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
       apiFetch<AdStat[]>("/api/v1/admin/analytics/ads", {
         headers: authHeader,
@@ -425,6 +428,8 @@ export default function AnalyticsDashboard() {
     queryKey: ["analytics-summary"],
     enabled: isAdmin,
     refetchInterval: 30_000,
+    retry: 8,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
       apiFetch<Summary>("/api/v1/admin/analytics/summary", {
         headers: authHeader,
@@ -441,6 +446,8 @@ export default function AnalyticsDashboard() {
     queryKey: ["analytics-db-events"],
     enabled: isAdmin,
     refetchInterval: 60_000,
+    retry: 8,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
       apiFetch<Event[]>("/api/v1/admin/analytics/db?limit=500", {
         headers: authHeader,
@@ -456,6 +463,8 @@ export default function AnalyticsDashboard() {
     queryKey: ["analytics-mem-events"],
     enabled: isAdmin,
     refetchInterval: 30_000,
+    retry: 8,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
       apiFetch<Event[]>("/api/v1/admin/analytics/events?limit=200", {
         headers: authHeader,
@@ -753,8 +762,11 @@ export default function AnalyticsDashboard() {
                 <Card key={i} className="h-14 animate-pulse bg-muted" />
               ))
             ) : eventsError ? (
-              <Card className="p-6 text-center text-sm text-destructive">
-                Villa við að sækja gögn. Reyndu að uppfæra.
+              <Card className="p-6 text-center space-y-2">
+                <p className="text-sm text-destructive">Villa við að sækja atburðagögn.</p>
+                <Button size="sm" variant="outline" onClick={() => refetchEvents()}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Reyna aftur
+                </Button>
               </Card>
             ) : filteredEvents.length === 0 ? (
               <Card className="p-6 text-center text-sm text-muted-foreground">
@@ -846,8 +858,11 @@ export default function AnalyticsDashboard() {
                 <Card key={i} className="h-14 animate-pulse bg-muted" />
               ))
             ) : eventsError ? (
-              <Card className="p-6 text-center text-sm text-destructive">
-                Villa við að sækja gögn. Reyndu að uppfæra.
+              <Card className="p-6 text-center space-y-2">
+                <p className="text-sm text-destructive">Villa við að sækja leitargögn.</p>
+                <Button size="sm" variant="outline" onClick={() => refetchSearches()}>
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Reyna aftur
+                </Button>
               </Card>
             ) : searches.length === 0 ? (
               <Card className="p-6 text-center text-sm text-muted-foreground">
@@ -975,6 +990,13 @@ export default function AnalyticsDashboard() {
                   {[...Array(4)].map((_, i) => (
                     <div key={i} className="h-12 rounded bg-muted animate-pulse" />
                   ))}
+                </div>
+              ) : adStatsError ? (
+                <div className="py-4 text-center space-y-2">
+                  <p className="text-sm text-destructive">Villa við að sækja auglýsingagögn.</p>
+                  <Button size="sm" variant="outline" onClick={() => refetchAds()}>
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Reyna aftur
+                  </Button>
                 </div>
               ) : adStats.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">

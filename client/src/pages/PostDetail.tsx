@@ -369,10 +369,10 @@ export default function PostDetail() {
         )}
       </div>
 
-      {/* ── Sticky bottom buy bar ──────────────────────────────── */}
+      {/* ── Sticky bottom buy bar — z-50 sits above BottomNav (z-40) */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-100 px-3 py-3 flex gap-2"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+        className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200 px-3 pt-2 flex gap-2"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
       >
         <button
           onClick={handleSave}

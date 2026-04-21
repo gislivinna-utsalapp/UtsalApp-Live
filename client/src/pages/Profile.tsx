@@ -179,6 +179,8 @@ export default function Profile() {
 
   const [logoUrl, setLogoUrl] = useState<string>("");
   const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUrl, setCoverUrl] = useState<string>("");
+  const [coverUploading, setCoverUploading] = useState(false);
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editPhone, setEditPhone] = useState("");
@@ -264,6 +266,18 @@ export default function Profile() {
     };
   }, [store?.id]);
 
+  /* ===================== HERO LOAD (logo + cover on mount) ===================== */
+
+  useEffect(() => {
+    if (!store?.id) return;
+    apiFetch<any>(`/api/v1/stores/${store.id}`)
+      .then((data) => {
+        if (data.logoUrl) setLogoUrl(data.logoUrl);
+        if (data.coverUrl) setCoverUrl(data.coverUrl);
+      })
+      .catch(() => {});
+  }, [store?.id]);
+
   /* ===================== APPEARANCE LOAD ===================== */
 
   useEffect(() => {
@@ -277,6 +291,7 @@ export default function Profile() {
         setEditPhone(data.phone || "");
         setEditWebsite(data.website || "");
         setLogoUrl(data.logoUrl || "");
+        setCoverUrl(data.coverUrl || "");
         setAppearanceLoaded(true);
       } catch {
         setEditName(store!.name || "");
@@ -584,6 +599,44 @@ export default function Profile() {
     }
   }
 
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCoverUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("cover", file);
+
+      const token =
+        localStorage.getItem("utsalapp_token") ||
+        localStorage.getItem("token") ||
+        "";
+
+      const res = await fetch(
+        `${API_BASE_URL || ""}/api/v1/stores/me/cover`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        },
+      );
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.message || "Myndaupphleðsla mistókst");
+      }
+
+      const data = await res.json();
+      setCoverUrl(data.coverUrl || "");
+    } catch (err) {
+      console.error("cover upload error:", err);
+    } finally {
+      setCoverUploading(false);
+    }
+  }
+
   async function handleSaveInfo(e: React.FormEvent) {
     e.preventDefault();
     setInfoMsg(null);
@@ -641,12 +694,38 @@ export default function Profile() {
   return (
     <div className="bg-white min-h-screen pb-24">
 
-      {/* ── Hero ──────────────────────────────────────────────── */}
-      <div className="relative h-28 bg-neutral-900">
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "12px 12px" }}
+      {/* ── Hero (cover image, clickable to upload) ───────────── */}
+      <label className="relative block h-36 bg-neutral-900 cursor-pointer group overflow-hidden" data-testid="label-upload-cover">
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleCoverUpload}
+          disabled={coverUploading}
+          data-testid="input-upload-cover"
         />
-        <div className="absolute top-3 right-3 flex gap-2">
+        {coverUrl ? (
+          <img src={coverUrl} alt="Forsíðumynd" className="absolute inset-0 w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 opacity-10"
+            style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "12px 12px" }}
+          />
+        )}
+        {/* Dark wash so buttons stay readable */}
+        <div className="absolute inset-0 bg-black/30" />
+        {/* Always-visible camera badge bottom-left (for mobile tap) */}
+        <div className="absolute bottom-2 left-3">
+          {coverUploading ? (
+            <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md">Hleð upp...</span>
+          ) : (
+            <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md flex items-center gap-1">
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              Breyta forsíðumynd
+            </span>
+          )}
+        </div>
+        {/* Top-right buttons */}
+        <div className="absolute top-3 right-3 flex gap-2" onClick={(e) => e.preventDefault()}>
           {isAdmin && (
             <button
               onClick={() => navigate("/admin")}
@@ -662,7 +741,7 @@ export default function Profile() {
             Útskrá
           </button>
         </div>
-      </div>
+      </label>
 
       {/* ── Logo + name ───────────────────────────────────────── */}
       <div className="px-4 -mt-10 mb-4">

@@ -1500,6 +1500,28 @@ async function registerRoutes(app) {
     }
   );
   router.post(
+    "/stores/me/cover",
+    auth("store"),
+    upload.single("cover"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        if (!req.file) {
+          return res.status(400).json({ message: "Engin mynd m\xF3ttekin" });
+        }
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = toAbsoluteImageUrl(relativePath, req);
+        await storage.updateStore(req.user.storeId, { coverUrl: absoluteUrl });
+        return res.json({ coverUrl: absoluteUrl });
+      } catch (err) {
+        console.error("upload cover error:", err);
+        return res.status(500).json({ message: "Myndaupphle\xF0sla mist\xF3kst" });
+      }
+    }
+  );
+  router.post(
     "/stores/me/update-info",
     auth("store"),
     async (req, res) => {
@@ -1592,6 +1614,7 @@ async function registerRoutes(app) {
         phone: store.phone ?? "",
         website: store.website ?? "",
         logoUrl: store.logoUrl ?? "",
+        coverUrl: store.coverUrl ?? "",
         createdAt: store.createdAt ?? null
       });
     } catch (err) {

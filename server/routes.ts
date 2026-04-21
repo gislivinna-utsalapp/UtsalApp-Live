@@ -787,6 +787,30 @@ export async function registerRoutes(app: Express): Promise<void> {
     },
   );
 
+  // ------------------ STORES: UPLOAD COVER IMAGE ------------------
+  router.post(
+    "/stores/me/cover",
+    auth("store"),
+    upload.single("cover"),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun fannst" });
+        }
+        if (!req.file) {
+          return res.status(400).json({ message: "Engin mynd móttekin" });
+        }
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = toAbsoluteImageUrl(relativePath, req);
+        await storage.updateStore(req.user.storeId, { coverUrl: absoluteUrl } as any);
+        return res.json({ coverUrl: absoluteUrl });
+      } catch (err) {
+        console.error("upload cover error:", err);
+        return res.status(500).json({ message: "Myndaupphleðsla mistókst" });
+      }
+    },
+  );
+
   // ------------------ STORES: UPDATE PUBLIC INFO ------------------
   router.post(
     "/stores/me/update-info",
@@ -905,6 +929,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         phone: (store as any).phone ?? "",
         website: (store as any).website ?? "",
         logoUrl: (store as any).logoUrl ?? "",
+        coverUrl: (store as any).coverUrl ?? "",
         createdAt: (store as any).createdAt ?? null,
       });
     } catch (err) {

@@ -107,7 +107,7 @@ export default function StorePage() {
     <div className="bg-white min-h-screen pb-24">
 
       {/* ── Hero banner ────────────────────────────────────────── */}
-      <div className="relative h-36 bg-neutral-900 overflow-hidden">
+      <div className="relative h-36 overflow-hidden" style={{ background: "linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1f1209 100%)" }}>
         {coverSrc ? (
           <img
             src={coverSrc}
@@ -116,11 +116,9 @@ export default function StorePage() {
             style={{ objectPosition: `50% ${coverPosY}%` }}
           />
         ) : (
-          <div className="absolute inset-0 opacity-10"
-            style={{ backgroundImage: "repeating-linear-gradient(45deg, #fff 0, #fff 1px, transparent 0, transparent 50%)", backgroundSize: "12px 12px" }}
-          />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 70% 50%, rgba(255,77,0,0.18) 0%, transparent 65%)" }} />
         )}
-        <div className="absolute inset-0 bg-black/25" />
+        <div className="absolute inset-0 bg-black/20" />
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}

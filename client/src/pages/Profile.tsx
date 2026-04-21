@@ -736,7 +736,8 @@ export default function Profile() {
 
       {/* ── Hero (cover image) ────────────────────────────────── */}
       <div
-        className={`relative h-36 bg-neutral-900 overflow-hidden ${isRepositioning ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+        className={`relative h-36 overflow-hidden ${isRepositioning ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
+        style={{ background: "linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1f1209 100%)" }}
         onPointerDown={handleRepoPointerDown}
         onPointerMove={handleRepoPointerMove}
         onPointerUp={handleRepoPointerUp}
@@ -752,12 +753,10 @@ export default function Profile() {
             draggable={false}
           />
         ) : (
-          <div className="absolute inset-0 opacity-10"
-            style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "12px 12px" }}
-          />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 70% 50%, rgba(255,77,0,0.18) 0%, transparent 65%)" }} />
         )}
         {/* Dark wash */}
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-black/20" />
 
         {isRepositioning ? (
           /* ── Reposition mode UI ── */

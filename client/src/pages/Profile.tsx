@@ -639,36 +639,68 @@ export default function Profile() {
     }`;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 pb-24 pt-4 space-y-4">
-      {/* Haus */}
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-semibold">Prófíll verslunar</h1>
-          <p className="text-xs text-muted-foreground">
-            Innskráður sem {authUser.user.email} (verslun)
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="bg-white min-h-screen pb-24">
+
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <div className="relative h-28 bg-neutral-900">
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "12px 12px" }}
+        />
+        <div className="absolute top-3 right-3 flex gap-2">
           {isAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="text-xs"
+            <button
               onClick={() => navigate("/admin")}
+              className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
             >
               Admin
-            </Button>
+            </button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-xs"
+          <button
             onClick={handleLogout}
+            className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
           >
             Útskrá
-          </Button>
+          </button>
         </div>
-      </header>
+      </div>
+
+      {/* ── Logo + name ───────────────────────────────────────── */}
+      <div className="px-4 -mt-10 mb-4">
+        <label className="block cursor-pointer group w-20" data-testid="label-upload-logo-hero">
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleLogoUpload}
+            disabled={logoUploading}
+            data-testid="input-upload-logo-hero"
+          />
+          <div className="w-20 h-20 rounded-full border-4 border-white bg-neutral-100 overflow-hidden shadow-sm relative">
+            {logoUrl ? (
+              <img src={logoUrl} alt="Merki" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-neutral-900">
+                <span className="text-white text-xl font-bold">
+                  {(editName || store.name || "?").split(" ").filter(Boolean).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                </span>
+              </div>
+            )}
+            {/* Upload overlay */}
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+              {logoUploading
+                ? <span className="text-white text-[9px] font-medium">Hleð...</span>
+                : <span className="text-white text-[9px] font-medium text-center leading-tight px-1">Breyta<br/>mynd</span>
+              }
+            </div>
+          </div>
+        </label>
+        <div className="mt-2">
+          <h1 className="text-base font-bold text-neutral-900">{editName || store.name}</h1>
+          <p className="text-xs text-neutral-400">{authUser.user.email}</p>
+        </div>
+      </div>
+
+      <div className="px-4 space-y-4">
 
       {/* Tabs */}
       <Card className="p-3">
@@ -849,13 +881,25 @@ export default function Profile() {
       {tab === "appearance" && (
         <>
           <Card className="p-4 space-y-4">
-            <h2 className="text-sm font-semibold">Merki verslunar</h2>
-            <p className="text-xs text-muted-foreground">
-              Hladdu upp merki sem birtist á opinberu verslunar­síðunni þinni.
-            </p>
+            <div>
+              <h2 className="text-sm font-semibold">Merki verslunar</h2>
+              <p className="text-xs text-neutral-400 mt-0.5">
+                Mynd sem birtist á opinberu verslunar­síðunni þinni.
+              </p>
+            </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex-shrink-0 w-20 h-20 rounded-md bg-primary/10 flex items-center justify-center overflow-hidden border border-border">
+            {/* Logo upload — centered clickable avatar */}
+            <label className="flex flex-col items-center gap-3 cursor-pointer group" data-testid="label-upload-logo">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoUpload}
+                disabled={logoUploading}
+                data-testid="input-upload-logo"
+              />
+              {/* Avatar */}
+              <div className="w-24 h-24 rounded-full bg-neutral-100 overflow-hidden relative border-2 border-neutral-200 group-hover:border-neutral-400 transition-colors">
                 {logoUrl ? (
                   <img
                     src={logoUrl}
@@ -864,37 +908,32 @@ export default function Profile() {
                     data-testid="img-store-logo"
                   />
                 ) : (
-                  <span className="text-primary text-xl font-bold">
-                    {(editName || store.name || "?")
-                      .split(" ")
-                      .filter(Boolean)
-                      .map((w) => w[0])
-                      .join("")
-                      .slice(0, 2)
-                      .toUpperCase()}
-                  </span>
+                  <div className="w-full h-full flex items-center justify-center bg-neutral-900">
+                    <span className="text-white text-2xl font-bold">
+                      {(editName || store.name || "?")
+                        .split(" ")
+                        .filter(Boolean)
+                        .map((w: string) => w[0])
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase()}
+                    </span>
+                  </div>
                 )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block" data-testid="label-upload-logo">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleLogoUpload}
-                    disabled={logoUploading}
-                    data-testid="input-upload-logo"
-                  />
-                  <span className="inline-block text-xs px-4 py-2 rounded-md bg-primary text-primary-foreground cursor-pointer hover:opacity-90 transition-opacity">
-                    {logoUploading ? "Hleð upp..." : "Velja mynd"}
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                  <span className="text-white text-[10px] font-medium">
+                    {logoUploading ? "Hleð..." : "Breyta"}
                   </span>
-                </label>
-                <p className="text-[10px] text-muted-foreground">
-                  JPG, PNG eða WebP. Mælt með 200×200px eða stærra.
-                </p>
+                </div>
               </div>
-            </div>
+              {/* Upload button */}
+              <span className="text-xs px-4 py-2 rounded-sm bg-neutral-900 text-white font-medium">
+                {logoUploading ? "Hleð upp..." : "Hlaða upp mynd"}
+              </span>
+              <p className="text-[10px] text-neutral-400">
+                JPG, PNG eða WebP · Mælt með 200×200px eða stærra
+              </p>
+            </label>
           </Card>
 
           <Card className="p-4 space-y-4">
@@ -1372,6 +1411,7 @@ export default function Profile() {
           )}
         </Card>
       )}
+      </div>{/* /px-4 space-y-4 */}
     </div>
   );
 }

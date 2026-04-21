@@ -106,63 +106,50 @@ export default function StorePage() {
   return (
     <div className="bg-white min-h-screen pb-24">
 
-      {/* ── Hero banner ────────────────────────────────────────── */}
-      <div className="relative h-36 overflow-hidden" style={{ background: "linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1f1209 100%)" }}>
-        {coverSrc ? (
-          <img
-            src={coverSrc}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ objectPosition: `50% ${coverPosY}%` }}
-          />
-        ) : (
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 70% 50%, rgba(255,77,0,0.18) 0%, transparent 65%)" }} />
-        )}
-        <div className="absolute inset-0 bg-black/20" />
-        {/* Back button */}
+      {/* ── Store header ───────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-neutral-100">
         <button
           onClick={() => navigate(-1)}
-          className="absolute top-3 left-3 z-10 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center"
+          className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center"
           data-testid="button-back-store"
         >
-          <ChevronLeft className="w-5 h-5 text-white" />
+          <ChevronLeft className="w-5 h-5 text-neutral-700" />
         </button>
+
+        {/* Logo */}
+        <div className="flex-shrink-0 w-12 h-12 rounded-full bg-neutral-100 overflow-hidden border border-neutral-200">
+          {logoSrc ? (
+            <img
+              src={logoSrc}
+              alt={store.name}
+              className="w-full h-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-neutral-200">
+              <span className="text-neutral-600 text-base font-bold tracking-tight">
+                {initials(store.name)}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Name + category */}
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-bold text-neutral-900 leading-tight truncate">
+            {store.name}
+          </h1>
+          {store.category && (
+            <span className="text-[11px] text-neutral-400 uppercase tracking-wide">
+              {store.category}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ── Store identity ─────────────────────────────────────── */}
+      {/* ── Store identity (contact info) ──────────────────────── */}
       <div className="px-4">
-        {/* Logo + name row */}
-        <div className="flex items-end gap-3 -mt-10 mb-3">
-          {/* Logo */}
-          <div className="flex-shrink-0 w-20 h-20 rounded-full border-4 border-white bg-neutral-100 overflow-hidden shadow-sm">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt={store.name}
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-neutral-900">
-                <span className="text-white text-xl font-bold tracking-tight">
-                  {initials(store.name)}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Name + badge */}
-          <div className="pb-1 flex-1 min-w-0">
-            <h1 className="text-lg font-bold text-neutral-900 leading-tight truncate">
-              {store.name}
-            </h1>
-            {store.category && (
-              <span className="inline-block text-[10px] font-medium text-neutral-500 uppercase tracking-wide mt-0.5">
-                {store.category}
-              </span>
-            )}
-          </div>
-        </div>
+        <div className="mb-3" />
 
         {/* Contact info */}
         {(store.address || store.phone || store.website) && (

@@ -734,140 +734,57 @@ export default function Profile() {
   return (
     <div className="bg-white min-h-screen pb-24">
 
-      {/* ── Hero (cover image) ────────────────────────────────── */}
-      <div
-        className={`relative h-36 overflow-hidden ${isRepositioning ? "cursor-grab active:cursor-grabbing select-none" : ""}`}
-        style={{ background: "linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 50%, #1f1209 100%)" }}
-        onPointerDown={handleRepoPointerDown}
-        onPointerMove={handleRepoPointerMove}
-        onPointerUp={handleRepoPointerUp}
-        onPointerCancel={handleRepoPointerUp}
-        data-testid="div-hero-cover"
-      >
-        {coverUrl ? (
-          <img
-            src={coverUrl}
-            alt="Forsíðumynd"
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-            style={{ objectPosition: `50% ${coverPositionY}%` }}
-            draggable={false}
-          />
-        ) : (
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at 70% 50%, rgba(255,77,0,0.18) 0%, transparent 65%)" }} />
-        )}
-        {/* Dark wash */}
-        <div className="absolute inset-0 bg-black/20" />
-
-        {isRepositioning ? (
-          /* ── Reposition mode UI ── */
-          <>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-white text-xs bg-black/50 px-3 py-1.5 rounded-md flex items-center gap-1.5 pointer-events-none">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
-                Dragðu mynd upp/niður
-              </span>
-            </div>
-            <div className="absolute bottom-2 right-3 flex gap-2">
-              <button
-                onClick={() => setIsRepositioning(false)}
-                className="text-[11px] bg-white/20 text-white px-2.5 py-1.5 rounded-md"
-              >
-                Hætta við
-              </button>
-              <button
-                onClick={handleSaveCoverPosition}
-                disabled={posSaving}
-                className="text-[11px] bg-[#ff4d00] text-white px-2.5 py-1.5 rounded-md font-medium disabled:opacity-60"
-              >
-                {posSaving ? "Vista..." : "Vista stöðu"}
-              </button>
-            </div>
-          </>
-        ) : (
-          /* ── Normal mode: upload button ── */
-          <>
-            <label className="absolute bottom-2 left-3 cursor-pointer" data-testid="label-upload-cover">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleCoverUpload}
-                disabled={coverUploading}
-                data-testid="input-upload-cover"
-              />
-              {coverUploading ? (
-                <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md">Hleð upp...</span>
+      {/* ── Profile header ────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-neutral-100">
+        <div className="flex items-center gap-3">
+          {/* Clickable logo */}
+          <label className="block cursor-pointer group flex-shrink-0" data-testid="label-upload-logo-hero">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleLogoUpload}
+              disabled={logoUploading}
+              data-testid="input-upload-logo-hero"
+            />
+            <div className="w-14 h-14 rounded-full bg-neutral-100 overflow-hidden border border-neutral-200 relative">
+              {logoUrl ? (
+                <img src={logoUrl} alt="Merki" className="w-full h-full object-cover" />
               ) : (
-                <span className="text-white text-[11px] font-medium bg-black/60 px-2.5 py-1 rounded-md flex items-center gap-1">
-                  <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  Breyta forsíðumynd
-                </span>
+                <div className="w-full h-full flex items-center justify-center bg-neutral-200">
+                  <span className="text-neutral-600 text-lg font-bold">
+                    {(editName || store.name || "?").split(" ").filter(Boolean).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
+                  </span>
+                </div>
               )}
-            </label>
-            {coverUrl && (
-              <button
-                onClick={() => setIsRepositioning(true)}
-                className="absolute bottom-2 right-3 text-[11px] bg-black/60 text-white px-2.5 py-1 rounded-md flex items-center gap-1"
-                data-testid="button-reposition-cover"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" /></svg>
-                Stilla staðsetningu
-              </button>
-            )}
-            {/* Top-right buttons */}
-            <div className="absolute top-3 right-3 flex gap-2">
-              {isAdmin && (
-                <button
-                  onClick={() => navigate("/admin")}
-                  className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
-                >
-                  Admin
-                </button>
-              )}
-              <button
-                onClick={handleLogout}
-                className="text-[11px] bg-white/20 text-white px-2.5 py-1 rounded-sm"
-              >
-                Útskrá
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Logo + name ───────────────────────────────────────── */}
-      <div className="px-4 -mt-10 mb-4">
-        <label className="block cursor-pointer group w-20" data-testid="label-upload-logo-hero">
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleLogoUpload}
-            disabled={logoUploading}
-            data-testid="input-upload-logo-hero"
-          />
-          <div className="w-20 h-20 rounded-full border-4 border-white bg-neutral-100 overflow-hidden shadow-sm relative">
-            {logoUrl ? (
-              <img src={logoUrl} alt="Merki" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-neutral-900">
-                <span className="text-white text-xl font-bold">
-                  {(editName || store.name || "?").split(" ").filter(Boolean).map((w: string) => w[0]).join("").slice(0, 2).toUpperCase()}
-                </span>
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
+                {logoUploading
+                  ? <span className="text-white text-[9px] font-medium">Hleð...</span>
+                  : <span className="text-white text-[9px] font-medium text-center leading-tight px-1">Breyta<br/>mynd</span>
+                }
               </div>
-            )}
-            {/* Upload overlay */}
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-full">
-              {logoUploading
-                ? <span className="text-white text-[9px] font-medium">Hleð...</span>
-                : <span className="text-white text-[9px] font-medium text-center leading-tight px-1">Breyta<br/>mynd</span>
-              }
             </div>
+          </label>
+          <div>
+            <h1 className="text-base font-bold text-neutral-900 leading-tight">{editName || store.name}</h1>
+            <p className="text-xs text-neutral-400">{authUser.user.email}</p>
           </div>
-        </label>
-        <div className="mt-2">
-          <h1 className="text-base font-bold text-neutral-900">{editName || store.name}</h1>
-          <p className="text-xs text-neutral-400">{authUser.user.email}</p>
+        </div>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => navigate("/admin")}
+              className="text-[11px] bg-neutral-100 text-neutral-700 px-2.5 py-1.5 rounded-md"
+            >
+              Admin
+            </button>
+          )}
+          <button
+            onClick={handleLogout}
+            className="text-[11px] bg-neutral-100 text-neutral-700 px-2.5 py-1.5 rounded-md"
+          >
+            Útskrá
+          </button>
         </div>
       </div>
 

@@ -172,6 +172,7 @@ function pathToFrontendUrl(path: string): string | null {
 /** Small component that fetches + displays entity title when an event row is expanded */
 function EntityInfo({ path }: { path: string }) {
   const entity = extractEntity(path);
+  const navigate = useNavigate();
   const [info, setInfo] = useState<{ title: string; subtitle?: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -225,15 +226,13 @@ function EntityInfo({ path }: { path: string }) {
         )}
       </div>
       {frontendUrl && (
-        <Link to={frontendUrl}>
-          <button
-            className="flex items-center gap-1 text-xs font-medium text-primary border border-primary/30 rounded px-2 py-1 flex-shrink-0 hover:bg-primary/10 transition-colors"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Globe className="w-3 h-3" />
-            Opna
-          </button>
-        </Link>
+        <button
+          className="flex items-center gap-1 text-xs font-medium text-primary border border-primary/30 rounded px-2 py-1 flex-shrink-0 hover:bg-primary/10 transition-colors"
+          onClick={(e) => { e.stopPropagation(); navigate(frontendUrl); }}
+        >
+          <Globe className="w-3 h-3" />
+          Opna
+        </button>
       )}
     </div>
   );
@@ -651,6 +650,12 @@ export default function AnalyticsDashboard() {
     matvorur: "Matvörur", annad: "Annað",
   };
 
+  // Top user-facing path (exclude ad-tracking + pure internal endpoints)
+  const topUserPath = useMemo(() => {
+    const SKIP = ["/api/v1/analytics/ad-event", "/api/v1/analytics/events", "/api/v1/admin/analytics"];
+    return summary?.top_paths?.find((p) => !SKIP.some((s) => p.path.startsWith(s))) ?? summary?.top_paths?.[0] ?? null;
+  }, [summary]);
+
   // Ads-tab derived stats
   const totalImpressions = adStats.reduce((s, a) => s + a.impressions, 0);
   const totalClicks = adStats.reduce((s, a) => s + a.clicks, 0);
@@ -778,14 +783,14 @@ export default function AnalyticsDashboard() {
             <StatCard
               icon={TrendingUp}
               label="Vinsælasta slóð"
-              value={summary?.top_paths[0]?.count ?? 0}
-              sub={summary?.top_paths[0]?.path ?? "—"}
+              value={topUserPath?.count ?? 0}
+              sub={topUserPath ? pathLabel(topUserPath.path) : "—"}
             />
             <StatCard
               icon={MousePointerClick}
               label="Slóðir raktar"
               value={summary?.top_paths.length ?? 0}
-              sub="mismunandi endapunktar"
+              sub="mismunandi síður"
             />
           </div>
         )}
@@ -1206,41 +1211,48 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* Hero metrics — pitch-ready */}
-            <div className="grid grid-cols-2 gap-3">
-              <Card className="p-4 space-y-1 text-center">
-                <p className="text-3xl font-bold text-primary">{summary?.unique_sessions ?? "—"}</p>
-                <p className="text-xs font-medium">Einstakar notandalotur</p>
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  Jafngildir „x einstakir besökare" — notaðu þessa tölu þegar þú talar við verslanir
-                </p>
-              </Card>
-              <Card className="p-4 space-y-1 text-center">
-                <p className="text-3xl font-bold text-primary">
-                  {(summary?.by_event_type?.find(e => e.event_type === "page_view")?.count ?? 0) +
-                   (summary?.by_event_type?.find(e => e.event_type === "api_request")?.count ?? 0)}
-                </p>
-                <p className="text-xs font-medium">Heildarsamskipti við app</p>
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  Sýnir hversu virkt appið er — hvert samskipti er mögulegt auga á útsölu verslunarinnar
-                </p>
-              </Card>
-              <Card className="p-4 space-y-1 text-center">
-                <p className="text-3xl font-bold text-primary">
-                  {summary?.by_event_type?.find(e => e.event_type === "search")?.count ?? 0}
-                </p>
-                <p className="text-xs font-medium">Leitir skráðar</p>
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  Sérhver leit er kaupáhugi — þú veist hvað neytendur eru að leita að
-                </p>
-              </Card>
-              <Card className="p-4 space-y-1 text-center">
-                <p className="text-3xl font-bold text-primary">{summary?.top_paths?.length ?? 0}</p>
-                <p className="text-xs font-medium">Einstaka síður skoðaðar</p>
-                <p className="text-[10px] text-muted-foreground leading-tight">
-                  Fjölbreyttar skoðanir sýna breidd notendahópsins
-                </p>
-              </Card>
-            </div>
+            {summaryLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {[...Array(4)].map((_, i) => (
+                  <Card key={i} className="p-4 h-28 animate-pulse bg-muted" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Card className="p-4 space-y-1 text-center">
+                  <p className="text-3xl font-bold text-primary">{summary?.unique_sessions ?? "—"}</p>
+                  <p className="text-xs font-medium">Einstakar notandalotur</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Jafngildir „x einstakir besökare" — notaðu þessa tölu þegar þú talar við verslanir
+                  </p>
+                </Card>
+                <Card className="p-4 space-y-1 text-center">
+                  <p className="text-3xl font-bold text-primary">
+                    {(summary?.total_events ?? summary?.total_events_cached ?? 0).toLocaleString("is-IS")}
+                  </p>
+                  <p className="text-xs font-medium">Heildarsamskipti við app</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Sýnir hversu virkt appið er — hvert samskipti er mögulegt auga á útsölu verslunarinnar
+                  </p>
+                </Card>
+                <Card className="p-4 space-y-1 text-center">
+                  <p className="text-3xl font-bold text-primary">
+                    {summary?.by_event_type?.find((e) => e.event_type === "search")?.count ?? searches.length}
+                  </p>
+                  <p className="text-xs font-medium">Leitir skráðar</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Sérhver leit er kaupáhugi — þú veist hvað neytendur eru að leita að
+                  </p>
+                </Card>
+                <Card className="p-4 space-y-1 text-center">
+                  <p className="text-3xl font-bold text-primary">{summary?.top_paths?.length ?? 0}</p>
+                  <p className="text-xs font-medium">Einstaka síður skoðaðar</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">
+                    Fjölbreyttar skoðanir sýna breidd notendahópsins
+                  </p>
+                </Card>
+              </div>
+            )}
 
             {/* Search demand — the most valuable data for sales */}
             <Card className="p-4 space-y-3">

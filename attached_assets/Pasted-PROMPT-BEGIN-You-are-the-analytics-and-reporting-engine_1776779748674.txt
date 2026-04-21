@@ -1,0 +1,49 @@
+PROMPT BEGIN
+You are the analytics and reporting engine for this Replit application. Your primary goal is to gather, process, and present key metrics in a clear, actionable, and shareable format.
+
+Here are the specific data points I need you to track and how I want them presented:
+
+**1. General App Usage Metrics (for overall understanding):**
+*   **Total User Sessions:** Count how many times the app is launched/accessed.
+*   **Unique Users:** Track the number of distinct users interacting with the app. Assign an anonymous ID (e.g., using a cookie or local storage if possible within the Replit environment, or a simple counter based on IP addresses/session IDs).
+*   **Average Session Duration:** Calculate the average time a user spends in the app per session.
+*   **Key Action Completion Rate:** Track specific "completion" events if defined in the app (e.g., "lesson completed", "quiz finished", "app generated"). Present this as a percentage of total users initiating that action.
+
+**2. Advertisement Performance Metrics (CRITICAL for advertisers):**
+*   **For EACH distinct advertisement displayed within the app:**
+    *   **Ad Identifier:** Each ad needs a unique ID or name (e.g., "Ad_ClothingStore_TopBanner", "Ad_CoffeeShop_Sidebar_1").
+    *   **Impressions:** Count how many times each specific ad is displayed to a user.
+    *   **Clicks:** Count how many times each specific ad is clicked.
+    *   **Click-Through Rate (CTR):** Calculate `(Clicks / Impressions) * 100%` for each ad.
+    *   **Presentation:** I need a clear table or list showing: `Ad Identifier | Impressions | Clicks | CTR (%)`.
+
+**3. Data Storage & Management:**
+*   You should continuously log these metrics. If there's a simple way to store this data (e.g., in a JSON file within the Repl, or a simple SQLite database), use that. The data should persist across sessions.
+*   Ensure that no personally identifiable information (PII) is explicitly collected or stored unless absolutely necessary and user consent is obtained (for example, if a user explicitly enters their name for a certificate, but not for analytics). Anonymous IDs are preferred.
+
+**4. Reporting & Presentation (for ME and for Advertisers):**
+
+**(A) My Admin View (for my personal overview):**
+*   When I type a command like "show me analytics today" or "app performance last week," you should provide:
+    *   A summary of all General App Usage Metrics for the requested period.
+    *   A ranked list of the **Top 5 Performing Ads** by CTR.
+    *   A brief summary of overall ad performance (total impressions, total clicks, overall CTR).
+
+**(B) Advertiser-Specific Report (for sharing with businesses):**
+*   When I provide an Ad Identifier and request a report, e.g., "generate report for Ad_ClothingStore_TopBanner," you should generate a concise, professional, and easily shareable summary for *that specific ad*.
+*   **This report should include:**
+    *   Ad Identifier and a brief description (e.g., what the ad was for).
+    *   Total Impressions for that ad over its active period.
+    *   Total Clicks for that ad over its active period.
+    *   Click-Through Rate (CTR) for that ad.
+    *   Average session duration for users who *saw* this ad (if possible to track this correlation).
+    *   A clear, positive statement about the ad's performance.
+    *   **Format:** Present this in a text format suitable for copying and pasting into an email or a document.
+
+**Implementation Details/Considerations:**
+*   You will need to define global variables or functions within the app to increment counts for impressions and clicks triggered by the user interface.
+*   Consider reset points for daily/weekly/monthly reports.
+*   If the app scales, advise on more robust data storage solutions.
+
+**Your initial task:** Acknowledge this prompt. Explain briefly how you will begin implementing these tracking mechanisms. What are the first steps you need to take (e.g., define data structures, create tracking functions)?
+PROMPT END

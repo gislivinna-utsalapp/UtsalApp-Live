@@ -51,7 +51,18 @@ type Event = {
   meta?: { q?: string; category?: string; location?: string; intent?: string } | null;
 };
 
-type Tab = "overview" | "events" | "searches" | "sales";
+type Tab = "overview" | "events" | "searches" | "sales" | "ads";
+
+type AdStat = {
+  postId: string;
+  postTitle: string;
+  storeName: string;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  firstSeen: string | null;
+  lastSeen: string | null;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -308,6 +319,73 @@ function TopPathsTable({ paths }: { paths: Summary["top_paths"] }) {
   );
 }
 
+// ─── AdRow ────────────────────────────────────────────────────────────────────
+
+function AdRow({ ad, sessions }: { ad: AdStat; sessions: number }) {
+  const [copied, setCopied] = useState(false);
+
+  const reportText = `AUGLÝSINGARSKÝRSLA — ÚtsalApp
+════════════════════════════════
+
+Tilboð: ${ad.postTitle}
+Verslun: ${ad.storeName}
+Tímabil: ${ad.firstSeen ? new Date(ad.firstSeen).toLocaleDateString("is-IS") : "—"} – ${ad.lastSeen ? new Date(ad.lastSeen).toLocaleDateString("is-IS") : "—"}
+
+NIÐURSTÖÐUR
+───────────
+Birtingar (Impressions): ${ad.impressions.toLocaleString("is-IS")}
+Smellir (Clicks):        ${ad.clicks.toLocaleString("is-IS")}
+Smellhlutfall (CTR):     ${ad.ctr}%
+
+SAMHENGI
+────────
+Appið hefur ${sessions.toLocaleString("is-IS")} einstakar notandalotur.
+${ad.impressions} af þeim notuðu sáu þetta tilboð.
+${ad.ctr}% þeirra smelltu á tilboðið — sem er framúrskarandi í samanburði við meðaltal vefauglýsinga (~0.1%).
+
+Þetta þýðir að tilboð á ÚtsalApp nær til mjög viðbragðsviljugra kaupenda.
+
+—
+Kynnt af ÚtsalApp teyminu`;
+
+  const copy = () => {
+    navigator.clipboard.writeText(reportText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  const ctrColor =
+    ad.ctr >= 5 ? "text-green-600 font-bold" :
+    ad.ctr >= 1 ? "text-[#ff4d00] font-semibold" :
+    "text-muted-foreground";
+
+  return (
+    <tr className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+      <td className="py-2 px-2 max-w-[160px]">
+        <p className="truncate font-medium text-neutral-800">{ad.postTitle}</p>
+      </td>
+      <td className="py-2 px-2 text-muted-foreground truncate max-w-[100px]">{ad.storeName}</td>
+      <td className="py-2 px-2 text-right">{ad.impressions.toLocaleString("is-IS")}</td>
+      <td className="py-2 px-2 text-right">{ad.clicks.toLocaleString("is-IS")}</td>
+      <td className={`py-2 px-2 text-right ${ctrColor}`}>{ad.ctr}%</td>
+      <td className="py-2 px-2 text-right">
+        <button
+          onClick={copy}
+          title="Afrita skýrslu"
+          className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-neutral-100 hover:bg-neutral-200 transition-colors text-neutral-600"
+          data-testid={`button-copy-report-${ad.postId}`}
+        >
+          {copied
+            ? <><CheckCheck className="w-3 h-3 text-green-600" /> Afritað</>
+            : <><Copy className="w-3 h-3" /> Skýrsla</>
+          }
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboard() {
@@ -324,6 +402,20 @@ export default function AnalyticsDashboard() {
         ""
       : "";
   const authHeader = { Authorization: `Bearer ${token}` };
+
+  const {
+    data: adStats = [],
+    isLoading: adStatsLoading,
+    refetch: refetchAds,
+  } = useQuery<AdStat[]>({
+    queryKey: ["analytics-ads"],
+    enabled: isAdmin,
+    refetchInterval: 60_000,
+    queryFn: () =>
+      apiFetch<AdStat[]>("/api/v1/admin/analytics/ads", {
+        headers: authHeader,
+      }),
+  });
 
   const {
     data: summary,
@@ -417,6 +509,7 @@ export default function AnalyticsDashboard() {
   const refetchAll = () => {
     refetchSummary();
     refetchEvents();
+    refetchAds();
   };
 
   // Derived stats from cached summary
@@ -444,9 +537,18 @@ export default function AnalyticsDashboard() {
     matvorur: "Matvörur", annad: "Annað",
   };
 
+  // Ads-tab derived stats
+  const totalImpressions = adStats.reduce((s, a) => s + a.impressions, 0);
+  const totalClicks = adStats.reduce((s, a) => s + a.clicks, 0);
+  const overallCtr = totalImpressions > 0
+    ? Math.round((totalClicks / totalImpressions) * 1000) / 10
+    : 0;
+  const top5Ads = [...adStats].sort((a, b) => b.ctr - a.ctr).slice(0, 5);
+
   // Tabs
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "overview", label: "Yfirlit", icon: BarChart2 },
+    { key: "ads", label: "Auglýsingar", icon: Megaphone },
     { key: "events", label: "Atburðir", icon: Clock },
     { key: "searches", label: "Leitir", icon: Search },
     { key: "sales", label: "Söluyfirlit", icon: Building2 },
@@ -816,6 +918,90 @@ export default function AnalyticsDashboard() {
                 ))}
               </>
             )}
+          </div>
+        )}
+
+        {/* ── ADS TAB ──────────────────────────────────────────────────── */}
+        {tab === "ads" && (
+          <div className="space-y-4">
+
+            {/* Summary row */}
+            <div className="grid grid-cols-3 gap-3">
+              <StatCard icon={Eye} label="Birtingar (total)" value={totalImpressions.toLocaleString("is-IS")} />
+              <StatCard icon={MousePointerClick} label="Smellir (total)" value={totalClicks.toLocaleString("is-IS")} />
+              <StatCard icon={TrendingUp} label="CTR meðaltal" value={`${overallCtr}%`} />
+            </div>
+
+            {/* Top 5 by CTR */}
+            {top5Ads.length > 0 && (
+              <Card className="p-4 space-y-3">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Top 5 auglýsingar eftir CTR
+                </h2>
+                <div className="space-y-2">
+                  {top5Ads.map((ad, i) => (
+                    <div key={ad.postId} className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-muted-foreground w-4 flex-shrink-0">
+                        {i + 1}.
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{ad.postTitle}</p>
+                        <p className="text-[10px] text-muted-foreground">{ad.storeName}</p>
+                      </div>
+                      <span className="text-sm font-bold text-[#ff4d00] flex-shrink-0">
+                        {ad.ctr}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Full ads table */}
+            <Card className="p-4 space-y-3">
+              <h2 className="text-sm font-semibold flex items-center gap-2">
+                <Tag className="w-4 h-4 text-primary" />
+                Allar auglýsingar
+                {adStats.length > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    ({adStats.length})
+                  </span>
+                )}
+              </h2>
+
+              {adStatsLoading ? (
+                <div className="space-y-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-12 rounded bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : adStats.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Engin gögn enn — birtingar byrja að mælast þegar notendur sjá tilboð.
+                </p>
+              ) : (
+                <div className="overflow-x-auto -mx-1">
+                  <table className="w-full text-xs min-w-[480px]">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">Tilboð</th>
+                        <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">Verslun</th>
+                        <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Birtingar</th>
+                        <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Smellir</th>
+                        <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">CTR</th>
+                        <th className="py-1.5 px-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adStats.map((ad) => (
+                        <AdRow key={ad.postId} ad={ad} sessions={summary?.unique_sessions ?? 0} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
           </div>
         )}
 

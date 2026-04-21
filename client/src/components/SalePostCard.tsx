@@ -1,3 +1,5 @@
+// client/src/components/SalePostCard.tsx
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import type { SalePostWithDetails } from "@shared/schema";
 import { API_BASE_URL } from "@/lib/api";
@@ -42,9 +44,22 @@ function pickFirstImage(images: unknown): { url: string | null; alt: string | nu
   return { url: null, alt: null };
 }
 
+/** Fire-and-forget ad event — never throws */
+function fireAdEvent(postId: string, eventType: "impression" | "click", postTitle?: string, storeName?: string) {
+  try {
+    fetch("/api/v1/analytics/ad-event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postId, eventType, postTitle, storeName }),
+    }).catch(() => {});
+  } catch (_) {}
+}
+
 export function SalePostCard({ post }: Props) {
   const { url: rawImage, alt: imageAlt } = pickFirstImage((post as any).images);
   const imageUrl = buildImageUrl(rawImage);
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const impressionFired = useRef(false);
 
   const discountPercent =
     typeof post.priceOriginal === "number" &&
@@ -55,11 +70,38 @@ export function SalePostCard({ post }: Props) {
       ? Math.round(((post.priceOriginal - post.priceSale) / post.priceOriginal) * 100)
       : null;
 
+  const storeName = (post as any).store?.name ?? undefined;
+
+  // ── Impression tracking via IntersectionObserver ─────────────────────────
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || impressionFired.current) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !impressionFired.current) {
+          impressionFired.current = true;
+          fireAdEvent(post.id, "impression", post.title ?? undefined, storeName);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [post.id, post.title, storeName]);
+
+  // ── Click tracking ────────────────────────────────────────────────────────
+  function handleClick() {
+    fireAdEvent(post.id, "click", post.title ?? undefined, storeName);
+  }
+
   return (
     <Link
       to={`/post/${post.id}`}
+      ref={cardRef}
       className="block bg-white"
       data-testid={`card-post-${post.id}`}
+      onClick={handleClick}
     >
       {/* Image */}
       <div className="relative w-full overflow-hidden bg-neutral-100" style={{ aspectRatio: "3/4" }}>
@@ -87,7 +129,7 @@ export function SalePostCard({ post }: Props) {
           </div>
         )}
 
-        {/* Discount badge — top left, small */}
+        {/* Discount badge */}
         {discountPercent !== null && (
           <div className="absolute top-0 left-0 bg-[#ff4d00] text-white text-[10px] font-bold px-1.5 py-0.5">
             -{discountPercent}%
@@ -97,9 +139,9 @@ export function SalePostCard({ post }: Props) {
 
       {/* Info */}
       <div className="pt-1.5 pb-2 px-0.5 space-y-0.5">
-        {post.store && (
+        {(post as any).store && (
           <p className="text-[10px] text-neutral-400 truncate uppercase tracking-wide">
-            {post.store.name}
+            {(post as any).store.name}
           </p>
         )}
         <p className="text-xs text-neutral-800 leading-tight line-clamp-2 font-medium">

@@ -1971,6 +1971,64 @@ async function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
+  router.post("/analytics/ad-event", async (req, res) => {
+    try {
+      const { postId, eventType, postTitle, storeName } = req.body;
+      if (!postId || !eventType || !["impression", "click"].includes(eventType)) {
+        return res.status(400).json({ ok: false });
+      }
+      const sessionId = req.utsalSessionId || req.cookies?.utsalapp_sid || "anon";
+      logEvent(req, eventType, postId, { postTitle, storeName });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[ad-event]", err);
+      return res.json({ ok: false });
+    }
+  });
+  router.get("/admin/analytics/ads", authAdmin, async (_req, res) => {
+    try {
+      const { Pool: Pool2 } = await import("pg");
+      const pool2 = new Pool2({
+        host: process.env.PGHOST,
+        port: Number(process.env.PGPORT) || 5432,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        max: 3,
+        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
+      });
+      const result = await pool2.query(`
+        SELECT
+          target                                           AS post_id,
+          SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
+          SUM(CASE WHEN event_type='click'      THEN 1 ELSE 0 END) AS clicks,
+          MAX(meta->>'postTitle')                          AS post_title,
+          MAX(meta->>'storeName')                          AS store_name,
+          MIN(timestamp)                                   AS first_seen,
+          MAX(timestamp)                                   AS last_seen
+        FROM interactions
+        WHERE event_type IN ('impression','click') AND target IS NOT NULL
+        GROUP BY target
+        ORDER BY impressions DESC
+        LIMIT 200
+      `);
+      await pool2.end();
+      const rows = result.rows.map((r) => ({
+        postId: r.post_id,
+        postTitle: r.post_title ?? r.post_id,
+        storeName: r.store_name ?? "\u2014",
+        impressions: Number(r.impressions) || 0,
+        clicks: Number(r.clicks) || 0,
+        ctr: r.impressions > 0 ? Math.round(Number(r.clicks) / Number(r.impressions) * 1e3) / 10 : 0,
+        firstSeen: r.first_seen,
+        lastSeen: r.last_seen
+      }));
+      return res.json(rows);
+    } catch (err) {
+      console.error("[analytics/ads]", err);
+      return res.status(500).json({ message: "Villa \xED greiningum" });
+    }
+  });
   router.get("/admin/analytics/summary", authAdmin, async (_req, res) => {
     try {
       const [dbStats, liveStats] = await Promise.all([

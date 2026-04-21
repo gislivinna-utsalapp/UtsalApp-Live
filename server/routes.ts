@@ -1397,6 +1397,81 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ─── AD TRACKING (public) ─────────────────────────────────────────────────
+
+  // POST /analytics/ad-event  – record impression or click for a post (no auth needed)
+  router.post("/analytics/ad-event", async (req: Request, res: Response) => {
+    try {
+      const { postId, eventType, postTitle, storeName } = req.body as {
+        postId?: string;
+        eventType?: "impression" | "click";
+        postTitle?: string;
+        storeName?: string;
+      };
+      if (!postId || !eventType || !["impression", "click"].includes(eventType)) {
+        return res.status(400).json({ ok: false });
+      }
+      const sessionId =
+        (req as any).utsalSessionId ||
+        req.cookies?.utsalapp_sid ||
+        "anon";
+      logEvent(req as any, eventType as any, postId, { postTitle, storeName });
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[ad-event]", err);
+      return res.json({ ok: false });
+    }
+  });
+
+  // GET /admin/analytics/ads – per-ad aggregated stats (admin)
+  router.get("/admin/analytics/ads", authAdmin, async (_req, res) => {
+    try {
+      const { Pool } = await import("pg");
+      const pool = new (Pool as any)({
+        host: process.env.PGHOST,
+        port: Number(process.env.PGPORT) || 5432,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        max: 3,
+        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
+          ? { rejectUnauthorized: false } : false,
+      });
+      const result = await pool.query(`
+        SELECT
+          target                                           AS post_id,
+          SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
+          SUM(CASE WHEN event_type='click'      THEN 1 ELSE 0 END) AS clicks,
+          MAX(meta->>'postTitle')                          AS post_title,
+          MAX(meta->>'storeName')                          AS store_name,
+          MIN(timestamp)                                   AS first_seen,
+          MAX(timestamp)                                   AS last_seen
+        FROM interactions
+        WHERE event_type IN ('impression','click') AND target IS NOT NULL
+        GROUP BY target
+        ORDER BY impressions DESC
+        LIMIT 200
+      `);
+      await pool.end();
+      const rows = result.rows.map((r: any) => ({
+        postId: r.post_id,
+        postTitle: r.post_title ?? r.post_id,
+        storeName: r.store_name ?? "—",
+        impressions: Number(r.impressions) || 0,
+        clicks: Number(r.clicks) || 0,
+        ctr: r.impressions > 0
+          ? Math.round((Number(r.clicks) / Number(r.impressions)) * 1000) / 10
+          : 0,
+        firstSeen: r.first_seen,
+        lastSeen: r.last_seen,
+      }));
+      return res.json(rows);
+    } catch (err) {
+      console.error("[analytics/ads]", err);
+      return res.status(500).json({ message: "Villa í greiningum" });
+    }
+  });
+
   // ─── ANALYTICS (admin-only) ──────────────────────────────────────────────
 
   // GET /admin/analytics/summary – persistent DB-backed stats + live memory overlay

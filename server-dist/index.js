@@ -385,10 +385,20 @@ function getSessionSummary() {
     top_paths
   };
 }
-async function getDbSummary(since) {
-  const whereClause = since ? `WHERE timestamp >= $1` : "";
-  const whereSearchClause = since ? `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL AND timestamp >= $1` : `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL`;
-  const params = since ? [since.toISOString()] : [];
+async function getDbSummary(since, until) {
+  const conditions = [];
+  const params = [];
+  if (since) {
+    params.push(since.toISOString());
+    conditions.push(`timestamp >= $${params.length}`);
+  }
+  if (until) {
+    params.push(until.toISOString());
+    conditions.push(`timestamp <= $${params.length}`);
+  }
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const searchConditions = [`event_type = 'search'`, `meta->>'q' IS NOT NULL`, ...conditions];
+  const whereSearchClause = `WHERE ${searchConditions.join(" AND ")}`;
   const [totalRes, sessionsRes, pathsRes, typesRes, searchesRes] = await Promise.all([
     pool.query(
       `SELECT COUNT(*)::text AS count FROM interactions ${whereClause}`,
@@ -2045,6 +2055,7 @@ async function registerRoutes(app) {
   router.get("/admin/analytics/ads", authAdmin, async (req, res) => {
     try {
       const since = req.query.since ? new Date(req.query.since) : void 0;
+      const until = req.query.until ? new Date(req.query.until) : void 0;
       const { Pool: Pool2 } = await import("pg");
       const pool2 = new Pool2({
         host: process.env.PGHOST,
@@ -2055,8 +2066,17 @@ async function registerRoutes(app) {
         max: 3,
         ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
       });
-      const sinceClause = since ? `AND timestamp >= $1` : "";
-      const params = since ? [since.toISOString()] : [];
+      const dateParams = [];
+      const dateClauses = [];
+      if (since) {
+        dateParams.push(since.toISOString());
+        dateClauses.push(`AND timestamp >= $${dateParams.length}`);
+      }
+      if (until) {
+        dateParams.push(until.toISOString());
+        dateClauses.push(`AND timestamp <= $${dateParams.length}`);
+      }
+      const dateFilter = dateClauses.join(" ");
       const result = await pool2.query(`
         SELECT
           target                                           AS post_id,
@@ -2067,11 +2087,11 @@ async function registerRoutes(app) {
           MIN(timestamp)                                   AS first_seen,
           MAX(timestamp)                                   AS last_seen
         FROM interactions
-        WHERE event_type IN ('impression','click') AND target IS NOT NULL ${sinceClause}
+        WHERE event_type IN ('impression','click') AND target IS NOT NULL ${dateFilter}
         GROUP BY target
         ORDER BY impressions DESC
         LIMIT 200
-      `, params);
+      `, dateParams);
       await pool2.end();
       const rows = result.rows.map((r) => ({
         postId: r.post_id,
@@ -2092,12 +2112,25 @@ async function registerRoutes(app) {
   router.get("/admin/analytics/store/:storeId", authAdmin, async (req, res) => {
     try {
       const { storeId } = req.params;
+      const since = req.query.since ? new Date(req.query.since) : void 0;
+      const until = req.query.until ? new Date(req.query.until) : void 0;
       const store = await storage.getStoreById(storeId);
       if (!store) return res.status(404).json({ message: "Verslun fannst ekki" });
       const allPosts = await storage.listPosts();
       const storePosts = allPosts.filter((p) => p.storeId === storeId);
       const postIds = storePosts.map((p) => p.id);
       const totalPostViews = storePosts.reduce((s, p) => s + (p.viewCount || 0), 0);
+      const dateParams = [];
+      const dateClauses = [];
+      if (since) {
+        dateParams.push(since.toISOString());
+        dateClauses.push(`AND timestamp >= $${dateParams.length}`);
+      }
+      if (until) {
+        dateParams.push(until.toISOString());
+        dateClauses.push(`AND timestamp <= $${dateParams.length}`);
+      }
+      const dateFilter = dateClauses.join(" ");
       let adRows = [];
       let storePageViews = 0;
       try {
@@ -2112,22 +2145,23 @@ async function registerRoutes(app) {
           ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
         });
         if (postIds.length > 0) {
-          const placeholders = postIds.map((_, i) => `$${i + 1}`).join(",");
+          const placeholders = postIds.map((_, i) => `$${dateParams.length + i + 1}`).join(",");
           const adResult = await pool2.query(
             `SELECT target AS post_id,
                SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
                SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks,
                MAX(meta->>'postTitle') AS post_title
              FROM interactions
-             WHERE event_type IN ('impression','click') AND target IN (${placeholders})
+             WHERE event_type IN ('impression','click') AND target IN (${placeholders}) ${dateFilter}
              GROUP BY target`,
-            postIds
+            [...dateParams, ...postIds]
           );
           adRows = adResult.rows;
         }
+        const viewParamIdx = dateParams.length + 1;
         const viewResult = await pool2.query(
-          `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $1`,
-          [`%/stores/${storeId}%`]
+          `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $${viewParamIdx} ${dateFilter}`,
+          [...dateParams, `%/stores/${storeId}%`]
         );
         storePageViews = Number(viewResult.rows[0]?.cnt) || 0;
         await pool2.end();
@@ -2177,11 +2211,12 @@ async function registerRoutes(app) {
   router.get("/admin/analytics/summary", authAdmin, async (req, res) => {
     try {
       const since = req.query.since ? new Date(req.query.since) : void 0;
+      const until = req.query.until ? new Date(req.query.until) : void 0;
       const [dbStats, liveStats] = await Promise.all([
-        getDbSummary(since),
+        getDbSummary(since, until),
         Promise.resolve(getSessionSummary())
       ]);
-      const isFull = !since;
+      const isFull = !since && !until;
       res.json({
         total_events_db: dbStats.total_events_db,
         total_events_cached: isFull ? liveStats.total_events_cached : 0,

@@ -1477,6 +1477,7 @@ export async function registerRoutes(app: Express): Promise<void> {
   router.get("/admin/analytics/ads", authAdmin, async (req, res) => {
     try {
       const since = req.query.since ? new Date(req.query.since as string) : undefined;
+      const until = req.query.until ? new Date(req.query.until as string) : undefined;
       const { Pool } = await import("pg");
       const pool = new (Pool as any)({
         host: process.env.PGHOST,
@@ -1488,8 +1489,11 @@ export async function registerRoutes(app: Express): Promise<void> {
         ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
           ? { rejectUnauthorized: false } : false,
       });
-      const sinceClause = since ? `AND timestamp >= $1` : "";
-      const params = since ? [since.toISOString()] : [];
+      const dateParams: string[] = [];
+      const dateClauses: string[] = [];
+      if (since) { dateParams.push(since.toISOString()); dateClauses.push(`AND timestamp >= $${dateParams.length}`); }
+      if (until) { dateParams.push(until.toISOString()); dateClauses.push(`AND timestamp <= $${dateParams.length}`); }
+      const dateFilter = dateClauses.join(" ");
       const result = await pool.query(`
         SELECT
           target                                           AS post_id,
@@ -1500,11 +1504,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           MIN(timestamp)                                   AS first_seen,
           MAX(timestamp)                                   AS last_seen
         FROM interactions
-        WHERE event_type IN ('impression','click') AND target IS NOT NULL ${sinceClause}
+        WHERE event_type IN ('impression','click') AND target IS NOT NULL ${dateFilter}
         GROUP BY target
         ORDER BY impressions DESC
         LIMIT 200
-      `, params);
+      `, dateParams);
       await pool.end();
       const rows = result.rows.map((r: any) => ({
         postId: r.post_id,
@@ -1530,6 +1534,9 @@ export async function registerRoutes(app: Express): Promise<void> {
   router.get("/admin/analytics/store/:storeId", authAdmin, async (req, res) => {
     try {
       const { storeId } = req.params;
+      const since = req.query.since ? new Date(req.query.since as string) : undefined;
+      const until = req.query.until ? new Date(req.query.until as string) : undefined;
+
       const store = await storage.getStoreById(storeId);
       if (!store) return res.status(404).json({ message: "Verslun fannst ekki" });
 
@@ -1538,6 +1545,13 @@ export async function registerRoutes(app: Express): Promise<void> {
 
       const postIds = storePosts.map((p: any) => p.id);
       const totalPostViews = storePosts.reduce((s: number, p: any) => s + (p.viewCount || 0), 0);
+
+      // Build date filter clauses
+      const dateParams: (string | any)[] = [];
+      const dateClauses: string[] = [];
+      if (since) { dateParams.push(since.toISOString()); dateClauses.push(`AND timestamp >= $${dateParams.length}`); }
+      if (until) { dateParams.push(until.toISOString()); dateClauses.push(`AND timestamp <= $${dateParams.length}`); }
+      const dateFilter = dateClauses.join(" ");
 
       // Pull ad stats + store-page views from PG
       let adRows: any[] = [];
@@ -1552,22 +1566,23 @@ export async function registerRoutes(app: Express): Promise<void> {
             ? { rejectUnauthorized: false } : false,
         });
         if (postIds.length > 0) {
-          const placeholders = postIds.map((_: any, i: number) => `$${i + 1}`).join(",");
+          const placeholders = postIds.map((_: any, i: number) => `$${dateParams.length + i + 1}`).join(",");
           const adResult = await pool.query(
             `SELECT target AS post_id,
                SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
                SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks,
                MAX(meta->>'postTitle') AS post_title
              FROM interactions
-             WHERE event_type IN ('impression','click') AND target IN (${placeholders})
+             WHERE event_type IN ('impression','click') AND target IN (${placeholders}) ${dateFilter}
              GROUP BY target`,
-            postIds
+            [...dateParams, ...postIds]
           );
           adRows = adResult.rows;
         }
+        const viewParamIdx = dateParams.length + 1;
         const viewResult = await pool.query(
-          `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $1`,
-          [`%/stores/${storeId}%`]
+          `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $${viewParamIdx} ${dateFilter}`,
+          [...dateParams, `%/stores/${storeId}%`]
         );
         storePageViews = Number(viewResult.rows[0]?.cnt) || 0;
         await pool.end();
@@ -1625,12 +1640,12 @@ export async function registerRoutes(app: Express): Promise<void> {
   router.get("/admin/analytics/summary", authAdmin, async (req, res) => {
     try {
       const since = req.query.since ? new Date(req.query.since as string) : undefined;
+      const until = req.query.until ? new Date(req.query.until as string) : undefined;
       const [dbStats, liveStats] = await Promise.all([
-        getDbSummary(since),
+        getDbSummary(since, until),
         Promise.resolve(getSessionSummary()),
       ]);
-      // When filtering by period, don't merge live memory stats (they lack timestamps)
-      const isFull = !since;
+      const isFull = !since && !until;
       res.json({
         total_events_db: dbStats.total_events_db,
         total_events_cached: isFull ? liveStats.total_events_cached : 0,

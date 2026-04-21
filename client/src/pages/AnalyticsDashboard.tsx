@@ -429,23 +429,46 @@ export default function AnalyticsDashboard() {
   const [eventFilter, setEventFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
-  const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "all">("all");
 
-  const sinceDate = useMemo(() => {
-    if (period === "all") return undefined;
+  // Main dashboard date range (YYYY-MM-DD strings, empty = no limit)
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  // Store modal date range
+  const [storeDateFrom, setStoreDateFrom] = useState<string>("");
+  const [storeDateTo, setStoreDateTo] = useState<string>("");
+
+  function todayStr() {
+    return new Date().toISOString().slice(0, 10);
+  }
+  function daysAgoStr(n: number) {
     const d = new Date();
-    d.setDate(d.getDate() - (period === "7d" ? 7 : period === "30d" ? 30 : 90));
-    return d;
-  }, [period]);
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  }
+  function buildDateQS(from: string, to: string) {
+    const p: string[] = [];
+    if (from) p.push(`since=${new Date(from).toISOString()}`);
+    if (to) p.push(`until=${new Date(to + "T23:59:59").toISOString()}`);
+    return p.length ? `&${p.join("&")}` : "";
+  }
+  function dateRangeLabel(from: string, to: string) {
+    if (!from && !to) return "Allt tímabilið";
+    const f = from ? new Date(from).toLocaleDateString("is-IS") : "—";
+    const t = to ? new Date(to).toLocaleDateString("is-IS") : "í dag";
+    return `${f} – ${t}`;
+  }
 
-  const sinceParam = sinceDate ? `&since=${sinceDate.toISOString()}` : "";
+  const mainDateQS = useMemo(() => buildDateQS(dateFrom, dateTo), [dateFrom, dateTo]);
+  const storeDateQS = useMemo(() => buildDateQS(storeDateFrom, storeDateTo), [storeDateFrom, storeDateTo]);
 
-  const PERIOD_LABELS: Record<string, string> = {
-    "7d": "7 dagar",
-    "30d": "30 dagar",
-    "90d": "90 dagar",
-    "all": "Allt tímabilið",
-  };
+  // Reset store date filter when opening a new store
+  useEffect(() => {
+    if (selectedStoreId) {
+      setStoreDateFrom("");
+      setStoreDateTo("");
+    }
+  }, [selectedStoreId]);
 
   const token =
     typeof window !== "undefined"
@@ -461,13 +484,13 @@ export default function AnalyticsDashboard() {
     isError: adStatsError,
     refetch: refetchAds,
   } = useQuery<AdStat[]>({
-    queryKey: ["analytics-ads", period],
+    queryKey: ["analytics-ads", dateFrom, dateTo],
     enabled: isAdmin,
     refetchInterval: 60_000,
     retry: 8,
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
-      apiFetch<AdStat[]>(`/api/v1/admin/analytics/ads?limit=200${sinceParam}`, {
+      apiFetch<AdStat[]>(`/api/v1/admin/analytics/ads?limit=200${mainDateQS}`, {
         headers: authHeader,
       }),
   });
@@ -477,13 +500,13 @@ export default function AnalyticsDashboard() {
     isLoading: summaryLoading,
     refetch: refetchSummary,
   } = useQuery<Summary>({
-    queryKey: ["analytics-summary", period],
+    queryKey: ["analytics-summary", dateFrom, dateTo],
     enabled: isAdmin,
     refetchInterval: 30_000,
     retry: 8,
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
-      apiFetch<Summary>(`/api/v1/admin/analytics/summary?v=1${sinceParam}`, {
+      apiFetch<Summary>(`/api/v1/admin/analytics/summary?v=1${mainDateQS}`, {
         headers: authHeader,
       }),
   });
@@ -495,13 +518,13 @@ export default function AnalyticsDashboard() {
     isError: dbError,
     refetch: refetchDb,
   } = useQuery<Event[]>({
-    queryKey: ["analytics-db-events", period],
+    queryKey: ["analytics-db-events", dateFrom, dateTo],
     enabled: isAdmin,
     refetchInterval: 60_000,
     retry: 8,
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
-      apiFetch<Event[]>(`/api/v1/admin/analytics/db?limit=500${sinceParam}`, {
+      apiFetch<Event[]>(`/api/v1/admin/analytics/db?limit=500${mainDateQS}`, {
         headers: authHeader,
       }),
   });
@@ -525,15 +548,15 @@ export default function AnalyticsDashboard() {
 
   // Merge: DB rows are authoritative; prepend any mem-only events (those without
   // a numeric id are in-memory only and not yet confirmed to be in the DB).
-  // When filtering by period, skip mem-only events (they lack reliable timestamps).
+  // When a date filter is active, skip mem-only events (they lack reliable timestamps).
   const events = useMemo<Event[]>(() => {
-    if (period !== "all") return dbEvents;
+    if (dateFrom || dateTo) return dbEvents;
     const dbIds = new Set(dbEvents.map((e) => String(e.id)));
     const memOnly = memEvents.filter(
       (e) => String(e.id).startsWith("mem-") || !dbIds.has(String(e.id)),
     );
     return [...memOnly, ...dbEvents];
-  }, [dbEvents, memEvents, period]);
+  }, [dbEvents, memEvents, dateFrom, dateTo]);
 
   const eventsLoading = dbLoading && memLoading;
   const eventsError = dbError;
@@ -569,13 +592,14 @@ export default function AnalyticsDashboard() {
     data: storeAnalytics,
     isLoading: storeAnalyticsLoading,
   } = useQuery<StoreAnalytics>({
-    queryKey: ["analytics-store", selectedStoreId],
+    queryKey: ["analytics-store", selectedStoreId, storeDateFrom, storeDateTo],
     enabled: isAdmin && !!selectedStoreId,
     retry: 3,
     queryFn: () =>
-      apiFetch<StoreAnalytics>(`/api/v1/admin/analytics/store/${selectedStoreId}`, {
-        headers: authHeader,
-      }),
+      apiFetch<StoreAnalytics>(
+        `/api/v1/admin/analytics/store/${selectedStoreId}?v=1${storeDateQS}`,
+        { headers: authHeader }
+      ),
   });
 
   if (loading) {
@@ -675,23 +699,59 @@ export default function AnalyticsDashboard() {
       </header>
 
       <div className="px-4 pt-4 space-y-4">
-        {/* Period selector */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground mr-1">Tímabil:</span>
-          {(["7d", "30d", "90d", "all"] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              data-testid={`button-period-${p}`}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                period === p
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover-elevate"
-              }`}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
+        {/* Date range picker */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <label className="text-xs text-muted-foreground flex-shrink-0">Frá</label>
+              <input
+                type="date"
+                value={dateFrom}
+                max={dateTo || todayStr()}
+                onChange={(e) => setDateFrom(e.target.value)}
+                data-testid="input-date-from"
+                className="flex-1 min-w-0 text-xs border rounded-md px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 flex-1 min-w-0">
+              <label className="text-xs text-muted-foreground flex-shrink-0">Til</label>
+              <input
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                max={todayStr()}
+                onChange={(e) => setDateTo(e.target.value)}
+                data-testid="input-date-to"
+                className="flex-1 min-w-0 text-xs border rounded-md px-2 py-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground">Flýtival:</span>
+            {([
+              { label: "Í dag", from: todayStr(), to: todayStr() },
+              { label: "7 dagar", from: daysAgoStr(7), to: todayStr() },
+              { label: "30 dagar", from: daysAgoStr(30), to: todayStr() },
+              { label: "90 dagar", from: daysAgoStr(90), to: todayStr() },
+              { label: "Allt", from: "", to: "" },
+            ]).map((opt) => {
+              const active = dateFrom === opt.from && dateTo === opt.to;
+              return (
+                <button
+                  key={opt.label}
+                  onClick={() => { setDateFrom(opt.from); setDateTo(opt.to); }}
+                  data-testid={`button-quick-${opt.label}`}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover-elevate"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Stat cards */}
@@ -707,13 +767,13 @@ export default function AnalyticsDashboard() {
               icon={Users}
               label="Einstakar lotur"
               value={summary?.unique_sessions ?? 0}
-              sub={PERIOD_LABELS[period]}
+              sub={dateRangeLabel(dateFrom, dateTo)}
             />
             <StatCard
               icon={Eye}
               label="Atburðir (heildarfjöldi)"
               value={summary?.total_events ?? summary?.total_events_cached ?? 0}
-              sub={PERIOD_LABELS[period]}
+              sub={dateRangeLabel(dateFrom, dateTo)}
             />
             <StatCard
               icon={TrendingUp}
@@ -1343,6 +1403,63 @@ export default function AnalyticsDashboard() {
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* Modal date filter */}
+            <div className="px-4 py-3 border-b flex-shrink-0 space-y-2 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <label className="text-xs text-muted-foreground flex-shrink-0">Frá</label>
+                  <input
+                    type="date"
+                    value={storeDateFrom}
+                    max={storeDateTo || todayStr()}
+                    onChange={(e) => setStoreDateFrom(e.target.value)}
+                    data-testid="input-store-date-from"
+                    className="flex-1 min-w-0 text-xs border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  <label className="text-xs text-muted-foreground flex-shrink-0">Til</label>
+                  <input
+                    type="date"
+                    value={storeDateTo}
+                    min={storeDateFrom || undefined}
+                    max={todayStr()}
+                    onChange={(e) => setStoreDateTo(e.target.value)}
+                    data-testid="input-store-date-to"
+                    className="flex-1 min-w-0 text-xs border rounded-md px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {([
+                  { label: "Í dag", from: todayStr(), to: todayStr() },
+                  { label: "7 dagar", from: daysAgoStr(7), to: todayStr() },
+                  { label: "30 dagar", from: daysAgoStr(30), to: todayStr() },
+                  { label: "Allt", from: "", to: "" },
+                ]).map((opt) => {
+                  const active = storeDateFrom === opt.from && storeDateTo === opt.to;
+                  return (
+                    <button
+                      key={opt.label}
+                      onClick={() => { setStoreDateFrom(opt.from); setStoreDateTo(opt.to); }}
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover-elevate"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+                {(storeDateFrom || storeDateTo) && (
+                  <span className="text-[10px] text-muted-foreground ml-auto">
+                    {dateRangeLabel(storeDateFrom, storeDateTo)}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Modal body */}

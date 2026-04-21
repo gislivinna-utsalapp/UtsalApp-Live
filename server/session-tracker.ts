@@ -266,18 +266,20 @@ export function getSessionSummary() {
  * DB-backed summary — persistent across server restarts.
  * Combines live in-memory stats with DB aggregates.
  */
-export async function getDbSummary(since?: Date): Promise<{
+export async function getDbSummary(since?: Date, until?: Date): Promise<{
   total_events_db: number;
   unique_sessions: number;
   top_paths: { path: string; count: number }[];
   by_event_type: { event_type: string; count: number }[];
   recent_searches: { q: string; count: number }[];
 }> {
-  const whereClause = since ? `WHERE timestamp >= $1` : "";
-  const whereSearchClause = since
-    ? `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL AND timestamp >= $1`
-    : `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL`;
-  const params = since ? [since.toISOString()] : [];
+  const conditions: string[] = [];
+  const params: string[] = [];
+  if (since)  { params.push(since.toISOString());  conditions.push(`timestamp >= $${params.length}`); }
+  if (until)  { params.push(until.toISOString());  conditions.push(`timestamp <= $${params.length}`); }
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const searchConditions = [`event_type = 'search'`, `meta->>'q' IS NOT NULL`, ...conditions];
+  const whereSearchClause = `WHERE ${searchConditions.join(" AND ")}`;
 
   const [totalRes, sessionsRes, pathsRes, typesRes, searchesRes] =
     await Promise.all([

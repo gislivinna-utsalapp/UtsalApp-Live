@@ -88,6 +88,9 @@ export default function Login() {
               id="password"
               type="password"
               autoComplete="current-password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}

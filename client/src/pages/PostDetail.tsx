@@ -263,7 +263,7 @@ export default function PostDetail() {
   };
 
   return (
-    <div className="bg-white min-h-screen pb-28">
+    <div className="bg-white min-h-screen pb-40">
       {/* ── Sticky header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-30 bg-white border-b border-neutral-100 flex items-center px-3 py-2.5 gap-2">
         <button
@@ -369,10 +369,10 @@ export default function PostDetail() {
         )}
       </div>
 
-      {/* ── Sticky bottom buy bar — z-50 sits above BottomNav (z-40) */}
+      {/* ── Sticky bottom buy bar — sits above BottomNav (bottom-14 ≈ 56px = BottomNav height) */}
       <div
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-neutral-200 px-3 pt-2 flex gap-2"
-        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}
+        className="fixed z-30 bg-white border-t border-neutral-200 px-3 py-2 flex gap-2"
+        style={{ bottom: "calc(56px + env(safe-area-inset-bottom, 0px))", left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: "32rem" }}
       >
         <button
           onClick={handleSave}

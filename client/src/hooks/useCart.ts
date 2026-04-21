@@ -67,5 +67,10 @@ export function useCart() {
     [ids],
   );
 
-  return { cartIds: ids, cartCount: ids.length, addToCart, removeFromCart, toggleCart, isInCart };
+  const clearCart = useCallback(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([]));
+    emitChange();
+  }, []);
+
+  return { cartIds: ids, cartCount: ids.length, addToCart, removeFromCart, toggleCart, isInCart, clearCart };
 }

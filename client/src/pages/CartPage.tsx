@@ -34,7 +34,7 @@ function pickFirstImageUrl(images: unknown): string {
 }
 
 export default function CartPage() {
-  const { cartIds, removeFromCart } = useCart();
+  const { cartIds, removeFromCart, clearCart } = useCart();
 
   const { data: rawData, isLoading } = useQuery<any>({
     queryKey: ["posts", "cart"],
@@ -58,6 +58,18 @@ export default function CartPage() {
           <span className="text-xs text-muted-foreground">
             ({cartIds.length})
           </span>
+        )}
+        {cartIds.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearCart}
+            data-testid="button-clear-cart"
+            className="ml-auto text-muted-foreground hover:text-destructive gap-1.5"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Tæma körfu
+          </Button>
         )}
       </div>
 

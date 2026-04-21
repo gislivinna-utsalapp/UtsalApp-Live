@@ -2038,6 +2038,40 @@ async function registerRoutes(app) {
       res.status(500).json({ message: "Villa kom upp" });
     }
   });
+  router.post("/analytics/pwa-install", async (req, res) => {
+    try {
+      logEvent(req, "other", "pwa_install", { type: "pwa_install" });
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.json({ ok: false });
+    }
+  });
+  router.get("/admin/analytics/pwa-installs", authAdmin, async (req, res) => {
+    try {
+      const { Pool: Pool2 } = await import("pg");
+      const pool2 = new Pool2({
+        host: process.env.PGHOST,
+        port: Number(process.env.PGPORT) || 5432,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        max: 2,
+        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
+      });
+      const result = await pool2.query(
+        `SELECT COUNT(*) AS count, DATE(timestamp) AS day
+           FROM interactions
+          WHERE event_type = 'other' AND target = 'pwa_install'
+          GROUP BY day ORDER BY day DESC LIMIT 30`
+      );
+      const total = result.rows.reduce((s, r) => s + Number(r.count), 0);
+      await pool2.end();
+      return res.json({ total, byDay: result.rows.map((r) => ({ day: r.day, count: Number(r.count) })) });
+    } catch (err) {
+      console.error("[pwa-installs]", err);
+      return res.status(500).json({ total: 0, byDay: [] });
+    }
+  });
   router.post("/analytics/ad-event", async (req, res) => {
     try {
       const { postId, eventType, postTitle, storeName } = req.body;

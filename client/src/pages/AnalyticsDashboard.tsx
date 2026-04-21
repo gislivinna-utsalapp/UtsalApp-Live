@@ -6,6 +6,7 @@ import {
   Users,
   Eye,
   Search,
+  Smartphone,
   MousePointerClick,
   TrendingUp,
   Clock,
@@ -494,6 +495,13 @@ export default function AnalyticsDashboard() {
       }),
   });
 
+  const { data: pwaInstalls } = useQuery<{ total: number; byDay: { day: string; count: number }[] }>({
+    queryKey: ["analytics-pwa-installs"],
+    enabled: isAdmin,
+    refetchInterval: 60_000,
+    queryFn: () => apiFetch("/api/v1/admin/analytics/pwa-installs", { headers: authHeader }),
+  });
+
   const {
     data: summary,
     isLoading: summaryLoading,
@@ -791,6 +799,12 @@ export default function AnalyticsDashboard() {
               label="Slóðir raktar"
               value={summary?.top_paths.length ?? 0}
               sub="mismunandi síður"
+            />
+            <StatCard
+              icon={Smartphone}
+              label="Sett á heimaskjá"
+              value={pwaInstalls?.total ?? 0}
+              sub="PWA uppsetningar"
             />
           </div>
         )}

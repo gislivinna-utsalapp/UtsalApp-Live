@@ -1,15 +1,37 @@
 {
-  "name": "ÚtsalApp",
+  "name": "ÚtsalApp – Bestu tilboðin á Íslandi",
   "short_name": "ÚtsalApp",
-  "start_url": ".",
+  "description": "Finndu bestu útsölurnar og tilboðin á Íslandi",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "theme_color": "#ff4d00",
+  "orientation": "portrait",
+  "lang": "is",
   "icons": [
     {
-      "src": "/favicon.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

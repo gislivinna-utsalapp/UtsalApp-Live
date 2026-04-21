@@ -1448,6 +1448,42 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   // ─── AD TRACKING (public) ─────────────────────────────────────────────────
 
+  // POST /analytics/pwa-install – fired when user adds app to home screen
+  router.post("/analytics/pwa-install", async (req: Request, res: Response) => {
+    try {
+      logEvent(req as any, "other" as any, "pwa_install", { type: "pwa_install" });
+      return res.json({ ok: true });
+    } catch (err) {
+      return res.json({ ok: false });
+    }
+  });
+
+  // GET /admin/analytics/pwa-installs – total PWA install count (admin)
+  router.get("/admin/analytics/pwa-installs", authAdmin, async (req: Request, res: Response) => {
+    try {
+      const { Pool } = await import("pg");
+      const pool = new (Pool as any)({
+        host: process.env.PGHOST, port: Number(process.env.PGPORT) || 5432,
+        user: process.env.PGUSER, password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE, max: 2,
+        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
+          ? { rejectUnauthorized: false } : false,
+      });
+      const result = await pool.query(
+        `SELECT COUNT(*) AS count, DATE(timestamp) AS day
+           FROM interactions
+          WHERE event_type = 'other' AND target = 'pwa_install'
+          GROUP BY day ORDER BY day DESC LIMIT 30`
+      );
+      const total = result.rows.reduce((s: number, r: any) => s + Number(r.count), 0);
+      await pool.end();
+      return res.json({ total, byDay: result.rows.map((r: any) => ({ day: r.day, count: Number(r.count) })) });
+    } catch (err) {
+      console.error("[pwa-installs]", err);
+      return res.status(500).json({ total: 0, byDay: [] });
+    }
+  });
+
   // POST /analytics/ad-event  – record impression or click for a post (no auth needed)
   router.post("/analytics/ad-event", async (req: Request, res: Response) => {
     try {

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Orange rounded square background -->
+  <rect width="512" height="512" rx="108" ry="108" fill="#ff4d00"/>
+
+  <!-- Price tag shape pointing right -->
+  <polygon
+    points="80,150 80,362 248,460 408,256 248,52"
+    fill="white"
+    opacity="0.97"
+  />
+
+  <!-- Hole in tag (orange circle) -->
+  <circle cx="340" cy="162" r="30" fill="#ff4d00"/>
+
+  <!-- % symbol - top circle -->
+  <circle cx="175" cy="200" r="38" fill="#ff4d00"/>
+  <circle cx="175" cy="200" r="22" fill="white"/>
+
+  <!-- % symbol - bottom circle -->
+  <circle cx="255" cy="310" r="38" fill="#ff4d00"/>
+  <circle cx="255" cy="310" r="22" fill="white"/>
+
+  <!-- % symbol - diagonal line -->
+  <line x1="147" y1="348" x2="283" y2="162" stroke="#ff4d00" stroke-width="44" stroke-linecap="round"/>
+</svg>

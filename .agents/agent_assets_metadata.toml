@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "dpko1RR6rmJ7YKb-Gc1oD"
+uri = "file://client/public/icon-512.png"
+type = "image"
+title = "utsalapp-orange-icon"

@@ -21,6 +21,9 @@ import {
   CheckCheck,
   Tag,
   ShoppingBag,
+  Store,
+  X,
+  BarChart,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
@@ -51,7 +54,38 @@ type Event = {
   meta?: { q?: string; category?: string; location?: string; intent?: string } | null;
 };
 
-type Tab = "overview" | "events" | "searches" | "sales" | "ads";
+type Tab = "overview" | "events" | "searches" | "sales" | "ads" | "stores";
+
+type AdminStore = {
+  id: string;
+  name: string;
+  email: string | null;
+  plan: string;
+  billingStatus: string;
+  createdAt: string | null;
+};
+
+type StoreAnalytics = {
+  store: AdminStore;
+  summary: {
+    postCount: number;
+    totalPostViews: number;
+    totalImpressions: number;
+    totalClicks: number;
+    storePageViews: number;
+    ctr: number;
+  };
+  posts: {
+    id: string;
+    title: string;
+    viewCount: number;
+    impressions: number;
+    clicks: number;
+    endsAt: string | null;
+    priceSale: number | null;
+    priceOriginal: number | null;
+  }[];
+};
 
 type AdStat = {
   postId: string;
@@ -394,6 +428,7 @@ export default function AnalyticsDashboard() {
   const [tab, setTab] = useState<Tab>("overview");
   const [eventFilter, setEventFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
 
   const token =
     typeof window !== "undefined"
@@ -498,6 +533,32 @@ export default function AnalyticsDashboard() {
   const refetchEvents = () => { refetchDb(); refetchMem(); };
   const refetchSearches = refetchEvents;
 
+  const {
+    data: adminStores = [],
+    isLoading: adminStoresLoading,
+    refetch: refetchAdminStores,
+  } = useQuery<AdminStore[]>({
+    queryKey: ["admin-stores"],
+    enabled: isAdmin,
+    retry: 8,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
+    queryFn: () =>
+      apiFetch<AdminStore[]>("/api/v1/admin/stores", { headers: authHeader }),
+  });
+
+  const {
+    data: storeAnalytics,
+    isLoading: storeAnalyticsLoading,
+  } = useQuery<StoreAnalytics>({
+    queryKey: ["analytics-store", selectedStoreId],
+    enabled: isAdmin && !!selectedStoreId,
+    retry: 3,
+    queryFn: () =>
+      apiFetch<StoreAnalytics>(`/api/v1/admin/analytics/store/${selectedStoreId}`, {
+        headers: authHeader,
+      }),
+  });
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto p-6 text-center text-muted-foreground">
@@ -519,6 +580,7 @@ export default function AnalyticsDashboard() {
     refetchSummary();
     refetchEvents();
     refetchAds();
+    refetchAdminStores();
   };
 
   // Derived stats from cached summary
@@ -561,6 +623,7 @@ export default function AnalyticsDashboard() {
     { key: "events", label: "Atburðir", icon: Clock },
     { key: "searches", label: "Leitir", icon: Search },
     { key: "sales", label: "Söluyfirlit", icon: Building2 },
+    { key: "stores", label: "Verslanir", icon: Store },
   ];
 
   return (
@@ -1144,7 +1207,224 @@ export default function AnalyticsDashboard() {
             />
           </div>
         )}
+
+        {/* ── STORES TAB ───────────────────────────────────────────────── */}
+        {tab === "stores" && (
+          <div className="space-y-3">
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Store className="w-4 h-4 text-primary" />
+                  Allar verslanir ({adminStores.length})
+                </h2>
+                <Button size="sm" variant="outline" onClick={() => refetchAdminStores()}>
+                  <RefreshCw className="w-3 h-3 mr-1.5" /> Uppfæra
+                </Button>
+              </div>
+
+              {adminStoresLoading ? (
+                <div className="space-y-2">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-12 rounded bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : adminStores.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Engar verslanir skráðar enn.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {adminStores.map((s) => {
+                    const planColor =
+                      s.plan === "premium" ? "bg-purple-100 text-purple-700" :
+                      s.plan === "pro" ? "bg-blue-100 text-blue-700" :
+                      "bg-muted text-muted-foreground";
+                    return (
+                      <button
+                        key={s.id}
+                        data-testid={`store-row-${s.id}`}
+                        onClick={() => setSelectedStoreId(s.id)}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover-elevate active-elevate-2 text-left transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Store className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{s.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{s.email ?? "—"}</p>
+                        </div>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${planColor}`}>
+                          {s.plan}
+                        </span>
+                        <ChevronDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 -rotate-90" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
       </div>
+
+      {/* ── STORE DETAIL MODAL ──────────────────────────────────────────── */}
+      {selectedStoreId && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4"
+          onClick={() => setSelectedStoreId(null)}
+          data-testid="modal-store-detail-backdrop"
+        >
+          <div
+            className="bg-background w-full sm:max-w-lg rounded-t-2xl sm:rounded-xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+            data-testid="modal-store-detail"
+          >
+            {/* Modal header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Store className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                {storeAnalyticsLoading ? (
+                  <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                ) : (
+                  <>
+                    <p className="font-semibold text-sm truncate">
+                      {storeAnalytics?.store.name ?? "—"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {storeAnalytics?.store.email ?? "—"}
+                    </p>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedStoreId(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover-elevate"
+                data-testid="button-close-store-modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="overflow-y-auto flex-1 p-4 space-y-4">
+              {storeAnalyticsLoading ? (
+                <div className="space-y-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-10 rounded bg-muted animate-pulse" />
+                  ))}
+                </div>
+              ) : !storeAnalytics ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Engin gögn fundust.
+                </p>
+              ) : (
+                <>
+                  {/* Plan badge row */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      storeAnalytics.store.plan === "premium" ? "bg-purple-100 text-purple-700" :
+                      storeAnalytics.store.plan === "pro" ? "bg-blue-100 text-blue-700" :
+                      "bg-muted text-muted-foreground"
+                    }`}>
+                      {storeAnalytics.store.plan}
+                    </span>
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      storeAnalytics.store.billingStatus === "active" ? "bg-green-100 text-green-700" :
+                      storeAnalytics.store.billingStatus === "trial" ? "bg-yellow-100 text-yellow-700" :
+                      "bg-red-100 text-red-700"
+                    }`}>
+                      {storeAnalytics.store.billingStatus}
+                    </span>
+                    {storeAnalytics.store.createdAt && (
+                      <span className="text-[10px] text-muted-foreground ml-auto">
+                        Skráð: {new Date(storeAnalytics.store.createdAt).toLocaleDateString("is-IS")}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Summary stats grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Tilboð", value: storeAnalytics.summary.postCount, icon: Tag },
+                      { label: "Skoðanir", value: storeAnalytics.summary.totalPostViews, icon: Eye },
+                      { label: "Verslunar-skoðanir", value: storeAnalytics.summary.storePageViews, icon: Store },
+                      { label: "Birtingar", value: storeAnalytics.summary.totalImpressions, icon: BarChart },
+                      { label: "Smellir", value: storeAnalytics.summary.totalClicks, icon: MousePointerClick },
+                      { label: "CTR", value: `${storeAnalytics.summary.ctr}%`, icon: TrendingUp },
+                    ].map(({ label, value, icon: Icon }) => (
+                      <div key={label} className="rounded-md border p-2.5 space-y-0.5">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Icon className="w-3 h-3" />
+                          <span className="text-[10px]">{label}</span>
+                        </div>
+                        <p className="text-base font-bold">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Per-post breakdown */}
+                  {storeAnalytics.posts.length > 0 && (
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                        <Tag className="w-3 h-3" />
+                        Tilboð ({storeAnalytics.posts.length})
+                      </h3>
+                      <div className="overflow-x-auto -mx-1">
+                        <table className="w-full text-xs min-w-[340px]">
+                          <thead>
+                            <tr className="border-b">
+                              <th className="text-left py-1.5 px-2 text-muted-foreground font-medium">Tilboð</th>
+                              <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Skoð.</th>
+                              <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Birtingar</th>
+                              <th className="text-right py-1.5 px-2 text-muted-foreground font-medium">Smellir</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {storeAnalytics.posts.map((p) => (
+                              <tr key={p.id} className="border-b last:border-0">
+                                <td className="py-2 px-2 max-w-[140px]">
+                                  <p className="truncate font-medium">{p.title}</p>
+                                  {p.priceSale != null && (
+                                    <p className="text-[10px] text-primary font-semibold">
+                                      {p.priceSale.toLocaleString("is-IS")} kr
+                                    </p>
+                                  )}
+                                </td>
+                                <td className="py-2 px-2 text-right">{p.viewCount}</td>
+                                <td className="py-2 px-2 text-right">{p.impressions}</td>
+                                <td className="py-2 px-2 text-right">{p.clicks}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {storeAnalytics.posts.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Þessi verslun hefur engin tilboð skráð.
+                    </p>
+                  )}
+
+                  {/* Link to store page */}
+                  <Link to={`/stores/${selectedStoreId}`}>
+                    <button
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-md border text-sm font-medium hover-elevate active-elevate-2"
+                      onClick={() => setSelectedStoreId(null)}
+                    >
+                      <Globe className="w-4 h-4" />
+                      Skoða verslunarsíðu
+                    </button>
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

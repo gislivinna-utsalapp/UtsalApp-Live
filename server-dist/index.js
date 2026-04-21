@@ -2074,6 +2074,91 @@ async function registerRoutes(app) {
       return res.status(500).json({ message: "Villa \xED greiningum" });
     }
   });
+  router.get("/admin/analytics/store/:storeId", authAdmin, async (req, res) => {
+    try {
+      const { storeId } = req.params;
+      const store = await storage.getStoreById(storeId);
+      if (!store) return res.status(404).json({ message: "Verslun fannst ekki" });
+      const allPosts = await storage.listPosts();
+      const storePosts = allPosts.filter((p) => p.storeId === storeId);
+      const postIds = storePosts.map((p) => p.id);
+      const totalPostViews = storePosts.reduce((s, p) => s + (p.viewCount || 0), 0);
+      let adRows = [];
+      let storePageViews = 0;
+      try {
+        const { Pool: Pool2 } = await import("pg");
+        const pool2 = new Pool2({
+          host: process.env.PGHOST,
+          port: Number(process.env.PGPORT) || 5432,
+          user: process.env.PGUSER,
+          password: process.env.PGPASSWORD,
+          database: process.env.PGDATABASE,
+          max: 2,
+          ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
+        });
+        if (postIds.length > 0) {
+          const placeholders = postIds.map((_, i) => `$${i + 1}`).join(",");
+          const adResult = await pool2.query(
+            `SELECT target AS post_id,
+               SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
+               SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks,
+               MAX(meta->>'postTitle') AS post_title
+             FROM interactions
+             WHERE event_type IN ('impression','click') AND target IN (${placeholders})
+             GROUP BY target`,
+            postIds
+          );
+          adRows = adResult.rows;
+        }
+        const viewResult = await pool2.query(
+          `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $1`,
+          [`%/stores/${storeId}%`]
+        );
+        storePageViews = Number(viewResult.rows[0]?.cnt) || 0;
+        await pool2.end();
+      } catch (_) {
+      }
+      const adByPostId = {};
+      for (const r of adRows) {
+        adByPostId[r.post_id] = { impressions: Number(r.impressions) || 0, clicks: Number(r.clicks) || 0 };
+      }
+      const totalImpressions = adRows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
+      const totalClicks = adRows.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
+      const users = await storage.listUsers();
+      const owner = users.find((u) => u.storeId === storeId);
+      return res.json({
+        store: {
+          id: store.id,
+          name: store.name,
+          email: owner?.email ?? null,
+          plan: store.plan ?? "basic",
+          billingStatus: store.billingStatus ?? "trial",
+          createdAt: store.createdAt ?? null
+        },
+        summary: {
+          postCount: storePosts.length,
+          totalPostViews,
+          totalImpressions,
+          totalClicks,
+          storePageViews,
+          ctr: totalImpressions > 0 ? Math.round(totalClicks / totalImpressions * 1e3) / 10 : 0
+        },
+        posts: storePosts.map((p) => ({
+          id: p.id,
+          title: p.title,
+          viewCount: p.viewCount || 0,
+          impressions: adByPostId[p.id]?.impressions ?? 0,
+          clicks: adByPostId[p.id]?.clicks ?? 0,
+          endsAt: p.endsAt ?? null,
+          priceSale: p.priceSale ?? null,
+          priceOriginal: p.priceOriginal ?? null
+        }))
+      });
+    } catch (err) {
+      console.error("[analytics/store]", err);
+      return res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
   router.get("/admin/analytics/summary", authAdmin, async (_req, res) => {
     try {
       const [dbStats, liveStats] = await Promise.all([

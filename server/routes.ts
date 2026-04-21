@@ -1521,6 +1521,99 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ─── ANALYTICS PER STORE (admin-only) ──────────────────────────────────────
+
+  router.get("/admin/analytics/store/:storeId", authAdmin, async (req, res) => {
+    try {
+      const { storeId } = req.params;
+      const store = await storage.getStoreById(storeId);
+      if (!store) return res.status(404).json({ message: "Verslun fannst ekki" });
+
+      const allPosts = await storage.listPosts();
+      const storePosts = (allPosts as any[]).filter((p) => p.storeId === storeId);
+
+      const postIds = storePosts.map((p: any) => p.id);
+      const totalPostViews = storePosts.reduce((s: number, p: any) => s + (p.viewCount || 0), 0);
+
+      // Pull ad stats + store-page views from PG
+      let adRows: any[] = [];
+      let storePageViews = 0;
+      try {
+        const { Pool } = await import("pg");
+        const pool = new (Pool as any)({
+          host: process.env.PGHOST, port: Number(process.env.PGPORT) || 5432,
+          user: process.env.PGUSER, password: process.env.PGPASSWORD,
+          database: process.env.PGDATABASE, max: 2,
+          ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
+            ? { rejectUnauthorized: false } : false,
+        });
+        if (postIds.length > 0) {
+          const placeholders = postIds.map((_: any, i: number) => `$${i + 1}`).join(",");
+          const adResult = await pool.query(
+            `SELECT target AS post_id,
+               SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
+               SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks,
+               MAX(meta->>'postTitle') AS post_title
+             FROM interactions
+             WHERE event_type IN ('impression','click') AND target IN (${placeholders})
+             GROUP BY target`,
+            postIds
+          );
+          adRows = adResult.rows;
+        }
+        const viewResult = await pool.query(
+          `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $1`,
+          [`%/stores/${storeId}%`]
+        );
+        storePageViews = Number(viewResult.rows[0]?.cnt) || 0;
+        await pool.end();
+      } catch (_) {}
+
+      const adByPostId: Record<string, { impressions: number; clicks: number }> = {};
+      for (const r of adRows) {
+        adByPostId[r.post_id] = { impressions: Number(r.impressions) || 0, clicks: Number(r.clicks) || 0 };
+      }
+
+      const totalImpressions = adRows.reduce((s: number, r: any) => s + (Number(r.impressions) || 0), 0);
+      const totalClicks = adRows.reduce((s: number, r: any) => s + (Number(r.clicks) || 0), 0);
+
+      const users = await storage.listUsers();
+      const owner = (users as any[]).find((u) => u.storeId === storeId);
+
+      return res.json({
+        store: {
+          id: (store as any).id,
+          name: (store as any).name,
+          email: owner?.email ?? null,
+          plan: (store as any).plan ?? "basic",
+          billingStatus: (store as any).billingStatus ?? "trial",
+          createdAt: (store as any).createdAt ?? null,
+        },
+        summary: {
+          postCount: storePosts.length,
+          totalPostViews,
+          totalImpressions,
+          totalClicks,
+          storePageViews,
+          ctr: totalImpressions > 0 ? Math.round((totalClicks / totalImpressions) * 1000) / 10 : 0,
+        },
+        posts: storePosts.map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          viewCount: p.viewCount || 0,
+          impressions: adByPostId[p.id]?.impressions ?? 0,
+          clicks: adByPostId[p.id]?.clicks ?? 0,
+          endsAt: p.endsAt ?? null,
+          priceSale: p.priceSale ?? null,
+          priceOriginal: p.priceOriginal ?? null,
+        })),
+      });
+    } catch (err) {
+      console.error("[analytics/store]", err);
+      return res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+
   // ─── ANALYTICS (admin-only) ──────────────────────────────────────────────
 
   // GET /admin/analytics/summary – persistent DB-backed stats + live memory overlay

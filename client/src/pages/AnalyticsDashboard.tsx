@@ -620,14 +620,14 @@ export default function AnalyticsDashboard() {
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex gap-1 border-b">
+        {/* Tab bar — horizontally scrollable on mobile */}
+        <div className="flex gap-0 border-b overflow-x-auto scrollbar-none -mx-4 px-4">
           {tabs.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
               data-testid={`tab-${key}`}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 tab === key
                   ? "border-primary text-primary"
                   : "border-transparent text-muted-foreground hover:text-foreground"

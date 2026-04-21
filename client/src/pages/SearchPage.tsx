@@ -1,6 +1,7 @@
 // client/src/pages/SearchPage.tsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
@@ -16,7 +17,15 @@ async function searchPosts(term: string): Promise<SalePostWithDetails[]> {
 }
 
 export default function SearchPage() {
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialQ = searchParams.get("q") ?? "";
+  const [searchTerm, setSearchTerm] = useState(initialQ);
+
+  // Update search term if URL param changes (e.g. navigated from header)
+  useEffect(() => {
+    const q = searchParams.get("q") ?? "";
+    if (q) setSearchTerm(q);
+  }, [searchParams]);
 
   const { data: results = [], isLoading, error } = useQuery({
     queryKey: ["posts", "search", searchTerm],

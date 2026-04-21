@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
 import { SalePostCard } from "@/components/SalePostCard";
@@ -17,6 +18,14 @@ interface PaginatedResponse {
 
 export default function Home() {
   const [page, setPage] = useState(1);
+  const [searchQ, setSearchQ] = useState("");
+  const navigate = useNavigate();
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQ.trim();
+    if (q) navigate(`/leit?q=${encodeURIComponent(q)}`);
+  }
 
   const { data, isLoading, error } = useQuery<PaginatedResponse>({
     queryKey: ["posts", "home", page],
@@ -48,13 +57,38 @@ export default function Home() {
   return (
     <div className="bg-white min-h-screen pb-20">
       {/* ── App header ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 bg-white border-b border-neutral-100 px-4 py-3 flex items-center justify-between">
-        <span className="text-lg font-extrabold tracking-tight text-neutral-900">
-          Útsalapp
+      <header className="sticky top-0 z-30 bg-white border-b border-neutral-100 px-4 py-2 flex items-center gap-3">
+        {/* Brand */}
+        <span className="text-base font-extrabold tracking-tight text-neutral-900 whitespace-nowrap flex-shrink-0">
+          ÚtsalApp
         </span>
-        <span className="text-xs text-neutral-400 font-medium">
-          {total > 0 ? `${total} tilboð` : ""}
-        </span>
+
+        {/* Search bar */}
+        <form
+          onSubmit={handleSearchSubmit}
+          className="flex-1 flex items-center bg-neutral-100 rounded-full px-3 gap-2"
+        >
+          <Search className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
+          <input
+            type="search"
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="Leita að tilboðum..."
+            autoCapitalize="none"
+            autoCorrect="off"
+            data-testid="input-header-search"
+            className="flex-1 bg-transparent py-2 text-sm text-neutral-800 placeholder:text-neutral-400 outline-none min-w-0"
+          />
+          {searchQ && (
+            <button
+              type="submit"
+              className="text-[#ff4d00] text-xs font-semibold flex-shrink-0"
+              data-testid="button-header-search-submit"
+            >
+              Leita
+            </button>
+          )}
+        </form>
       </header>
 
       {/* ── Loading skeleton ───────────────────────────────────── */}

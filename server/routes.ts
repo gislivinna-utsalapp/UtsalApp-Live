@@ -1473,8 +1473,10 @@ export async function registerRoutes(app: Express): Promise<void> {
   });
 
   // GET /admin/analytics/ads – per-ad aggregated stats (admin)
-  router.get("/admin/analytics/ads", authAdmin, async (_req, res) => {
+  // ?since=2025-01-01  (optional ISO date string)
+  router.get("/admin/analytics/ads", authAdmin, async (req, res) => {
     try {
+      const since = req.query.since ? new Date(req.query.since as string) : undefined;
       const { Pool } = await import("pg");
       const pool = new (Pool as any)({
         host: process.env.PGHOST,
@@ -1486,6 +1488,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
           ? { rejectUnauthorized: false } : false,
       });
+      const sinceClause = since ? `AND timestamp >= $1` : "";
+      const params = since ? [since.toISOString()] : [];
       const result = await pool.query(`
         SELECT
           target                                           AS post_id,
@@ -1496,11 +1500,11 @@ export async function registerRoutes(app: Express): Promise<void> {
           MIN(timestamp)                                   AS first_seen,
           MAX(timestamp)                                   AS last_seen
         FROM interactions
-        WHERE event_type IN ('impression','click') AND target IS NOT NULL
+        WHERE event_type IN ('impression','click') AND target IS NOT NULL ${sinceClause}
         GROUP BY target
         ORDER BY impressions DESC
         LIMIT 200
-      `);
+      `, params);
       await pool.end();
       const rows = result.rows.map((r: any) => ({
         postId: r.post_id,
@@ -1617,19 +1621,25 @@ export async function registerRoutes(app: Express): Promise<void> {
   // ─── ANALYTICS (admin-only) ──────────────────────────────────────────────
 
   // GET /admin/analytics/summary – persistent DB-backed stats + live memory overlay
-  router.get("/admin/analytics/summary", authAdmin, async (_req, res) => {
+  // ?since=2025-01-01  (optional ISO date string)
+  router.get("/admin/analytics/summary", authAdmin, async (req, res) => {
     try {
+      const since = req.query.since ? new Date(req.query.since as string) : undefined;
       const [dbStats, liveStats] = await Promise.all([
-        getDbSummary(),
+        getDbSummary(since),
         Promise.resolve(getSessionSummary()),
       ]);
+      // When filtering by period, don't merge live memory stats (they lack timestamps)
+      const isFull = !since;
       res.json({
-        // Totals: prefer DB count (persistent), add live-only events
         total_events_db: dbStats.total_events_db,
-        total_events_cached: liveStats.total_events_cached,
-        total_events: Math.max(dbStats.total_events_db, liveStats.total_events_cached),
-        unique_sessions: Math.max(dbStats.unique_sessions, liveStats.unique_sessions),
-        // Top paths: merge DB (historical) + live, de-dup and re-sort
+        total_events_cached: isFull ? liveStats.total_events_cached : 0,
+        total_events: isFull
+          ? Math.max(dbStats.total_events_db, liveStats.total_events_cached)
+          : dbStats.total_events_db,
+        unique_sessions: isFull
+          ? Math.max(dbStats.unique_sessions, liveStats.unique_sessions)
+          : dbStats.unique_sessions,
         top_paths: dbStats.top_paths,
         by_event_type: dbStats.by_event_type,
         recent_searches: dbStats.recent_searches,

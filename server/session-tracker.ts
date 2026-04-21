@@ -266,39 +266,54 @@ export function getSessionSummary() {
  * DB-backed summary — persistent across server restarts.
  * Combines live in-memory stats with DB aggregates.
  */
-export async function getDbSummary(): Promise<{
+export async function getDbSummary(since?: Date): Promise<{
   total_events_db: number;
   unique_sessions: number;
   top_paths: { path: string; count: number }[];
   by_event_type: { event_type: string; count: number }[];
   recent_searches: { q: string; count: number }[];
 }> {
+  const whereClause = since ? `WHERE timestamp >= $1` : "";
+  const whereSearchClause = since
+    ? `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL AND timestamp >= $1`
+    : `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL`;
+  const params = since ? [since.toISOString()] : [];
+
   const [totalRes, sessionsRes, pathsRes, typesRes, searchesRes] =
     await Promise.all([
-      pool.query<{ count: string }>("SELECT COUNT(*)::text AS count FROM interactions"),
       pool.query<{ count: string }>(
-        "SELECT COUNT(DISTINCT session_id)::text AS count FROM interactions",
+        `SELECT COUNT(*)::text AS count FROM interactions ${whereClause}`,
+        params,
+      ),
+      pool.query<{ count: string }>(
+        `SELECT COUNT(DISTINCT session_id)::text AS count FROM interactions ${whereClause}`,
+        params,
       ),
       pool.query<{ path: string; count: string }>(
         `SELECT path, COUNT(*)::text AS count
            FROM interactions
+           ${whereClause}
           GROUP BY path
           ORDER BY count DESC
           LIMIT 20`,
+        params,
       ),
       pool.query<{ event_type: string; count: string }>(
         `SELECT event_type, COUNT(*)::text AS count
            FROM interactions
+           ${whereClause}
           GROUP BY event_type
           ORDER BY count DESC`,
+        params,
       ),
       pool.query<{ q: string; count: string }>(
         `SELECT meta->>'q' AS q, COUNT(*)::text AS count
            FROM interactions
-          WHERE event_type = 'search' AND meta->>'q' IS NOT NULL
+          ${whereSearchClause}
           GROUP BY meta->>'q'
           ORDER BY count DESC
           LIMIT 20`,
+        params,
       ),
     ]);
 

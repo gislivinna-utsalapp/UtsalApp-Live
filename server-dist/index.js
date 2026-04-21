@@ -385,32 +385,44 @@ function getSessionSummary() {
     top_paths
   };
 }
-async function getDbSummary() {
+async function getDbSummary(since) {
+  const whereClause = since ? `WHERE timestamp >= $1` : "";
+  const whereSearchClause = since ? `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL AND timestamp >= $1` : `WHERE event_type = 'search' AND meta->>'q' IS NOT NULL`;
+  const params = since ? [since.toISOString()] : [];
   const [totalRes, sessionsRes, pathsRes, typesRes, searchesRes] = await Promise.all([
-    pool.query("SELECT COUNT(*)::text AS count FROM interactions"),
     pool.query(
-      "SELECT COUNT(DISTINCT session_id)::text AS count FROM interactions"
+      `SELECT COUNT(*)::text AS count FROM interactions ${whereClause}`,
+      params
+    ),
+    pool.query(
+      `SELECT COUNT(DISTINCT session_id)::text AS count FROM interactions ${whereClause}`,
+      params
     ),
     pool.query(
       `SELECT path, COUNT(*)::text AS count
            FROM interactions
+           ${whereClause}
           GROUP BY path
           ORDER BY count DESC
-          LIMIT 20`
+          LIMIT 20`,
+      params
     ),
     pool.query(
       `SELECT event_type, COUNT(*)::text AS count
            FROM interactions
+           ${whereClause}
           GROUP BY event_type
-          ORDER BY count DESC`
+          ORDER BY count DESC`,
+      params
     ),
     pool.query(
       `SELECT meta->>'q' AS q, COUNT(*)::text AS count
            FROM interactions
-          WHERE event_type = 'search' AND meta->>'q' IS NOT NULL
+          ${whereSearchClause}
           GROUP BY meta->>'q'
           ORDER BY count DESC
-          LIMIT 20`
+          LIMIT 20`,
+      params
     )
   ]);
   return {
@@ -2030,8 +2042,9 @@ async function registerRoutes(app) {
       return res.json({ ok: false });
     }
   });
-  router.get("/admin/analytics/ads", authAdmin, async (_req, res) => {
+  router.get("/admin/analytics/ads", authAdmin, async (req, res) => {
     try {
+      const since = req.query.since ? new Date(req.query.since) : void 0;
       const { Pool: Pool2 } = await import("pg");
       const pool2 = new Pool2({
         host: process.env.PGHOST,
@@ -2042,6 +2055,8 @@ async function registerRoutes(app) {
         max: 3,
         ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
       });
+      const sinceClause = since ? `AND timestamp >= $1` : "";
+      const params = since ? [since.toISOString()] : [];
       const result = await pool2.query(`
         SELECT
           target                                           AS post_id,
@@ -2052,11 +2067,11 @@ async function registerRoutes(app) {
           MIN(timestamp)                                   AS first_seen,
           MAX(timestamp)                                   AS last_seen
         FROM interactions
-        WHERE event_type IN ('impression','click') AND target IS NOT NULL
+        WHERE event_type IN ('impression','click') AND target IS NOT NULL ${sinceClause}
         GROUP BY target
         ORDER BY impressions DESC
         LIMIT 200
-      `);
+      `, params);
       await pool2.end();
       const rows = result.rows.map((r) => ({
         postId: r.post_id,
@@ -2159,19 +2174,19 @@ async function registerRoutes(app) {
       return res.status(500).json({ message: "Villa kom upp" });
     }
   });
-  router.get("/admin/analytics/summary", authAdmin, async (_req, res) => {
+  router.get("/admin/analytics/summary", authAdmin, async (req, res) => {
     try {
+      const since = req.query.since ? new Date(req.query.since) : void 0;
       const [dbStats, liveStats] = await Promise.all([
-        getDbSummary(),
+        getDbSummary(since),
         Promise.resolve(getSessionSummary())
       ]);
+      const isFull = !since;
       res.json({
-        // Totals: prefer DB count (persistent), add live-only events
         total_events_db: dbStats.total_events_db,
-        total_events_cached: liveStats.total_events_cached,
-        total_events: Math.max(dbStats.total_events_db, liveStats.total_events_cached),
-        unique_sessions: Math.max(dbStats.unique_sessions, liveStats.unique_sessions),
-        // Top paths: merge DB (historical) + live, de-dup and re-sort
+        total_events_cached: isFull ? liveStats.total_events_cached : 0,
+        total_events: isFull ? Math.max(dbStats.total_events_db, liveStats.total_events_cached) : dbStats.total_events_db,
+        unique_sessions: isFull ? Math.max(dbStats.unique_sessions, liveStats.unique_sessions) : dbStats.unique_sessions,
         top_paths: dbStats.top_paths,
         by_event_type: dbStats.by_event_type,
         recent_searches: dbStats.recent_searches

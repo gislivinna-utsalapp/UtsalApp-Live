@@ -429,6 +429,23 @@ export default function AnalyticsDashboard() {
   const [eventFilter, setEventFilter] = useState<string>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "all">("all");
+
+  const sinceDate = useMemo(() => {
+    if (period === "all") return undefined;
+    const d = new Date();
+    d.setDate(d.getDate() - (period === "7d" ? 7 : period === "30d" ? 30 : 90));
+    return d;
+  }, [period]);
+
+  const sinceParam = sinceDate ? `&since=${sinceDate.toISOString()}` : "";
+
+  const PERIOD_LABELS: Record<string, string> = {
+    "7d": "7 dagar",
+    "30d": "30 dagar",
+    "90d": "90 dagar",
+    "all": "Allt tímabilið",
+  };
 
   const token =
     typeof window !== "undefined"
@@ -444,13 +461,13 @@ export default function AnalyticsDashboard() {
     isError: adStatsError,
     refetch: refetchAds,
   } = useQuery<AdStat[]>({
-    queryKey: ["analytics-ads"],
+    queryKey: ["analytics-ads", period],
     enabled: isAdmin,
     refetchInterval: 60_000,
     retry: 8,
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
-      apiFetch<AdStat[]>("/api/v1/admin/analytics/ads", {
+      apiFetch<AdStat[]>(`/api/v1/admin/analytics/ads?limit=200${sinceParam}`, {
         headers: authHeader,
       }),
   });
@@ -460,13 +477,13 @@ export default function AnalyticsDashboard() {
     isLoading: summaryLoading,
     refetch: refetchSummary,
   } = useQuery<Summary>({
-    queryKey: ["analytics-summary"],
+    queryKey: ["analytics-summary", period],
     enabled: isAdmin,
     refetchInterval: 30_000,
     retry: 8,
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
-      apiFetch<Summary>("/api/v1/admin/analytics/summary", {
+      apiFetch<Summary>(`/api/v1/admin/analytics/summary?v=1${sinceParam}`, {
         headers: authHeader,
       }),
   });
@@ -478,13 +495,13 @@ export default function AnalyticsDashboard() {
     isError: dbError,
     refetch: refetchDb,
   } = useQuery<Event[]>({
-    queryKey: ["analytics-db-events"],
+    queryKey: ["analytics-db-events", period],
     enabled: isAdmin,
     refetchInterval: 60_000,
     retry: 8,
     retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 15_000),
     queryFn: () =>
-      apiFetch<Event[]>("/api/v1/admin/analytics/db?limit=500", {
+      apiFetch<Event[]>(`/api/v1/admin/analytics/db?limit=500${sinceParam}`, {
         headers: authHeader,
       }),
   });
@@ -507,14 +524,16 @@ export default function AnalyticsDashboard() {
   });
 
   // Merge: DB rows are authoritative; prepend any mem-only events (those without
-  // a numeric id are in-memory only and not yet confirmed to be in the DB)
+  // a numeric id are in-memory only and not yet confirmed to be in the DB).
+  // When filtering by period, skip mem-only events (they lack reliable timestamps).
   const events = useMemo<Event[]>(() => {
+    if (period !== "all") return dbEvents;
     const dbIds = new Set(dbEvents.map((e) => String(e.id)));
     const memOnly = memEvents.filter(
       (e) => String(e.id).startsWith("mem-") || !dbIds.has(String(e.id)),
     );
     return [...memOnly, ...dbEvents];
-  }, [dbEvents, memEvents]);
+  }, [dbEvents, memEvents, period]);
 
   const eventsLoading = dbLoading && memLoading;
   const eventsError = dbError;
@@ -656,6 +675,25 @@ export default function AnalyticsDashboard() {
       </header>
 
       <div className="px-4 pt-4 space-y-4">
+        {/* Period selector */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground mr-1">Tímabil:</span>
+          {(["7d", "30d", "90d", "all"] as const).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              data-testid={`button-period-${p}`}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                period === p
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover-elevate"
+              }`}
+            >
+              {PERIOD_LABELS[p]}
+            </button>
+          ))}
+        </div>
+
         {/* Stat cards */}
         {summaryLoading ? (
           <div className="grid grid-cols-2 gap-3">
@@ -669,13 +707,13 @@ export default function AnalyticsDashboard() {
               icon={Users}
               label="Einstakar lotur"
               value={summary?.unique_sessions ?? 0}
-              sub="allt frá upphafi"
+              sub={PERIOD_LABELS[period]}
             />
             <StatCard
               icon={Eye}
               label="Atburðir (heildarfjöldi)"
               value={summary?.total_events ?? summary?.total_events_cached ?? 0}
-              sub="í gagnagrunni"
+              sub={PERIOD_LABELS[period]}
             />
             <StatCard
               icon={TrendingUp}

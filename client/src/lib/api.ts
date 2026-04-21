@@ -6,14 +6,11 @@ export const API_BASE_URL =
 
 // Býr til fulla URL út frá relative path + API base-url
 function buildUrl(path: string): string {
-  // Ef path er þegar absolute (http/https)
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
-
   const base = (API_BASE_URL || "").replace(/\/$/, "");
   const p = path.startsWith("/") ? path : `/${path}`;
-
   return base ? `${base}${p}` : p;
 }
 
@@ -24,20 +21,18 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const url = buildUrl(path);
 
-  // Grunn headers
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  // Sækjum token úr localStorage og bætum við Bearer haus ef hann er til
   try {
     const token = localStorage.getItem("token");
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
   } catch {
-    // ef localStorage er ekki til (t.d. SSR), sleppum bara
+    // SSR fallback
   }
 
   const res = await fetch(url, {
@@ -49,20 +44,30 @@ export async function apiFetch<T = unknown>(
   const rawText = await res.text().catch(() => "");
 
   if (!res.ok) {
-    // Reynum að ná „message“ úr JSON ef hægt
-    let msg = `API error ${res.status} ${res.statusText}`;
+    // Extract just the Icelandic `message` field — never show raw HTTP status
+    let msg = "Villa kom upp. Vinsamlegast reyndu aftur.";
     if (rawText) {
-      msg += ` – ${rawText}`;
+      try {
+        const parsed = JSON.parse(rawText);
+        if (parsed?.message && typeof parsed.message === "string") {
+          msg = parsed.message;
+        } else if (parsed?.error && typeof parsed.error === "string") {
+          msg = parsed.error;
+        }
+      } catch {
+        if (res.status === 401) msg = "Rangt netfang eða lykilorð.";
+        else if (res.status === 403) msg = "Aðgangur bannaður.";
+        else if (res.status === 404) msg = "Fannst ekki.";
+        else if (res.status >= 500) msg = "Villa á þjóni. Reyndu aftur síðar.";
+      }
     }
     throw new Error(msg);
   }
 
   if (!rawText) {
-    // 204 No Content eða tómt svar
     return undefined as T;
   }
 
-  // Reynum að parse-a sem JSON, annars skilum við bara texta
   try {
     return JSON.parse(rawText) as T;
   } catch {

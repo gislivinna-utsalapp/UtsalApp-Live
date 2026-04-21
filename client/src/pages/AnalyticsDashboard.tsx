@@ -15,6 +15,12 @@ import {
   ChevronUp,
   Globe,
   Filter,
+  Building2,
+  Megaphone,
+  Copy,
+  CheckCheck,
+  Tag,
+  ShoppingBag,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth";
@@ -45,7 +51,7 @@ type Event = {
   meta?: { q?: string; category?: string; location?: string; intent?: string } | null;
 };
 
-type Tab = "overview" | "events" | "searches";
+type Tab = "overview" | "events" | "searches" | "sales";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -189,6 +195,66 @@ function EntityInfo({ path }: { path: string }) {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
+
+function PitchCopyCard({
+  sessions,
+  interactions,
+  searchCount,
+  topTerm,
+}: {
+  sessions: number;
+  interactions: number;
+  searchCount: number;
+  topTerm: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  const pitchText = `Kæri viðskiptavinur,
+
+ÚtsalApp er íslenska útsöluappið þar sem neytendur leita að bestu tilboðunum í verslunum um allt land.
+
+Gögn frá appinu:
+• ${sessions} einstakar notendur hafa notað appið
+• ${interactions} heildarsamskipti við appið
+• ${searchCount} leitir skráðar — við vitum hvað neytendur eru að leita að
+${topTerm ? `• Vinsælasta leitarorðið: „${topTerm}"` : ""}
+
+Með því að birta útsölurnar þínar á ÚtsalApp nærðu til þeirra ${sessions} notenda sem eru nú þegar að leita að tilboðum.
+
+Við bjóðum upp á þrjá pakka: Basic, Pro og Premium.
+Við getum rætt frekar um hvað hentar þér best.
+
+Kveðja,
+ÚtsalApp teymið`;
+
+  const copy = () => {
+    navigator.clipboard.writeText(pitchText).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    });
+  };
+
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <ShoppingBag className="w-4 h-4 text-primary" />
+          <div>
+            <h3 className="text-sm font-semibold">Tilbúið sölupostr</h3>
+            <p className="text-[10px] text-muted-foreground">Afritaðu og sendu beint til hugsanlegs viðskiptavinar</p>
+          </div>
+        </div>
+        <Button size="sm" variant="outline" onClick={copy} className="gap-1.5">
+          {copied ? <CheckCheck className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+          {copied ? "Afritað!" : "Afrita"}
+        </Button>
+      </div>
+      <pre className="text-xs text-muted-foreground bg-muted rounded-md p-3 whitespace-pre-wrap font-sans leading-relaxed">
+        {pitchText}
+      </pre>
+    </Card>
+  );
+}
 
 function StatCard({
   icon: Icon,
@@ -359,11 +425,31 @@ export default function AnalyticsDashboard() {
 
   const searchCount = events.filter((e) => e.event_type === "search").length;
 
+  // Sales-tab derived data
+  const topSearchTerms = summary?.recent_searches ?? [];
+  const categoryBreakdown = useMemo(() => {
+    const cats: Record<string, number> = {};
+    events.forEach((e) => {
+      const cat = e.meta?.category;
+      if (cat) cats[cat] = (cats[cat] ?? 0) + 1;
+    });
+    return Object.entries(cats)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 5)
+      .map(([cat, count]) => ({ cat, count }));
+  }, [events]);
+
+  const CATEGORY_LABELS: Record<string, string> = {
+    fatnad: "Fatnaður", husgogn: "Húsgögn", raftaeki: "Raftæki",
+    matvorur: "Matvörur", annad: "Annað",
+  };
+
   // Tabs
   const tabs: { key: Tab; label: string; icon: any }[] = [
     { key: "overview", label: "Yfirlit", icon: BarChart2 },
     { key: "events", label: "Atburðir", icon: Clock },
     { key: "searches", label: "Leitir", icon: Search },
+    { key: "sales", label: "Söluyfirlit", icon: Building2 },
   ];
 
   return (
@@ -730,6 +816,124 @@ export default function AnalyticsDashboard() {
                 ))}
               </>
             )}
+          </div>
+        )}
+
+        {/* ── SALES TAB ────────────────────────────────────────────────── */}
+        {tab === "sales" && (
+          <div className="space-y-4">
+
+            {/* Explainer banner */}
+            <div className="flex gap-3 p-4 rounded-md bg-primary/5 border border-primary/20">
+              <Megaphone className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="text-sm space-y-1">
+                <p className="font-semibold">Hvað þýðir þetta og hvernig sel ég þetta?</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">
+                  Þessi flipi sýnir þér gögnin sem þú notar til að sanna verðmæti ÚtsalApp gagnvart verslunum.
+                  Þegar þú ert að tala við hugsanlegan viðskiptavin, notar þú tölurnar hér til að sýna hve margir
+                  notendur eru á appinu og hvað þeir eru að leita að — þannig getur þú sannfært þá um að birta útsölur hjá þér.
+                </p>
+              </div>
+            </div>
+
+            {/* Hero metrics — pitch-ready */}
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="p-4 space-y-1 text-center">
+                <p className="text-3xl font-bold text-primary">{summary?.unique_sessions ?? "—"}</p>
+                <p className="text-xs font-medium">Einstakar notandalotur</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Jafngildir „x einstakir besökare" — notaðu þessa tölu þegar þú talar við verslanir
+                </p>
+              </Card>
+              <Card className="p-4 space-y-1 text-center">
+                <p className="text-3xl font-bold text-primary">
+                  {(summary?.by_event_type?.find(e => e.event_type === "page_view")?.count ?? 0) +
+                   (summary?.by_event_type?.find(e => e.event_type === "api_request")?.count ?? 0)}
+                </p>
+                <p className="text-xs font-medium">Heildarsamskipti við app</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Sýnir hversu virkt appið er — hvert samskipti er mögulegt auga á útsölu verslunarinnar
+                </p>
+              </Card>
+              <Card className="p-4 space-y-1 text-center">
+                <p className="text-3xl font-bold text-primary">
+                  {summary?.by_event_type?.find(e => e.event_type === "search")?.count ?? 0}
+                </p>
+                <p className="text-xs font-medium">Leitir skráðar</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Sérhver leit er kaupáhugi — þú veist hvað neytendur eru að leita að
+                </p>
+              </Card>
+              <Card className="p-4 space-y-1 text-center">
+                <p className="text-3xl font-bold text-primary">{summary?.top_paths?.length ?? 0}</p>
+                <p className="text-xs font-medium">Einstaka síður skoðaðar</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Fjölbreyttar skoðanir sýna breidd notendahópsins
+                </p>
+              </Card>
+            </div>
+
+            {/* Search demand — the most valuable data for sales */}
+            <Card className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-primary" />
+                <div>
+                  <h3 className="text-sm font-semibold">Hvað eru neytendur að leita að?</h3>
+                  <p className="text-[10px] text-muted-foreground">
+                    Þetta er gullið — þú getur sagt við verslun: „Við vitum að fólk er að leita að þessum vörum á appinu"
+                  </p>
+                </div>
+              </div>
+              {topSearchTerms.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Engar leitir enn. Þegar notendur leita birtist hér.</p>
+              ) : (
+                <div className="space-y-2">
+                  {topSearchTerms.map((s, i) => {
+                    const max = topSearchTerms[0]?.count ?? 1;
+                    return (
+                      <div key={s.q} className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-muted-foreground w-4 flex-shrink-0">#{i + 1}</span>
+                        <span className="text-sm font-medium truncate w-36 flex-shrink-0">„{s.q}"</span>
+                        <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${(s.count / max) * 100}%` }} />
+                        </div>
+                        <span className="text-xs font-bold w-8 text-right flex-shrink-0">{s.count}x</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Category demand */}
+            {categoryBreakdown.length > 0 && (
+              <Card className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-primary" />
+                  <div>
+                    <h3 className="text-sm font-semibold">Vinsælustu flokkar</h3>
+                    <p className="text-[10px] text-muted-foreground">Notaðu þetta þegar þú pitchar við verslun í tilteknum flokki</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {categoryBreakdown.map(({ cat, count }) => (
+                    <div key={cat} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted text-sm font-medium">
+                      {CATEGORY_LABELS[cat] ?? cat}
+                      <span className="text-xs text-muted-foreground">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Pitch copy — ready to paste into email/pitch */}
+            <PitchCopyCard
+              sessions={summary?.unique_sessions ?? 0}
+              interactions={(summary?.by_event_type?.find(e => e.event_type === "page_view")?.count ?? 0) +
+                (summary?.by_event_type?.find(e => e.event_type === "api_request")?.count ?? 0)}
+              searchCount={summary?.by_event_type?.find(e => e.event_type === "search")?.count ?? 0}
+              topTerm={topSearchTerms[0]?.q ?? null}
+            />
           </div>
         )}
       </div>

@@ -483,8 +483,6 @@ export async function registerRoutes(app: Express): Promise<void> {
   // ------------------ AUTH: LOGIN ------------------
   router.post("/auth/login", async (req: Request, res: Response) => {
     try {
-      console.log("------ LOGIN DEBUG START ------");
-
       const rawEmail = (req.body?.email ?? "") as string;
       const rawPassword = (req.body?.password ?? "") as string;
 
@@ -495,32 +493,21 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Vantar netfang og lykilorð" });
       }
 
-      // ------------------ USER LOOKUP ------------------
-      console.log("Looking up user...");
       const user = await storage.findUserByEmail(email);
-      console.log("User lookup done");
 
       if (!user) {
         return res.status(401).json({ message: "Rangt netfang eða lykilorð" });
       }
 
-      // ------------------ PASSWORD CHECK ------------------
       let passwordOk = false;
-
       const storedHash = user.passwordHash || (user as any).password || null;
 
       if (storedHash && storedHash.startsWith("$2")) {
-        console.log("Starting bcrypt compare...");
-        const start = Date.now();
-
         passwordOk = await bcrypt.compare(password, storedHash);
-
-        console.log("bcrypt compare took:", Date.now() - start, "ms");
       }
 
       // Legacy fallback (plain password upgrade)
       if (!passwordOk && (user as any).password === password) {
-        console.log("Legacy password match – upgrading hash");
 
         passwordOk = true;
 
@@ -1332,7 +1319,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         category: p.category ?? null,
         price: p.price ?? p.priceSale ?? 0,
         oldPrice: p.oldPrice ?? p.priceOriginal ?? 0,
-        imageUrl: p.imageUrl ?? null,
+        imageUrl: p.imageUrl
+          ?? (Array.isArray(p.images) && p.images[0]?.url ? p.images[0].url : null),
         storeId: p.storeId ?? null,
         storeName: p.storeId ? (storeMap[p.storeId]?.name ?? "Óþekkt") : "Óþekkt",
         createdAt: p.createdAt ?? null,

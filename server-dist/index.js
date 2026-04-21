@@ -1276,7 +1276,6 @@ async function registerRoutes(app) {
   });
   router.post("/auth/login", async (req, res) => {
     try {
-      console.log("------ LOGIN DEBUG START ------");
       const rawEmail = req.body?.email ?? "";
       const rawPassword = req.body?.password ?? "";
       const email = rawEmail.trim().toLowerCase();
@@ -1284,22 +1283,16 @@ async function registerRoutes(app) {
       if (!email || !password) {
         return res.status(400).json({ message: "Vantar netfang og lykilor\xF0" });
       }
-      console.log("Looking up user...");
       const user = await storage.findUserByEmail(email);
-      console.log("User lookup done");
       if (!user) {
         return res.status(401).json({ message: "Rangt netfang e\xF0a lykilor\xF0" });
       }
       let passwordOk = false;
       const storedHash = user.passwordHash || user.password || null;
       if (storedHash && storedHash.startsWith("$2")) {
-        console.log("Starting bcrypt compare...");
-        const start = Date.now();
         passwordOk = await bcrypt.compare(password, storedHash);
-        console.log("bcrypt compare took:", Date.now() - start, "ms");
       }
       if (!passwordOk && user.password === password) {
-        console.log("Legacy password match \u2013 upgrading hash");
         passwordOk = true;
         const newHash = await bcrypt.hash(password, 8);
         await storage.updateUser(user.id, {
@@ -1915,7 +1908,7 @@ async function registerRoutes(app) {
         category: p.category ?? null,
         price: p.price ?? p.priceSale ?? 0,
         oldPrice: p.oldPrice ?? p.priceOriginal ?? 0,
-        imageUrl: p.imageUrl ?? null,
+        imageUrl: p.imageUrl ?? (Array.isArray(p.images) && p.images[0]?.url ? p.images[0].url : null),
         storeId: p.storeId ?? null,
         storeName: p.storeId ? storeMap[p.storeId]?.name ?? "\xD3\xFEekkt" : "\xD3\xFEekkt",
         createdAt: p.createdAt ?? null

@@ -80,10 +80,21 @@ export function SalePostCard({ post }: Props) {
               alt={imageAlt || post.title}
               className="absolute inset-0 w-full h-full object-cover"
               loading="lazy"
+              onError={(e) => {
+                const el = e.currentTarget;
+                el.style.display = "none";
+                const parent = el.parentElement;
+                if (parent && !parent.querySelector(".img-fallback")) {
+                  const fb = document.createElement("div");
+                  fb.className = "img-fallback absolute inset-0 flex items-center justify-center text-xs text-neutral-400 bg-neutral-100";
+                  fb.textContent = post.title?.slice(0, 20) ?? "Mynd";
+                  parent.appendChild(fb);
+                }
+              }}
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-400">
-              Engin mynd skráð
+            <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-400 bg-neutral-100">
+              Engin mynd
             </div>
           )}
 

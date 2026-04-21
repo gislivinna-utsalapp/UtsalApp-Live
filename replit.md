@@ -33,7 +33,7 @@ Mobile-first PWA á íslensku þar sem verslanir birta útsalur og notendur leit
 ## Admin aðgangur
 
 - **Netfang**: `gisli@utsalapp.is`
-- **Lykilorð**: `Utsalapp2024!`
+- **Lykilorð**: `utsalapp123`
 - **Admin slóðir**: `/admin`, `/admin/analytics`
 
 ## Kynningargögn (Demo Data)

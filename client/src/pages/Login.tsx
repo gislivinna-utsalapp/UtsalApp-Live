@@ -28,12 +28,16 @@ export default function Login() {
 
     setIsSubmitting(true);
     try {
-      // Notum central login úr AuthProvider
-      await login(email.trim(), password.trim());
+      const result = await login(email.trim(), password.trim());
 
-      // Eftir vel heppnaða innskráningu:
-      // Farðu frekar á /profile (ekki forsíðu)
-      navigate("/profile", { replace: true });
+      // Admin fer á /admin, verslunarnotendur á /profile
+      if (result?.user?.isAdmin) {
+        navigate("/admin", { replace: true });
+      } else if (result?.store) {
+        navigate("/profile", { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       console.error("login error:", err);
       let msg =

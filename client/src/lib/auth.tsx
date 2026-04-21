@@ -44,7 +44,7 @@ type AuthContextType = {
   isStore: boolean;
   isAdmin: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
   registerStore: (data: {
     storeName: string;
     email: string;
@@ -146,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setAuthUser(authData);
+      return authData;
     } finally {
       setLoading(false);
     }

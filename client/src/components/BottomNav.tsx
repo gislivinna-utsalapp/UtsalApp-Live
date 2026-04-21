@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, Grid3x3, ShoppingBag, User } from "lucide-react";
+import { Home, Grid3x3, ShoppingBag, User } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { useCart } from "@/hooks/useCart";
 
@@ -19,7 +19,6 @@ export default function BottomNav() {
 
   const staticTabs = [
     { to: "/", label: "Heim", Icon: Home },
-    { to: "/leit", label: "Leita", Icon: Search },
     { to: "/flokkar", label: "Flokkar", Icon: Grid3x3 },
     { to: "/karfa", label: "Karfa", Icon: ShoppingBag, cart: true },
   ];

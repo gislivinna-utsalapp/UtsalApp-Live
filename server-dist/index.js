@@ -1397,6 +1397,85 @@ async function registerRoutes(app) {
       }
     }
   );
+  router.get(
+    "/stores/me/analytics",
+    auth("store"),
+    async (req, res) => {
+      try {
+        if (!req.user?.storeId) {
+          return res.status(400).json({ message: "Engin tengd verslun" });
+        }
+        const storeId = req.user.storeId;
+        const since = req.query.since ? new Date(req.query.since) : void 0;
+        const until = req.query.until ? new Date(req.query.until) : void 0;
+        const allPosts = await storage.listPosts();
+        const storePosts = allPosts.filter((p) => p.storeId === storeId);
+        const postIds = storePosts.map((p) => p.id);
+        const dateParams = [];
+        const dateClauses = [];
+        if (since) {
+          dateParams.push(since.toISOString());
+          dateClauses.push(`AND timestamp >= $${dateParams.length}`);
+        }
+        if (until) {
+          dateParams.push(until.toISOString());
+          dateClauses.push(`AND timestamp <= $${dateParams.length}`);
+        }
+        const dateFilter = dateClauses.join(" ");
+        let adByPostId = {};
+        let totalImpressions = 0;
+        let totalClicks = 0;
+        if (postIds.length > 0) {
+          try {
+            const { Pool: Pool2 } = await import("pg");
+            const pool2 = new Pool2({
+              host: process.env.PGHOST,
+              port: Number(process.env.PGPORT) || 5432,
+              user: process.env.PGUSER,
+              password: process.env.PGPASSWORD,
+              database: process.env.PGDATABASE,
+              max: 2,
+              ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
+            });
+            const placeholders = postIds.map((_, i) => `$${dateParams.length + i + 1}`).join(",");
+            const result = await pool2.query(
+              `SELECT target AS post_id,
+                 SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
+                 SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks
+               FROM interactions
+               WHERE event_type IN ('impression','click') AND target IN (${placeholders}) ${dateFilter}
+               GROUP BY target`,
+              [...dateParams, ...postIds]
+            );
+            await pool2.end();
+            for (const r of result.rows) {
+              adByPostId[r.post_id] = { impressions: Number(r.impressions) || 0, clicks: Number(r.clicks) || 0 };
+            }
+            totalImpressions = result.rows.reduce((s, r) => s + (Number(r.impressions) || 0), 0);
+            totalClicks = result.rows.reduce((s, r) => s + (Number(r.clicks) || 0), 0);
+          } catch (pgErr) {
+            console.error("[stores/me/analytics pg]", pgErr);
+          }
+        }
+        const totalViews = storePosts.reduce((s, p) => s + (p.viewCount || 0), 0);
+        const ctr = totalImpressions > 0 ? Math.round(totalClicks / totalImpressions * 1e3) / 10 : 0;
+        return res.json({
+          summary: { totalViews, totalImpressions, totalClicks, ctr, postCount: storePosts.length },
+          posts: storePosts.map((p) => ({
+            id: p.id,
+            title: p.title,
+            viewCount: p.viewCount || 0,
+            impressions: adByPostId[p.id]?.impressions ?? 0,
+            clicks: adByPostId[p.id]?.clicks ?? 0,
+            ctr: (adByPostId[p.id]?.impressions ?? 0) > 0 ? Math.round((adByPostId[p.id]?.clicks ?? 0) / (adByPostId[p.id]?.impressions ?? 0) * 1e3) / 10 : 0
+          }))
+        });
+      } catch (err) {
+        console.error("[stores/me/analytics]", err);
+        return res.status(500).json({ message: "Villa kom upp" });
+      }
+    }
+  );
   router.post(
     "/stores/activate-plan",
     auth("store"),

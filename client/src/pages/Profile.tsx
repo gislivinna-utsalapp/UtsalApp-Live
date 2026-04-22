@@ -8,7 +8,7 @@ import { apiFetch } from "@/lib/api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getTimeRemaining } from "@/lib/utils";
-import { MapPin, Phone, Globe } from "lucide-react";
+import { MapPin, Phone, Globe, Eye, MousePointerClick, TrendingUp } from "lucide-react";
 
 /* ===================== TYPES ===================== */
 
@@ -211,6 +211,22 @@ export default function Profile() {
     ? storePosts
     : [];
 
+  const token = typeof window !== "undefined"
+    ? localStorage.getItem("utsalapp_token") || localStorage.getItem("token") || ""
+    : "";
+
+  const { data: storeAnalytics } = useQuery<{
+    summary: { totalViews: number; totalImpressions: number; totalClicks: number; ctr: number; postCount: number };
+    posts: { id: string; title: string; viewCount: number; impressions: number; clicks: number; ctr: number }[];
+  }>({
+    queryKey: ["store-my-analytics", store?.id],
+    enabled: !!store?.id,
+    refetchInterval: 60_000,
+    queryFn: () => apiFetch("/api/v1/stores/me/analytics", {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  });
+
   /* ===== 🔧 FIX: KPI useMemo BEFORE EARLY RETURNS ===== */
 
   const kpi = useMemo(() => {
@@ -222,18 +238,22 @@ export default function Profile() {
       return Number.isFinite(end) ? end > now : true;
     }).length;
 
-    const views = safeStorePosts.reduce(
-      (sum, p) => sum + (typeof p.viewCount === "number" ? p.viewCount : 0),
-      0,
-    );
+    const views = storeAnalytics?.summary.totalViews ??
+      safeStorePosts.reduce(
+        (sum, p) => sum + (typeof p.viewCount === "number" ? p.viewCount : 0),
+        0,
+      );
 
     return {
       activeOffersCount: activeCount,
       totalViews: views,
+      totalImpressions: storeAnalytics?.summary.totalImpressions ?? 0,
+      totalClicks: storeAnalytics?.summary.totalClicks ?? 0,
+      ctr: storeAnalytics?.summary.ctr ?? 0,
     };
-  }, [safeStorePosts]);
+  }, [safeStorePosts, storeAnalytics]);
 
-  const { activeOffersCount, totalViews } = kpi;
+  const { activeOffersCount, totalViews, totalImpressions, totalClicks, ctr } = kpi;
 
   /* ===================== BILLING EFFECT ===================== */
 
@@ -878,16 +898,40 @@ export default function Profile() {
 
           <Card className="p-4 space-y-3">
             <h2 className="text-sm font-semibold">Yfirlit</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="border rounded-lg p-3">
                 <p className="text-[11px] text-muted-foreground">Virk tilboð</p>
                 <p className="text-lg font-semibold">{activeOffersCount}</p>
               </div>
               <div className="border rounded-lg p-3">
-                <p className="text-[11px] text-muted-foreground">
-                  Heildarskoðanir
-                </p>
+                <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                  <Eye className="w-3 h-3" />
+                  <p className="text-[11px]">Skoðanir</p>
+                </div>
                 <p className="text-lg font-semibold">{totalViews}</p>
+              </div>
+              <div className="border rounded-lg p-3">
+                <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                  <Eye className="w-3 h-3" />
+                  <p className="text-[11px]">Birtingar</p>
+                </div>
+                <p className="text-lg font-semibold">{totalImpressions.toLocaleString("is-IS")}</p>
+              </div>
+              <div className="border rounded-lg p-3">
+                <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                  <MousePointerClick className="w-3 h-3" />
+                  <p className="text-[11px]">Smellir</p>
+                </div>
+                <p className="text-lg font-semibold">{totalClicks.toLocaleString("is-IS")}</p>
+              </div>
+              <div className="border rounded-lg p-3">
+                <div className="flex items-center gap-1 text-muted-foreground mb-0.5">
+                  <TrendingUp className="w-3 h-3" />
+                  <p className="text-[11px]">CTR</p>
+                </div>
+                <p className={`text-lg font-semibold ${ctr >= 5 ? "text-green-600" : ctr >= 1 ? "text-[#ff4d00]" : ""}`}>
+                  {ctr}%
+                </p>
               </div>
               <div className="border rounded-lg p-3">
                 <p className="text-[11px] text-muted-foreground">
@@ -1242,6 +1286,7 @@ export default function Profile() {
                 const timeRemainingLabel = getPostTimeRemainingLabel(
                   post.endsAt,
                 );
+                const postAd = storeAnalytics?.posts.find(p => p.id === post.id);
 
                 return (
                   <div
@@ -1275,27 +1320,33 @@ export default function Profile() {
                           )}
                         </div>
 
-                        {typeof post.viewCount === "number" && (
-                          <p className="text-[11px] text-muted-foreground whitespace-nowrap text-right">
-                            {post.viewCount} skoðanir
-                            {timeRemainingLabel && (
-                              <>
-                                <br />
-                                <span className="text-[10px] text-neutral-500">
-                                  {timeRemainingLabel}
-                                </span>
-                              </>
-                            )}
-                          </p>
-                        )}
+                        <div className="text-[11px] text-muted-foreground whitespace-nowrap text-right space-y-0.5">
+                          {typeof post.viewCount === "number" && (
+                            <p>{post.viewCount} skoðanir</p>
+                          )}
+                          {postAd && (
+                            <>
+                              <p className="flex items-center justify-end gap-1">
+                                <Eye className="w-3 h-3" />
+                                {postAd.impressions} birtingar
+                              </p>
+                              <p className="flex items-center justify-end gap-1">
+                                <MousePointerClick className="w-3 h-3" />
+                                {postAd.clicks} smellir
+                                {postAd.impressions > 0 && (
+                                  <span className={`${postAd.ctr >= 1 ? "text-[#ff4d00]" : ""}`}>
+                                    ({postAd.ctr}%)
+                                  </span>
+                                )}
+                              </p>
+                            </>
+                          )}
+                          {timeRemainingLabel && (
+                            <p className="text-[10px] text-neutral-500">{timeRemainingLabel}</p>
+                          )}
+                        </div>
                       </div>
 
-                      {typeof post.viewCount !== "number" &&
-                        timeRemainingLabel && (
-                          <p className="text-[11px] text-neutral-500">
-                            {timeRemainingLabel}
-                          </p>
-                        )}
 
                       <div className="flex items-center gap-2 text-[11px] pt-1">
                         {typeof post.priceOriginal === "number" && (

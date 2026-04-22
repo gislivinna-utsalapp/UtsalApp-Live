@@ -84,7 +84,7 @@ export function SalePostCard({ post }: Props) {
           obs.disconnect();
         }
       },
-      { threshold: 0.5 },
+      { threshold: 0.1 },
     );
     obs.observe(el);
     return () => obs.disconnect();

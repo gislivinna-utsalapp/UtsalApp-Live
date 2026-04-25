@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
 import { SalePostCard } from "@/components/SalePostCard";
 import { Button } from "@/components/ui/button";
+import { InstallBanner } from "@/components/InstallBanner";
 
 const PAGE_SIZE = 40;
 
@@ -98,6 +99,8 @@ export default function Home() {
           )}
         </div>
       </header>
+
+      <InstallBanner />
 
       {/* ── SEARCH MODE ────────────────────────────────────────── */}
       {isSearchMode && (

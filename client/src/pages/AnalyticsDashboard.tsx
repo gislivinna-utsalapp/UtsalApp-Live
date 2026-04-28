@@ -261,11 +261,15 @@ function StoreRow({ store }: { store: AdminStore }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboard() {
-  const { user } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [range, setRange] = useState<Range>("today");
 
-  if (!user?.isAdmin) {
+  if (authLoading) {
+    return <div className="p-8 text-center text-muted-foreground">Hleður...</div>;
+  }
+
+  if (!isAdmin) {
     return (
       <div className="p-8 text-center text-muted-foreground">
         Þú hefur ekki aðgang að þessum síðum.

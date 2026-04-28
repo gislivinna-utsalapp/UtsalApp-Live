@@ -304,10 +304,16 @@ export default function AnalyticsDashboard() {
     );
   }
 
-  const pageViews =
-    summary?.by_event_type?.find((e) => e.event_type === "page_view")?.count ?? 0;
+  // Count page views from top_paths (robust: works even if event_type is
+  // misclassified as api_request on older server versions)
+  const pageViews = (summary?.top_paths ?? [])
+    .filter((p) => isUserPath(p.path))
+    .reduce((sum, p) => sum + p.count, 0) ||
+    (summary?.by_event_type?.find((e) => e.event_type === "page_view")?.count ?? 0);
+
   const searches =
-    summary?.by_event_type?.find((e) => e.event_type === "search")?.count ?? 0;
+    (summary?.by_event_type?.find((e) => e.event_type === "search")?.count ?? 0) ||
+    (summary?.recent_searches?.reduce((s, r) => s + r.count, 0) ?? 0);
   const sessions = summary?.unique_sessions ?? 0;
 
   const userPaths = (summary?.top_paths ?? [])

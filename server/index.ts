@@ -7,11 +7,11 @@ import session from "express-session";
 
 import { registerRoutes } from "./routes";
 import { UPLOAD_DIR } from "./config/uploads";
-import { sessionTracker } from "./session-tracker";
+import { sessionTracker, initDb } from "./session-tracker";
 
 const PORT = Number(process.env.PORT) || 5000;
 
-function main() {
+async function main() {
   /**
    * 1) Global process error logging
    */
@@ -22,6 +22,9 @@ function main() {
   process.on("uncaughtException", (err) => {
     console.error("[uncaughtException]", err);
   });
+
+  // Create analytics table if it doesn't exist (safe on every startup)
+  await initDb();
 
   const app = express();
 

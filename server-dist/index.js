@@ -266,6 +266,28 @@ var pool = new Pool({
 pool.on("error", (err) => {
   console.error("[session-tracker] pg pool error:", err.message);
 });
+async function initDb() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS interactions (
+        id          BIGSERIAL PRIMARY KEY,
+        session_id  TEXT        NOT NULL,
+        event_type  TEXT        NOT NULL,
+        target      TEXT,
+        path        TEXT        NOT NULL,
+        method      TEXT        NOT NULL DEFAULT 'GET',
+        timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        meta        JSONB
+      );
+      CREATE INDEX IF NOT EXISTS idx_interactions_timestamp ON interactions (timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_interactions_event_type ON interactions (event_type);
+      CREATE INDEX IF NOT EXISTS idx_interactions_target ON interactions (target);
+    `);
+    console.log("[session-tracker] DB ready \u2014 interactions table ok");
+  } catch (err) {
+    console.error("[session-tracker] initDb failed:", err.message);
+  }
+}
 var MAX_CACHE = 1e3;
 var cache = [];
 function addToCache(event) {
@@ -2127,28 +2149,17 @@ async function registerRoutes(app) {
   });
   router.get("/admin/analytics/pwa-installs", authAdmin, async (req, res) => {
     try {
-      const { Pool: Pool2 } = await import("pg");
-      const pool2 = new Pool2({
-        host: process.env.PGHOST,
-        port: Number(process.env.PGPORT) || 5432,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        max: 2,
-        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
-      });
-      const result = await pool2.query(
+      const result = await pool.query(
         `SELECT COUNT(*) AS count, DATE(timestamp) AS day
            FROM interactions
           WHERE event_type = 'other' AND target = 'pwa_install'
           GROUP BY day ORDER BY day DESC LIMIT 30`
       );
       const total = result.rows.reduce((s, r) => s + Number(r.count), 0);
-      await pool2.end();
       return res.json({ total, byDay: result.rows.map((r) => ({ day: r.day, count: Number(r.count) })) });
     } catch (err) {
       console.error("[pwa-installs]", err);
-      return res.status(500).json({ total: 0, byDay: [] });
+      return res.json({ total: 0, byDay: [] });
     }
   });
   router.post("/analytics/ad-event", async (req, res) => {
@@ -2169,16 +2180,6 @@ async function registerRoutes(app) {
     try {
       const since = req.query.since ? new Date(req.query.since) : void 0;
       const until = req.query.until ? new Date(req.query.until) : void 0;
-      const { Pool: Pool2 } = await import("pg");
-      const pool2 = new Pool2({
-        host: process.env.PGHOST,
-        port: Number(process.env.PGPORT) || 5432,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        max: 3,
-        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
-      });
       const dateParams = [];
       const dateClauses = [];
       if (since) {
@@ -2190,7 +2191,7 @@ async function registerRoutes(app) {
         dateClauses.push(`AND timestamp <= $${dateParams.length}`);
       }
       const dateFilter = dateClauses.join(" ");
-      const result = await pool2.query(`
+      const result = await pool.query(`
         SELECT
           target                                           AS post_id,
           SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
@@ -2205,7 +2206,6 @@ async function registerRoutes(app) {
         ORDER BY impressions DESC
         LIMIT 200
       `, dateParams);
-      await pool2.end();
       const rows = result.rows.map((r) => ({
         postId: r.post_id,
         postTitle: r.post_title ?? r.post_id,
@@ -2247,19 +2247,9 @@ async function registerRoutes(app) {
       let adRows = [];
       let storePageViews = 0;
       try {
-        const { Pool: Pool2 } = await import("pg");
-        const pool2 = new Pool2({
-          host: process.env.PGHOST,
-          port: Number(process.env.PGPORT) || 5432,
-          user: process.env.PGUSER,
-          password: process.env.PGPASSWORD,
-          database: process.env.PGDATABASE,
-          max: 2,
-          ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium" ? { rejectUnauthorized: false } : false
-        });
         if (postIds.length > 0) {
           const placeholders = postIds.map((_, i) => `$${dateParams.length + i + 1}`).join(",");
-          const adResult = await pool2.query(
+          const adResult = await pool.query(
             `SELECT target AS post_id,
                SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
                SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks,
@@ -2272,13 +2262,13 @@ async function registerRoutes(app) {
           adRows = adResult.rows;
         }
         const viewParamIdx = dateParams.length + 1;
-        const viewResult = await pool2.query(
+        const viewResult = await pool.query(
           `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $${viewParamIdx} ${dateFilter}`,
           [...dateParams, `%/stores/${storeId}%`]
         );
         storePageViews = Number(viewResult.rows[0]?.cnt) || 0;
-        await pool2.end();
-      } catch (_) {
+      } catch (pgErr) {
+        console.error("[analytics/store] PG query failed:", pgErr.message);
       }
       const adByPostId = {};
       for (const r of adRows) {
@@ -2401,13 +2391,14 @@ async function registerRoutes(app) {
 
 // server/index.ts
 var PORT = Number(process.env.PORT) || 5e3;
-function main() {
+async function main() {
   process.on("unhandledRejection", (reason) => {
     console.error("[unhandledRejection]", reason);
   });
   process.on("uncaughtException", (err) => {
     console.error("[uncaughtException]", err);
   });
+  await initDb();
   const app = express2();
   app.set("trust proxy", 1);
   app.use(

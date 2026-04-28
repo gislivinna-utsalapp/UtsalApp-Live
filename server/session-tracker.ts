@@ -48,6 +48,33 @@ pool.on("error", (err) => {
   console.error("[session-tracker] pg pool error:", err.message);
 });
 
+export { pool as analyticsPool };
+
+// ─── Auto-create table on startup ────────────────────────────────────────────
+
+export async function initDb(): Promise<void> {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS interactions (
+        id          BIGSERIAL PRIMARY KEY,
+        session_id  TEXT        NOT NULL,
+        event_type  TEXT        NOT NULL,
+        target      TEXT,
+        path        TEXT        NOT NULL,
+        method      TEXT        NOT NULL DEFAULT 'GET',
+        timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        meta        JSONB
+      );
+      CREATE INDEX IF NOT EXISTS idx_interactions_timestamp ON interactions (timestamp DESC);
+      CREATE INDEX IF NOT EXISTS idx_interactions_event_type ON interactions (event_type);
+      CREATE INDEX IF NOT EXISTS idx_interactions_target ON interactions (target);
+    `);
+    console.log("[session-tracker] DB ready — interactions table ok");
+  } catch (err: any) {
+    console.error("[session-tracker] initDb failed:", err.message);
+  }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type EventType =

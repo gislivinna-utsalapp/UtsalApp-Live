@@ -18,6 +18,7 @@ import {
   getDbSummary,
   queryAnalytics,
   logEvent,
+  analyticsPool,
   type EventType,
 } from "./session-tracker";
 import { analyzeQuery } from "./search-analyzer";
@@ -1542,26 +1543,17 @@ export async function registerRoutes(app: Express): Promise<void> {
   // GET /admin/analytics/pwa-installs – total PWA install count (admin)
   router.get("/admin/analytics/pwa-installs", authAdmin, async (req: Request, res: Response) => {
     try {
-      const { Pool } = await import("pg");
-      const pool = new (Pool as any)({
-        host: process.env.PGHOST, port: Number(process.env.PGPORT) || 5432,
-        user: process.env.PGUSER, password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE, max: 2,
-        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
-          ? { rejectUnauthorized: false } : false,
-      });
-      const result = await pool.query(
+      const result = await analyticsPool.query(
         `SELECT COUNT(*) AS count, DATE(timestamp) AS day
            FROM interactions
           WHERE event_type = 'other' AND target = 'pwa_install'
           GROUP BY day ORDER BY day DESC LIMIT 30`
       );
       const total = result.rows.reduce((s: number, r: any) => s + Number(r.count), 0);
-      await pool.end();
       return res.json({ total, byDay: result.rows.map((r: any) => ({ day: r.day, count: Number(r.count) })) });
     } catch (err) {
       console.error("[pwa-installs]", err);
-      return res.status(500).json({ total: 0, byDay: [] });
+      return res.json({ total: 0, byDay: [] });
     }
   });
 
@@ -1595,23 +1587,12 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const since = req.query.since ? new Date(req.query.since as string) : undefined;
       const until = req.query.until ? new Date(req.query.until as string) : undefined;
-      const { Pool } = await import("pg");
-      const pool = new (Pool as any)({
-        host: process.env.PGHOST,
-        port: Number(process.env.PGPORT) || 5432,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        max: 3,
-        ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
-          ? { rejectUnauthorized: false } : false,
-      });
       const dateParams: string[] = [];
       const dateClauses: string[] = [];
       if (since) { dateParams.push(since.toISOString()); dateClauses.push(`AND timestamp >= $${dateParams.length}`); }
       if (until) { dateParams.push(until.toISOString()); dateClauses.push(`AND timestamp <= $${dateParams.length}`); }
       const dateFilter = dateClauses.join(" ");
-      const result = await pool.query(`
+      const result = await analyticsPool.query(`
         SELECT
           target                                           AS post_id,
           SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
@@ -1626,7 +1607,6 @@ export async function registerRoutes(app: Express): Promise<void> {
         ORDER BY impressions DESC
         LIMIT 200
       `, dateParams);
-      await pool.end();
       const rows = result.rows.map((r: any) => ({
         postId: r.post_id,
         postTitle: r.post_title ?? r.post_id,
@@ -1674,17 +1654,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       let adRows: any[] = [];
       let storePageViews = 0;
       try {
-        const { Pool } = await import("pg");
-        const pool = new (Pool as any)({
-          host: process.env.PGHOST, port: Number(process.env.PGPORT) || 5432,
-          user: process.env.PGUSER, password: process.env.PGPASSWORD,
-          database: process.env.PGDATABASE, max: 2,
-          ssl: process.env.PGHOST !== "localhost" && process.env.PGHOST !== "helium"
-            ? { rejectUnauthorized: false } : false,
-        });
         if (postIds.length > 0) {
           const placeholders = postIds.map((_: any, i: number) => `$${dateParams.length + i + 1}`).join(",");
-          const adResult = await pool.query(
+          const adResult = await analyticsPool.query(
             `SELECT target AS post_id,
                SUM(CASE WHEN event_type='impression' THEN 1 ELSE 0 END) AS impressions,
                SUM(CASE WHEN event_type='click' THEN 1 ELSE 0 END) AS clicks,
@@ -1697,13 +1669,14 @@ export async function registerRoutes(app: Express): Promise<void> {
           adRows = adResult.rows;
         }
         const viewParamIdx = dateParams.length + 1;
-        const viewResult = await pool.query(
+        const viewResult = await analyticsPool.query(
           `SELECT COUNT(*) AS cnt FROM interactions WHERE path LIKE $${viewParamIdx} ${dateFilter}`,
           [...dateParams, `%/stores/${storeId}%`]
         );
         storePageViews = Number(viewResult.rows[0]?.cnt) || 0;
-        await pool.end();
-      } catch (_) {}
+      } catch (pgErr: any) {
+        console.error("[analytics/store] PG query failed:", pgErr.message);
+      }
 
       const adByPostId: Record<string, { impressions: number; clicks: number }> = {};
       for (const r of adRows) {

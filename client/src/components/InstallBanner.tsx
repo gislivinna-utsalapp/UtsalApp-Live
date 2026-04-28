@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Share2, MoreVertical, Plus } from "lucide-react";
+import { X, Share2, Globe, Menu } from "lucide-react";
 import { SiApple, SiAndroid } from "react-icons/si";
 
 const STORAGE_KEY = "utsalapp_install_banner_dismissed";
@@ -105,12 +105,15 @@ export function InstallBanner() {
         ) : (
           <div className="flex items-start gap-4">
             <Step n={1}>
-              Opnaðu í <span className="font-semibold text-neutral-700">Chrome</span>
+              Smelltu á{" "}
+              <Globe className="inline w-3.5 h-3.5 mb-0.5 text-neutral-600" />{" "}
+              <span className="font-semibold text-neutral-700">„Opna í internetforriti"</span>
             </Step>
             <Step n={2}>
-              Pikkaðu á{" "}
-              <MoreVertical className="inline w-3.5 h-3.5 mb-0.5 text-neutral-600" />{" "}
-              valmynd
+              Smelltu á{" "}
+              <Menu className="inline w-3.5 h-3.5 mb-0.5 text-neutral-600" />{" "}
+              <span className="font-semibold text-neutral-700">3 línur</span>{" "}
+              neðst til hægri
             </Step>
             <Step n={3}>
               Veldu{" "}

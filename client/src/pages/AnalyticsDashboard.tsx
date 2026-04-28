@@ -261,10 +261,37 @@ function StoreRow({ store }: { store: AdminStore }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboard() {
+  // ALL hooks must be called before any early return
   const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [range, setRange] = useState<Range>("today");
 
+  const { since, until } = rangeToParams(range);
+  const qs = [since && `since=${since}`, until && `until=${until}`]
+    .filter(Boolean)
+    .join("&");
+  const summaryUrl = `/api/v1/admin/analytics/summary${qs ? `?${qs}` : ""}`;
+
+  const { data: summary, isLoading } = useQuery<Summary>({
+    queryKey: ["analytics-summary", range],
+    enabled: isAdmin && !authLoading,
+    queryFn: () => apiFetch<Summary>(summaryUrl),
+    refetchInterval: 60_000,
+  });
+
+  const { data: pwa } = useQuery<PwaInstalls>({
+    queryKey: ["analytics-pwa"],
+    enabled: isAdmin && !authLoading,
+    queryFn: () => apiFetch<PwaInstalls>("/api/v1/admin/analytics/pwa-installs"),
+  });
+
+  const { data: stores } = useQuery<AdminStore[]>({
+    queryKey: ["admin-stores"],
+    enabled: isAdmin && !authLoading,
+    queryFn: () => apiFetch<AdminStore[]>("/api/v1/admin/stores"),
+  });
+
+  // Early returns after all hooks
   if (authLoading) {
     return <div className="p-8 text-center text-muted-foreground">Hleður...</div>;
   }
@@ -276,28 +303,6 @@ export default function AnalyticsDashboard() {
       </div>
     );
   }
-
-  const { since, until } = rangeToParams(range);
-  const qs = [since && `since=${since}`, until && `until=${until}`]
-    .filter(Boolean)
-    .join("&");
-  const summaryUrl = `/api/v1/admin/analytics/summary${qs ? `?${qs}` : ""}`;
-
-  const { data: summary, isLoading } = useQuery<Summary>({
-    queryKey: ["analytics-summary", range],
-    queryFn: () => apiFetch<Summary>(summaryUrl),
-    refetchInterval: 60_000,
-  });
-
-  const { data: pwa } = useQuery<PwaInstalls>({
-    queryKey: ["analytics-pwa"],
-    queryFn: () => apiFetch<PwaInstalls>("/api/v1/admin/analytics/pwa-installs"),
-  });
-
-  const { data: stores } = useQuery<AdminStore[]>({
-    queryKey: ["admin-stores"],
-    queryFn: () => apiFetch<AdminStore[]>("/api/v1/admin/stores"),
-  });
 
   const pageViews =
     summary?.by_event_type?.find((e) => e.event_type === "page_view")?.count ?? 0;

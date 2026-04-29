@@ -1,0 +1,109 @@
+The analytics tab in the admin panel shows nothing. Fix this by implementing the full analytics system end-to-end. Here is the exact stack: Express + TypeScript backend (server/index.ts), PostgreSQL via DATABASE_URL, frontend is a SPA served from the same server.
+
+Do the following steps IN ORDER:
+
+---
+
+STEP 1 — Verify the database table exists
+
+In server/index.ts or wherever initDb() is defined, make sure this SQL runs on startup:
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id SERIAL PRIMARY KEY,
+  event_name VARCHAR(100) NOT NULL,
+  store_id VARCHAR(100),
+  store_name VARCHAR(100),
+  offer_id VARCHAR(100),
+  offer_title TEXT,
+  user_id VARCHAR(100) DEFAULT 'anonymous',
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+Run this and confirm the table is created. Log "analytics_events table ready" to console on success.
+
+---
+
+STEP 2 — Create the analytics API routes
+
+Add these routes to the existing Express router (same place as other /api routes):
+
+POST /api/analytics/event
+- Accepts JSON body: { event_name, store_id?, store_name?, offer_id?, offer_title?, user_id?, metadata? }
+- Inserts one row into analytics_events
+- Returns { ok: true }
+- This must work without authentication (fire-and-forget from frontend)
+
+GET /api/analytics/summary?period=today|yesterday|7days|30days|all
+- Returns JSON:
+  {
+    page_views: number,
+    unique_users: number,
+    searches: number,
+    homescreen_adds: number,
+    top_offers: [ { offer_title, store_name, clicks } ],  // top 10 by ad_click count
+    by_store: [ { store_name, store_views, ad_clicks, store_clicks, offer_saves } ],
+    daily_trend: [ { date: "YYYY-MM-DD", clicks: number } ]  // last N days
+  }
+- Filter by created_at based on period param
+- Sort by_store by ad_clicks descending
+- daily_trend should cover the full selected period
+
+---
+
+STEP 3 — Add event tracking calls in the frontend
+
+Find where these actions happen in the frontend code and add a fire-and-forget fetch call after each:
+
+a) When any offer/ad card is clicked:
+fetch('/api/analytics/event', { method:'POST', headers:{'Content-Type':'application/json'},
+  body: JSON.stringify({ event_name:'ad_click', store_id, store_name, offer_id, offer_title, user_id: getSessionId() }) })
+
+b) When a store page is opened:
+fetch('/api/analytics/event', { method:'POST', ..., body: JSON.stringify({ event_name:'store_view', store_id, store_name }) })
+
+c) When user searches:
+fetch('/api/analytics/event', { method:'POST', ..., body: JSON.stringify({ event_name:'search', metadata:{ query } }) })
+
+d) On every page/screen load (router navigation):
+fetch('/api/analytics/event', { method:'POST', ..., body: JSON.stringify({ event_name:'page_view', metadata:{ screen: currentRoute } }) })
+
+For getSessionId(): read from localStorage key 'utsalapp_session_id'. If not set, generate crypto.randomUUID() and save it, then return it.
+
+---
+
+STEP 4 — Wire up the admin analytics tab
+
+Find the existing analytics tab/page component in the frontend. Replace the empty content with:
+
+1. Time filter bar — 5 buttons: Í dag, Í gær, 7 dagar, 30 dagar, Allt. Default: Í dag.
+
+2. On period change, call GET /api/analytics/summary?period=... and store the result in state.
+
+3. Render 4 metric cards in a 2x2 grid:
+   - Heimsóknir → page_views
+   - Einstaklingar → unique_users
+   - Leitir → searches
+   - Sett á heimaskjá → homescreen_adds
+
+4. Section "Vinsælustu slóðir" — table with columns: Tilboð | Verslun | Smellir
+   Map over top_offers array.
+   If empty, show: "Engar slóðir skráðar á þessu tímabili."
+
+5. Section "Verslanir" — table with columns: Verslun | Heimsóknir | Augl. smellir | Vef smellir | Vistaðar
+   Map over by_store array.
+   If empty, show skeleton/loading state.
+
+Use the same orange color (#FF6B35) and card styles already used elsewhere in the app.
+
+---
+
+STEP 5 — Test it
+
+After implementing:
+1. Open the app and click on 2-3 offers and 1-2 stores
+2. Go to admin → Greiningar tab
+3. Confirm the Heimsóknir and Auglýsingasmellir counts are above 0
+4. If still 0, check browser console for errors on the POST /api/analytics/event calls and fix them
+
+Do not change any existing functionality — only add new code.

@@ -1,6 +1,7 @@
 // client/src/App.tsx
 import { Routes, Route, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { trackPageView } from "@/lib/analytics";
 
 import AdminPage from "@/pages/Admin";
 import AnalyticsDashboard from "@/pages/AnalyticsDashboard";
@@ -33,6 +34,7 @@ function AnalyticsTracker() {
   const location = useLocation();
 
   useEffect(() => {
+    // 1) Google Analytics (ef það er til staðar)
     if (typeof window !== "undefined" && (window as any).gtag) {
       (window as any).gtag("event", "page_view", {
         page_path: location.pathname + location.search + location.hash,
@@ -40,6 +42,8 @@ function AnalyticsTracker() {
         page_title: document.title,
       });
     }
+    // 2) Bakendagreining — skráir page_view í analytics_events töfluna
+    trackPageView(location.pathname, { search: location.search || undefined });
   }, [location]);
 
   return null;

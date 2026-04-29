@@ -1878,5 +1878,24 @@ export async function registerRoutes(app: Express): Promise<void> {
     });
   }
 
+  // GET /health – diagnostic endpoint (no auth)
+  router.get("/health", (req, res) => {
+    const db = (storage as any).db as { users: any[]; stores: any[]; posts: any[] };
+    res.json({
+      ok: true,
+      db: {
+        users: db?.users?.length ?? "?",
+        stores: db?.stores?.length ?? "?",
+        posts: db?.posts?.length ?? "?",
+      },
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        has_jwt_secret: !!process.env.JWT_SECRET,
+        db_file: process.env.DB_FILE_DEBUG ?? "/var/data or ./database.json",
+      },
+      ts: new Date().toISOString(),
+    });
+  });
+
   // ⬅️ LOKAR registerRoutes(app)
 }

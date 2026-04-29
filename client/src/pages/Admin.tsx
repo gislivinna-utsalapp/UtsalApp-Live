@@ -51,10 +51,12 @@ export default function AdminPage() {
   const {
     data: posts = [],
     isLoading: postsLoading,
+    error: postsError,
     refetch: refetchPosts,
   } = useQuery<AdminPost[]>({
     queryKey: ["admin-posts"],
     enabled: isAdmin,
+    retry: 1,
     queryFn: () =>
       apiFetch<AdminPost[]>("/api/v1/admin/posts", { headers: authHeader }),
   });
@@ -62,13 +64,17 @@ export default function AdminPage() {
   const {
     data: stores = [],
     isLoading: storesLoading,
+    error: storesError,
     refetch: refetchStores,
   } = useQuery<AdminStore[]>({
     queryKey: ["admin-stores"],
     enabled: isAdmin,
+    retry: 1,
     queryFn: () =>
       apiFetch<AdminStore[]>("/api/v1/admin/stores", { headers: authHeader }),
   });
+
+  const apiError = (postsError || storesError) as Error | null;
 
   if (loading) {
     return (
@@ -174,6 +180,14 @@ export default function AdminPage() {
           </Button>
         </div>
       </header>
+
+      {apiError && (
+        <div className="p-3 rounded-md bg-red-50 border border-red-200 text-xs text-red-700">
+          <strong>Villa við að sækja gögn:</strong> {apiError.message}
+          <br />
+          <span className="text-red-500">Skráðu þig út og inn aftur ef vandinn heldur áfram.</span>
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap">
         <button

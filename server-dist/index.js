@@ -47,22 +47,12 @@ function loadDatabase() {
     posts: raw.posts ?? []
   };
 }
-var _saveTimer = null;
-var _pendingDb = null;
 function saveDatabase(db) {
-  _pendingDb = db;
-  if (_saveTimer) return;
-  _saveTimer = setTimeout(() => {
-    _saveTimer = null;
-    const data = _pendingDb;
-    _pendingDb = null;
-    if (!data) return;
-    try {
-      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
-    } catch (err) {
-      console.error("[storage-db] Save failed:", err.message);
-    }
-  }, 300);
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+  } catch (err) {
+    console.error("[storage-db] Save failed:", err.message);
+  }
 }
 var DbStorage = class {
   db;
@@ -2564,6 +2554,23 @@ async function registerRoutes(app) {
       return res.sendFile(path4.join(clientDistPath, "index.html"));
     });
   }
+  router.get("/health", (req, res) => {
+    const db = storage.db;
+    res.json({
+      ok: true,
+      db: {
+        users: db?.users?.length ?? "?",
+        stores: db?.stores?.length ?? "?",
+        posts: db?.posts?.length ?? "?"
+      },
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        has_jwt_secret: !!process.env.JWT_SECRET,
+        db_file: process.env.DB_FILE_DEBUG ?? "/var/data or ./database.json"
+      },
+      ts: (/* @__PURE__ */ new Date()).toISOString()
+    });
+  });
 }
 
 // server/seed-db.ts

@@ -1723,6 +1723,117 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // ─── RICH CLIENT-SIDE ANALYTICS ──────────────────────────────────────────
+
+  // POST /analytics/event  – record a rich client-side analytics event (no auth needed)
+  router.post("/analytics/event", async (req: Request, res: Response) => {
+    try {
+      const {
+        event_name, store_id, store_name, offer_id, offer_title, user_id, metadata,
+      } = req.body as {
+        event_name?: string;
+        store_id?: string;
+        store_name?: string;
+        offer_id?: string;
+        offer_title?: string;
+        user_id?: string;
+        metadata?: Record<string, unknown>;
+      };
+      if (!event_name) return res.status(400).json({ ok: false, error: "Missing event_name" });
+      // Fire-and-forget to DB
+      analyticsPool.query(
+        `INSERT INTO analytics_events (event_name, store_id, store_name, offer_id, offer_title, user_id, metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [event_name, store_id ?? null, store_name ?? null, offer_id ?? null, offer_title ?? null,
+         user_id ?? "anonymous", metadata ? JSON.stringify(metadata) : null],
+      ).catch((err: any) => console.error("[analytics/event] DB write failed:", err.message));
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[analytics/event]", err);
+      return res.json({ ok: false });
+    }
+  });
+
+  // GET /admin/analytics/dashboard – rich analytics_events dashboard query
+  // ?since=&until=
+  router.get("/admin/analytics/dashboard", authAdmin, async (req, res) => {
+    try {
+      const since = req.query.since ? new Date(req.query.since as string) : undefined;
+      const until = req.query.until ? new Date(req.query.until as string) : undefined;
+
+      const params: string[] = [];
+      const conditions: string[] = [];
+      if (since)  { params.push(since.toISOString());  conditions.push(`created_at >= $${params.length}`); }
+      if (until)  { params.push(until.toISOString());  conditions.push(`created_at <= $${params.length}`); }
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+
+      const [
+        summaryRes, topOffersRes, perStoreRes, dailyRes,
+        pageViewsRes, uniqueUsersRes, searchesRes, pwaRes,
+      ] = await Promise.all([
+        // total events by name
+        analyticsPool.query(
+          `SELECT event_name, COUNT(*)::int AS count
+           FROM analytics_events ${where}
+           GROUP BY event_name ORDER BY count DESC`, params),
+        // top 10 most clicked offers
+        analyticsPool.query(
+          `SELECT offer_id, MAX(offer_title) AS offer_title, MAX(store_name) AS store_name,
+                  COUNT(*)::int AS clicks
+           FROM analytics_events
+           WHERE event_name='ad_click' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
+           GROUP BY offer_id ORDER BY clicks DESC LIMIT 10`, params),
+        // per-store breakdown
+        analyticsPool.query(
+          `SELECT store_id, MAX(store_name) AS store_name,
+                  SUM(CASE WHEN event_name='store_view'  THEN 1 ELSE 0 END)::int AS store_views,
+                  SUM(CASE WHEN event_name='ad_click'    THEN 1 ELSE 0 END)::int AS ad_clicks,
+                  SUM(CASE WHEN event_name='store_click' THEN 1 ELSE 0 END)::int AS store_clicks,
+                  SUM(CASE WHEN event_name='offer_saved' THEN 1 ELSE 0 END)::int AS offer_saves
+           FROM analytics_events
+           WHERE store_id IS NOT NULL ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
+           GROUP BY store_id ORDER BY ad_clicks DESC`, params),
+        // daily ad_click trend
+        analyticsPool.query(
+          `SELECT DATE(created_at) AS day, COUNT(*)::int AS count
+           FROM analytics_events
+           WHERE event_name='ad_click' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
+           GROUP BY day ORDER BY day ASC`, params),
+        // page views count
+        analyticsPool.query(
+          `SELECT COUNT(*)::int AS count FROM analytics_events
+           WHERE event_name='page_view' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`, params),
+        // unique users
+        analyticsPool.query(
+          `SELECT COUNT(DISTINCT user_id)::int AS count FROM analytics_events ${where}`, params),
+        // searches
+        analyticsPool.query(
+          `SELECT COUNT(*)::int AS count FROM analytics_events
+           WHERE event_name='search' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`, params),
+        // pwa installs
+        analyticsPool.query(
+          `SELECT COUNT(*)::int AS count FROM analytics_events
+           WHERE event_name='add_to_homescreen' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`, params),
+      ]);
+
+      return res.json({
+        by_event_name: summaryRes.rows,
+        top_offers: topOffersRes.rows,
+        per_store: perStoreRes.rows,
+        daily_trend: dailyRes.rows.map(r => ({ day: r.day, count: r.count })),
+        summary: {
+          page_views:    pageViewsRes.rows[0]?.count ?? 0,
+          unique_users:  uniqueUsersRes.rows[0]?.count ?? 0,
+          searches:      searchesRes.rows[0]?.count ?? 0,
+          pwa_installs:  pwaRes.rows[0]?.count ?? 0,
+        },
+      });
+    } catch (err: any) {
+      console.error("[analytics/dashboard]", err.message);
+      return res.status(500).json({ error: "Villa í greiningum" });
+    }
+  });
+
   // ─── ANALYTICS (admin-only) ──────────────────────────────────────────────
 
   // GET /admin/analytics/summary – persistent DB-backed stats + live memory overlay

@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import type { SalePostWithDetails } from "@shared/schema";
 import { API_BASE_URL } from "@/lib/api";
+import { trackAdClick } from "@/lib/analytics";
 
 type Props = {
   post: SalePostWithDetails;
@@ -93,6 +94,12 @@ export function SalePostCard({ post }: Props) {
   // ── Click tracking ────────────────────────────────────────────────────────
   function handleClick() {
     fireAdEvent(post.id, "click", post.title ?? undefined, storeName);
+    trackAdClick({
+      offerId: post.id,
+      offerTitle: post.title ?? undefined,
+      storeId: (post as any).store?.id,
+      storeName,
+    });
   }
 
   return (

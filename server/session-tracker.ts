@@ -68,8 +68,25 @@ export async function initDb(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_interactions_timestamp ON interactions (timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_interactions_event_type ON interactions (event_type);
       CREATE INDEX IF NOT EXISTS idx_interactions_target ON interactions (target);
+
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id          BIGSERIAL PRIMARY KEY,
+        event_name  TEXT        NOT NULL,
+        store_id    TEXT,
+        store_name  TEXT,
+        offer_id    TEXT,
+        offer_title TEXT,
+        user_id     TEXT        NOT NULL DEFAULT 'anonymous',
+        metadata    JSONB,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ae_created_at  ON analytics_events (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ae_event_name  ON analytics_events (event_name);
+      CREATE INDEX IF NOT EXISTS idx_ae_store_id    ON analytics_events (store_id);
+      CREATE INDEX IF NOT EXISTS idx_ae_offer_id    ON analytics_events (offer_id);
+      CREATE INDEX IF NOT EXISTS idx_ae_user_id     ON analytics_events (user_id);
     `);
-    console.log("[session-tracker] DB ready — interactions table ok");
+    console.log("[session-tracker] DB ready — interactions + analytics_events ok");
   } catch (err: any) {
     console.error("[session-tracker] initDb failed:", err.message);
   }

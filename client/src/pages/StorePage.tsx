@@ -1,9 +1,11 @@
 // client/src/pages/StorePage.tsx
 import { useParams, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MapPin, Phone, Globe, ChevronLeft, Store, Tag } from "lucide-react";
 import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { SalePostCard } from "@/components/SalePostCard";
+import { trackStoreView, trackStoreClick } from "@/lib/analytics";
 
 type StoreDetail = {
   id: string;
@@ -58,6 +60,13 @@ export default function StorePage() {
   const logoSrc = buildUrl(store?.logoUrl);
   const coverSrc = buildUrl(store?.coverUrl);
   const coverPosY = store?.coverPositionY ?? 50;
+
+  // Track store_view once store data loads
+  useEffect(() => {
+    if (store?.id) {
+      trackStoreView(store.id, store.name, store.category ?? undefined);
+    }
+  }, [store?.id]);
 
   /* ── Loading skeleton ─────────────────────────────────────── */
   if (storeLoading || postsLoading) {
@@ -181,6 +190,7 @@ export default function StorePage() {
                   rel="noreferrer"
                   className="hover:text-neutral-800 transition-colors truncate"
                   data-testid="link-store-website"
+                  onClick={() => trackStoreClick(store.id, store.name)}
                 >
                   {store.website.replace(/^https?:\/\//, "")}
                 </a>

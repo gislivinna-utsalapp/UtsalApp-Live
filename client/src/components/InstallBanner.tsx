@@ -21,6 +21,7 @@ export function InstallBanner() {
     const ua = navigator.userAgent.toLowerCase();
     if (ua.includes("android")) setTab("android");
     else setTab("ios");
+
   }, []);
 
   function dismiss() {

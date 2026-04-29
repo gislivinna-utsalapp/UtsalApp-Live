@@ -1,0 +1,94 @@
+Add a full analytics tracking system to ÚtsalApp. The goal is to measure user behavior, store, and display analytics data. Here is exactly what to implement:
+
+---
+
+## 1. EVENTS TO TRACK
+
+Track the following events throughout the app:
+
+### Page / Screen views
+- `page_view` — every time a screen loads. Include: screen_name, timestamp, user_id (if logged in, else "anonymous")
+
+### Ad / Offer clicks
+- `ad_click` — when user taps an ad, deal, or offer. Include: store_id, store_name, offer_title, offer_id, position_in_list, timestamp, user_id
+
+### Store interactions
+- `store_view` — when user opens a store page. Include: store_id, store_name, category, timestamp, user_id
+- `store_click` — when user taps a link to the store's website or app. Include: store_id, store_name, timestamp, user_id
+
+### Search
+- `search` — when user submits a search. Include: query_text, result_count, timestamp, user_id
+
+### Saves / Favorites
+- `offer_saved` — when user saves/favorites an offer. Include: offer_id, store_id, timestamp, user_id
+
+### App install prompt
+- `add_to_homescreen` — when user adds app to homescreen. Include: platform (iOS/Android), timestamp
+
+---
+
+## 2. DATA STORAGE
+
+Store all events in a database table called `analytics_events` with these columns:
+- id (auto increment)
+- event_name (string)
+- store_id (string, nullable)
+- store_name (string, nullable)
+- offer_id (string, nullable)
+- offer_title (string, nullable)
+- user_id (string, default "anonymous")
+- metadata (JSON — store all other extra fields here)
+- created_at (timestamp, auto)
+
+---
+
+## 3. ANALYTICS DASHBOARD — /admin/analytics
+
+Build an analytics dashboard page at /admin/analytics with:
+
+### Time filter (top of page)
+Buttons to filter all data by: Today, Yesterday, Last 7 days, Last 30 days, All time
+
+### Summary cards (top row)
+Show these 4 metric cards:
+1. **Heimsóknir** (Total page views in period)
+2. **Einstaklingar** (Unique user_ids in period)
+3. **Leitir** (Total search events in period)
+4. **Sett á heimaskjá** (Total add_to_homescreen events in period)
+
+### Most popular offers / ads
+Table showing top 10 most clicked offers in the period. Columns: Offer title, Store name, Click count
+
+### Per-store breakdown
+Table showing every store with these columns:
+- Store name
+- Store views (store_view count)
+- Ad clicks (ad_click count)
+- Website clicks (store_click count)
+- Offer saves (offer_saved count)
+Sort by total ad clicks descending.
+
+### Daily trend
+A simple line chart showing total ad_click count per day for the selected period.
+
+---
+
+## 4. STYLE
+
+Match the existing ÚtsalApp design:
+- Orange primary color (#FF6B35 or closest match already in the app)
+- White cards with light gray borders
+- Same tab bar and navigation as the rest of the app
+- Labels in Icelandic (use the label names above: Heimsóknir, Einstaklingar, Leitir, Sett á heimaskjá, Vinsælustu slóðir, Verslanir)
+
+---
+
+## 5. IMPLEMENTATION NOTES
+
+- Use the existing database/backend already set up in this Replit project
+- The tracking calls should be lightweight (fire-and-forget, do not block UI)
+- If user is not logged in, use a persistent anonymous ID stored in localStorage
+- Admin dashboard should be protected — only accessible if user has admin role
+- All timestamps in UTC, displayed in Reykjavík time (GMT+0 / GMT+1 summer)
+
+Start by creating the analytics_events table, then add tracking to the most important user actions (ad clicks and store views first), then build the dashboard.

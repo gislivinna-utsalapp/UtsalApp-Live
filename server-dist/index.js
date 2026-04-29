@@ -282,8 +282,25 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_interactions_timestamp ON interactions (timestamp DESC);
       CREATE INDEX IF NOT EXISTS idx_interactions_event_type ON interactions (event_type);
       CREATE INDEX IF NOT EXISTS idx_interactions_target ON interactions (target);
+
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id          BIGSERIAL PRIMARY KEY,
+        event_name  TEXT        NOT NULL,
+        store_id    TEXT,
+        store_name  TEXT,
+        offer_id    TEXT,
+        offer_title TEXT,
+        user_id     TEXT        NOT NULL DEFAULT 'anonymous',
+        metadata    JSONB,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_ae_created_at  ON analytics_events (created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_ae_event_name  ON analytics_events (event_name);
+      CREATE INDEX IF NOT EXISTS idx_ae_store_id    ON analytics_events (store_id);
+      CREATE INDEX IF NOT EXISTS idx_ae_offer_id    ON analytics_events (offer_id);
+      CREATE INDEX IF NOT EXISTS idx_ae_user_id     ON analytics_events (user_id);
     `);
-    console.log("[session-tracker] DB ready \u2014 interactions table ok");
+    console.log("[session-tracker] DB ready \u2014 interactions + analytics_events ok");
   } catch (err) {
     console.error("[session-tracker] initDb failed:", err.message);
   }
@@ -2309,6 +2326,139 @@ async function registerRoutes(app) {
     } catch (err) {
       console.error("[analytics/store]", err);
       return res.status(500).json({ message: "Villa kom upp" });
+    }
+  });
+  router.post("/analytics/event", async (req, res) => {
+    try {
+      const {
+        event_name,
+        store_id,
+        store_name,
+        offer_id,
+        offer_title,
+        user_id,
+        metadata
+      } = req.body;
+      if (!event_name) return res.status(400).json({ ok: false, error: "Missing event_name" });
+      pool.query(
+        `INSERT INTO analytics_events (event_name, store_id, store_name, offer_id, offer_title, user_id, metadata)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [
+          event_name,
+          store_id ?? null,
+          store_name ?? null,
+          offer_id ?? null,
+          offer_title ?? null,
+          user_id ?? "anonymous",
+          metadata ? JSON.stringify(metadata) : null
+        ]
+      ).catch((err) => console.error("[analytics/event] DB write failed:", err.message));
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[analytics/event]", err);
+      return res.json({ ok: false });
+    }
+  });
+  router.get("/admin/analytics/dashboard", authAdmin, async (req, res) => {
+    try {
+      const since = req.query.since ? new Date(req.query.since) : void 0;
+      const until = req.query.until ? new Date(req.query.until) : void 0;
+      const params = [];
+      const conditions = [];
+      if (since) {
+        params.push(since.toISOString());
+        conditions.push(`created_at >= $${params.length}`);
+      }
+      if (until) {
+        params.push(until.toISOString());
+        conditions.push(`created_at <= $${params.length}`);
+      }
+      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const [
+        summaryRes,
+        topOffersRes,
+        perStoreRes,
+        dailyRes,
+        pageViewsRes,
+        uniqueUsersRes,
+        searchesRes,
+        pwaRes
+      ] = await Promise.all([
+        // total events by name
+        pool.query(
+          `SELECT event_name, COUNT(*)::int AS count
+           FROM analytics_events ${where}
+           GROUP BY event_name ORDER BY count DESC`,
+          params
+        ),
+        // top 10 most clicked offers
+        pool.query(
+          `SELECT offer_id, MAX(offer_title) AS offer_title, MAX(store_name) AS store_name,
+                  COUNT(*)::int AS clicks
+           FROM analytics_events
+           WHERE event_name='ad_click' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
+           GROUP BY offer_id ORDER BY clicks DESC LIMIT 10`,
+          params
+        ),
+        // per-store breakdown
+        pool.query(
+          `SELECT store_id, MAX(store_name) AS store_name,
+                  SUM(CASE WHEN event_name='store_view'  THEN 1 ELSE 0 END)::int AS store_views,
+                  SUM(CASE WHEN event_name='ad_click'    THEN 1 ELSE 0 END)::int AS ad_clicks,
+                  SUM(CASE WHEN event_name='store_click' THEN 1 ELSE 0 END)::int AS store_clicks,
+                  SUM(CASE WHEN event_name='offer_saved' THEN 1 ELSE 0 END)::int AS offer_saves
+           FROM analytics_events
+           WHERE store_id IS NOT NULL ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
+           GROUP BY store_id ORDER BY ad_clicks DESC`,
+          params
+        ),
+        // daily ad_click trend
+        pool.query(
+          `SELECT DATE(created_at) AS day, COUNT(*)::int AS count
+           FROM analytics_events
+           WHERE event_name='ad_click' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
+           GROUP BY day ORDER BY day ASC`,
+          params
+        ),
+        // page views count
+        pool.query(
+          `SELECT COUNT(*)::int AS count FROM analytics_events
+           WHERE event_name='page_view' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`,
+          params
+        ),
+        // unique users
+        pool.query(
+          `SELECT COUNT(DISTINCT user_id)::int AS count FROM analytics_events ${where}`,
+          params
+        ),
+        // searches
+        pool.query(
+          `SELECT COUNT(*)::int AS count FROM analytics_events
+           WHERE event_name='search' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`,
+          params
+        ),
+        // pwa installs
+        pool.query(
+          `SELECT COUNT(*)::int AS count FROM analytics_events
+           WHERE event_name='add_to_homescreen' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`,
+          params
+        )
+      ]);
+      return res.json({
+        by_event_name: summaryRes.rows,
+        top_offers: topOffersRes.rows,
+        per_store: perStoreRes.rows,
+        daily_trend: dailyRes.rows.map((r) => ({ day: r.day, count: r.count })),
+        summary: {
+          page_views: pageViewsRes.rows[0]?.count ?? 0,
+          unique_users: uniqueUsersRes.rows[0]?.count ?? 0,
+          searches: searchesRes.rows[0]?.count ?? 0,
+          pwa_installs: pwaRes.rows[0]?.count ?? 0
+        }
+      });
+    } catch (err) {
+      console.error("[analytics/dashboard]", err.message);
+      return res.status(500).json({ error: "Villa \xED greiningum" });
     }
   });
   router.get("/admin/analytics/summary", authAdmin, async (req, res) => {

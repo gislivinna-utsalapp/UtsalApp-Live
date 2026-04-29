@@ -48,13 +48,19 @@ function AnalyticsTracker() {
 function PwaInstallTracker() {
   useEffect(() => {
     const handler = () => {
-      try {
-        fetch("/api/v1/analytics/pwa-install", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ts: new Date().toISOString() }),
-        }).catch(() => {});
-      } catch (_) {}
+      const platform = navigator.userAgent.toLowerCase().includes("android") ? "android" : "ios";
+      // New rich analytics event
+      fetch("/api/v1/analytics/event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event_name: "add_to_homescreen", metadata: { platform } }),
+      }).catch(() => {});
+      // Legacy interactions table event (for backward compat with old dashboard)
+      fetch("/api/v1/analytics/pwa-install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ts: new Date().toISOString() }),
+      }).catch(() => {});
     };
     window.addEventListener("appinstalled", handler);
     return () => window.removeEventListener("appinstalled", handler);

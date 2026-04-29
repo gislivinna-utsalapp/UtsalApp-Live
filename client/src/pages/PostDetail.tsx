@@ -9,6 +9,7 @@ import { apiFetch, API_BASE_URL } from "@/lib/api";
 import { getTimeRemaining } from "@/lib/utils";
 import { useCart } from "@/hooks/useCart";
 import { useToast } from "@/hooks/use-toast";
+import { trackOfferSaved } from "@/lib/analytics";
 
 function buildImageUrl(rawUrl?: string | null): string | null {
   if (!rawUrl) return null;
@@ -259,6 +260,12 @@ export default function PostDetail() {
     } else {
       addToCart(post.id);
       toast({ title: "Vistað" });
+      trackOfferSaved({
+        offerId: post.id,
+        offerTitle: post.title ?? undefined,
+        storeId: post.store?.id,
+        storeName: (post.store as any)?.name,
+      });
     }
   };
 

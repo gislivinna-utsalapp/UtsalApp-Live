@@ -1,11 +1,12 @@
 // client/src/pages/SearchPage.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import type { SalePostWithDetails } from "@shared/schema";
 import { SalePostCard } from "@/components/SalePostCard";
+import { trackSearch } from "@/lib/analytics";
 
 async function searchPosts(term: string): Promise<SalePostWithDetails[]> {
   const q = term.trim();
@@ -20,6 +21,7 @@ export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const initialQ = searchParams.get("q") ?? "";
   const [searchTerm, setSearchTerm] = useState(initialQ);
+  const trackedTerms = useRef<Set<string>>(new Set());
 
   // Update search term if URL param changes (e.g. navigated from header)
   useEffect(() => {
@@ -32,6 +34,14 @@ export default function SearchPage() {
     enabled: searchTerm.trim().length > 0,
     queryFn: () => searchPosts(searchTerm),
   });
+
+  // Track search once per unique query term (after results load)
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (!term || isLoading || trackedTerms.current.has(term)) return;
+    trackedTerms.current.add(term);
+    trackSearch(term, results.length);
+  }, [searchTerm, isLoading, results.length]);
 
   const activeTerm = searchTerm.trim();
 

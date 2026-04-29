@@ -1,17 +1,15 @@
 // client/src/lib/api.ts
 
-// Les grunnslóð á API (ef hún er skilgreind), annars notum við relative slóðir
-export const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() || "";
+// Alltaf hlutfallslegar slóðir — virkar bæði á Render og Replit
+// þar sem framendinn og bakendinn eru á sama þjóni.
+export const API_BASE_URL = "";
 
-// Býr til fulla URL út frá relative path + API base-url
+// Býr til fulla URL út frá relative path
 function buildUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) {
     return path;
   }
-  const base = (API_BASE_URL || "").replace(/\/$/, "");
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return base ? `${base}${p}` : p;
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
 // Sameiginlegt API-fall sem bætir við Authorization haus ef token er til

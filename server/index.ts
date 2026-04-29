@@ -8,6 +8,7 @@ import session from "express-session";
 import { registerRoutes } from "./routes";
 import { UPLOAD_DIR } from "./config/uploads";
 import { sessionTracker, initDb } from "./session-tracker";
+import { seedDatabaseIfEmpty } from "./seed-db";
 
 const PORT = Number(process.env.PORT) || 5000;
 
@@ -25,6 +26,9 @@ async function main() {
 
   // Create analytics table if it doesn't exist (safe on every startup)
   await initDb();
+
+  // Seed database with initial data if it is empty (first deploy on Render)
+  await seedDatabaseIfEmpty();
 
   const app = express();
 

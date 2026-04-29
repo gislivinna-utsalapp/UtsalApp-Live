@@ -1,7 +1,7 @@
 // server/index.ts
 import express2 from "express";
 import { createServer } from "http";
-import fs4 from "fs";
+import fs5 from "fs";
 import session from "express-session";
 
 // server/routes.ts
@@ -355,15 +355,15 @@ function writeSessionId(res, sessionId) {
     path: "/"
   });
 }
-function classifyPath(method, path4, hasQuery = false) {
-  if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path4))
+function classifyPath(method, path5, hasQuery = false) {
+  if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path5))
     return "page_view";
-  if (method === "GET" && /\/posts/.test(path4) && hasQuery)
+  if (method === "GET" && /\/posts/.test(path5) && hasQuery)
     return "search";
-  if (method === "GET" && /\/posts/.test(path4)) return "page_view";
-  if (method === "GET" && /\/stores/.test(path4)) return "page_view";
-  if (/analyze-search/.test(path4)) return "search";
-  if (/^\/api\//.test(path4)) return "api_request";
+  if (method === "GET" && /\/posts/.test(path5)) return "page_view";
+  if (method === "GET" && /\/stores/.test(path5)) return "page_view";
+  if (/analyze-search/.test(path5)) return "search";
+  if (/^\/api\//.test(path5)) return "api_request";
   return "other";
 }
 var sessionTracker = (req, res, next) => {
@@ -373,15 +373,15 @@ var sessionTracker = (req, res, next) => {
     writeSessionId(res, sessionId);
   }
   req.sessionId = sessionId;
-  const path4 = req.path;
-  const skip = path4.startsWith("/uploads/") || path4 === "/health" || !path4.startsWith("/api/");
+  const path5 = req.path;
+  const skip = path5.startsWith("/uploads/") || path5 === "/health" || !path5.startsWith("/api/");
   if (!skip) {
     const qParam = req.query.q;
     const meta = qParam ? { q: qParam } : void 0;
     storeEvent({
       session_id: sessionId,
-      event_type: classifyPath(req.method, path4, !!qParam),
-      path: path4,
+      event_type: classifyPath(req.method, path5, !!qParam),
+      path: path5,
       method: req.method,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       meta
@@ -417,7 +417,7 @@ function getSessionSummary() {
   }
   const counts = {};
   for (const e of cache) counts[e.path] = (counts[e.path] ?? 0) + 1;
-  const top_paths = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 20).map(([path4, count]) => ({ path: path4, count }));
+  const top_paths = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 20).map(([path5, count]) => ({ path: path5, count }));
   return {
     total_events_cached: cache.length,
     unique_sessions: Object.keys(bySession).length,
@@ -2539,6 +2539,326 @@ async function registerRoutes(app) {
   }
 }
 
+// server/seed-db.ts
+import fs4 from "fs";
+import path4 from "path";
+function resolveDbFile2() {
+  const prodPath = "/var/data/database.json";
+  try {
+    if (fs4.existsSync(path4.dirname(prodPath))) return prodPath;
+  } catch {
+  }
+  return path4.join(process.cwd(), "database.json");
+}
+var SEED_DATA = {
+  users: [
+    {
+      id: "7a6bcdd6-4090-488f-b84d-baf4eaad6220",
+      email: "gisli@utsalapp.is",
+      passwordHash: "$2b$10$506EpDVjJdY/UfTqG1PsGul/gA2xtF/001CjLAF65iciXp2RoEG5y",
+      role: "store",
+      storeId: "404d8fb6-15fc-4552-a710-f6d6c7d27659",
+      isAdmin: true
+    },
+    {
+      id: "3978e0f2-03e2-4a3a-aa7c-376457026e5a",
+      email: "utsalapp@utsalapp.is",
+      passwordHash: "$2b$10$rk9rE4hUu.2rMVmuIQ4sN..JWHEGhsDZwcox1/0mw2bZUdqBprLqO",
+      role: "store",
+      storeId: "c5384bfd-5dd1-4322-91e0-5fdc9f6aa51a",
+      isAdmin: false
+    }
+  ],
+  stores: [
+    {
+      id: "1d1ba5c3-a7b5-4757-b954-cdfa9e4ba908",
+      name: "Kr\xF3nan",
+      category: "matvorur",
+      address: "Grens\xE1svegur 9, 108 Reykjav\xEDk",
+      phone: "5401700",
+      website: "https://kronan.is",
+      billingStatus: "active",
+      trialEndsAt: null,
+      createdAt: "2026-04-20T23:24:28.940Z",
+      plan: "pro"
+    },
+    {
+      id: "92b8c7dc-37ad-4e92-85b0-93a014745158",
+      name: "Elko",
+      category: "raftaeki",
+      address: "Skeifan 9, 108 Reykjav\xEDk",
+      phone: "5158000",
+      website: "https://elko.is",
+      billingStatus: "active",
+      trialEndsAt: null,
+      createdAt: "2026-04-20T23:24:28.940Z",
+      plan: "premium"
+    },
+    {
+      id: "b39cbbfd-9faa-4b5c-96c2-b3855d93b749",
+      name: "Hagkaup",
+      category: "fatnad",
+      address: "Hagasm\xE1ra 1, 201 K\xF3pavogur",
+      phone: "5655500",
+      website: "https://hagkaup.is",
+      billingStatus: "active",
+      trialEndsAt: null,
+      createdAt: "2026-04-20T23:24:28.940Z",
+      plan: "pro"
+    },
+    {
+      id: "d0568224-6096-42fa-b24a-f3ca3c9b4798",
+      name: "Skr\xFA\xF0ur",
+      category: "husgogn",
+      address: "Miklabraut 79, 105 Reykjav\xEDk",
+      phone: "5337700",
+      website: "https://skrudur.is",
+      billingStatus: "active",
+      trialEndsAt: null,
+      createdAt: "2026-04-20T23:24:28.940Z",
+      plan: "basic"
+    },
+    {
+      id: "dac35f9b-784a-4bb2-8a20-0365e4af2213",
+      name: "66\xB0North",
+      category: "fatnad",
+      address: "Bankastr\xE6ti 5, 101 Reykjav\xEDk",
+      phone: "5357660",
+      website: "https://66north.com",
+      billingStatus: "active",
+      trialEndsAt: null,
+      createdAt: "2026-04-20T23:24:28.940Z",
+      plan: "premium"
+    },
+    {
+      id: "c5384bfd-5dd1-4322-91e0-5fdc9f6aa51a",
+      name: "\xDAtsalApp",
+      address: "",
+      phone: "",
+      website: "https://utsalapp-live.onrender.com",
+      ownerEmail: "utsalapp@utsalapp.is",
+      plan: "unlimited",
+      billingStatus: "active",
+      trialEndsAt: null,
+      createdAt: "2026-04-21T13:25:12.831Z"
+    }
+  ],
+  posts: [
+    {
+      id: "45da641c-dbf2-4dd5-b5ef-f344d1603014",
+      storeId: "1d1ba5c3-a7b5-4757-b954-cdfa9e4ba908",
+      title: "Mj\xF3lk 1L \u2014 st\xF3r frambo\xF0s\xFAtsala",
+      description: "N\xFDfr\xEDskt mj\xF3lk fr\xE1 \xEDslenskum b\xE6ndum. Til \xED l\xE9ttmj\xF3lk og heilmj\xF3lk. Ver\xF0 gildir \xFEar til birg\xF0ir t\xE6mast.",
+      priceOriginal: 279,
+      priceSale: 189,
+      category: "matvorur",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 1,
+      images: [{ url: "https://images.unsplash.com/photo-1550583724-b2692b85b150?w=800&h=600&fit=crop", alt: "Mj\xF3lkurflaska" }]
+    },
+    {
+      id: "48ca46a6-fffc-46f0-9a75-137ca7f26262",
+      storeId: "1d1ba5c3-a7b5-4757-b954-cdfa9e4ba908",
+      title: "Skyr \u2014 4 d\xF3sir \xE1 s\xE9rkj\xF6rum",
+      description: "\xCDslenskur skyr \xED fj\xF3rum brag\xF0tegundum. Pr\xF3t\xEDnr\xEDkur og hollur.",
+      priceOriginal: 899,
+      priceSale: 599,
+      category: "matvorur",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 2,
+      images: [{ url: "https://images.unsplash.com/photo-1488477181899-ab9f07f95b07?w=800&h=600&fit=crop", alt: "Skyr d\xF3sir" }]
+    },
+    {
+      id: "89615302-a1f9-4cff-8c5d-6da1b29ded99",
+      storeId: "1d1ba5c3-a7b5-4757-b954-cdfa9e4ba908",
+      title: "Lambakj\xF6t \u2014 \xEDslenskt, 500g",
+      description: "Ferskt \xEDslenskt lambakj\xF6t, beint fr\xE1 b\xF3ndanum. Til \xED hakkakj\xF6ti og steik.",
+      priceOriginal: 2490,
+      priceSale: 1690,
+      category: "matvorur",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 3,
+      images: [{ url: "https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=800&h=600&fit=crop", alt: "Lambakj\xF6t" }]
+    },
+    {
+      id: "ab8d39e7-d4b1-4abc-8def-111122223333",
+      storeId: "92b8c7dc-37ad-4e92-85b0-93a014745158",
+      title: 'Samsung QLED 55" sj\xF3nvarp',
+      description: "Snertilegt QLED skj\xE1r me\xF0 4K upplausn og HDR10+. Fullkomi\xF0 fyrir heimilisb\xED\xF3.",
+      priceOriginal: 189900,
+      priceSale: 139900,
+      category: "raftaeki",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 5,
+      images: [{ url: "https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&h=600&fit=crop", alt: "Samsung sj\xF3nvarp" }]
+    },
+    {
+      id: "d350644d-d4b1-4abc-8def-111122223334",
+      storeId: "92b8c7dc-37ad-4e92-85b0-93a014745158",
+      title: "Apple AirPods Pro 2. kynsl\xF3\xF0",
+      description: "Hlj\xF3\xF0dempun \xED heimsklassa \xE1samt Transparency Mode. USB-C hle\xF0sluhulstur innifalinn.",
+      priceOriginal: 69900,
+      priceSale: 54900,
+      category: "raftaeki",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 8,
+      images: [{ url: "https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=800&h=600&fit=crop", alt: "AirPods Pro" }]
+    },
+    {
+      id: "3e0ef3d3-d4b1-4abc-8def-111122223335",
+      storeId: "92b8c7dc-37ad-4e92-85b0-93a014745158",
+      title: "Dyson V15 Detect \xFEr\xE1\xF0laus ryksuga",
+      description: "Kraftmesta \xFEr\xE1\xF0lausa ryksuga Dysons me\xF0 laser-ryk skynjara og LCD skj\xE1.",
+      priceOriginal: 109900,
+      priceSale: 79900,
+      category: "raftaeki",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 12,
+      images: [{ url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=600&fit=crop", alt: "Dyson V15" }]
+    },
+    {
+      id: "105b5c75-d4b1-4abc-8def-111122223336",
+      storeId: "b39cbbfd-9faa-4b5c-96c2-b3855d93b749",
+      title: "Levi's 501 gallabuxur",
+      description: "Klass\xEDskar Levi's 501 Original \u2014 t\xEDmalausar gallabuxur \xED sl\xE9ttu sker\xF0ingarver\xF0i.",
+      priceOriginal: 19900,
+      priceSale: 12900,
+      category: "fatnad",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 7,
+      images: [{ url: "https://images.unsplash.com/photo-1542272604-787c3835535d?w=800&h=600&fit=crop", alt: "Levis gallabuxur" }]
+    },
+    {
+      id: "d0c020b0-d4b1-4abc-8def-111122223337",
+      storeId: "b39cbbfd-9faa-4b5c-96c2-b3855d93b749",
+      title: "Nike Air Max 270 \u2014 kvenna",
+      description: "\xDE\xE6gilegar \xED\xFEr\xF3ttask\xF3r me\xF0 Air Max einingu. Til \xED m\xF6rgum litum.",
+      priceOriginal: 29900,
+      priceSale: 19900,
+      category: "fatnad",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 9,
+      images: [{ url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&h=600&fit=crop", alt: "Nike Air Max" }]
+    },
+    {
+      id: "398be689-d4b1-4abc-8def-111122223338",
+      storeId: "d0568224-6096-42fa-b24a-f3ca3c9b4798",
+      title: "Hillur BEST\xC5 \u2014 3 h\xF3lf",
+      description: "Gl\xE6sileg BEST\xC5 hillu \xED hv\xEDtu me\xF0 \xFEremur h\xF3lfum. Au\xF0veld uppsetning.",
+      priceOriginal: 34900,
+      priceSale: 24900,
+      category: "husgogn",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 4,
+      images: [{ url: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&h=600&fit=crop", alt: "BEST\xC5 hillu" }]
+    },
+    {
+      id: "e5ccb374-d4b1-4abc-8def-111122223339",
+      storeId: "d0568224-6096-42fa-b24a-f3ca3c9b4798",
+      title: "Bor\xF0st\xF3lar \xED Skandinav\xEDu-st\xEDl",
+      description: "Fallegir bor\xF0st\xF3lar me\xF0 mass\xEDvum eikartrefjum og ry\xF0fr\xEDu st\xE1li. Seldir \xED p\xF6rum.",
+      priceOriginal: 49900,
+      priceSale: 34900,
+      category: "husgogn",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 6,
+      images: [{ url: "https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=800&h=600&fit=crop", alt: "Bor\xF0st\xF3lar" }]
+    },
+    {
+      id: "f24d49e5-d4b1-4abc-8def-111122223340",
+      storeId: "dac35f9b-784a-4bb2-8a20-0365e4af2213",
+      title: "Sn\xE6fell GoreTex \xFAlpa",
+      description: "\xDE\xE9tt GoreTex \xFAtik\xE1pa sem heldur \xFE\xE9r hl\xFDjum og \xFEurrum \xED \xF6llum ve\xF0rum.",
+      priceOriginal: 64900,
+      priceSale: 44900,
+      category: "fatnad",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 5,
+      images: [{ url: "https://images.unsplash.com/photo-1544441893-675973e31985?w=800&h=600&fit=crop", alt: "GoreTex \xFAlpa" }]
+    },
+    {
+      id: "4dd5a946-d4b1-4abc-8def-111122223341",
+      storeId: "dac35f9b-784a-4bb2-8a20-0365e4af2213",
+      title: "Keilir Fleece Peysa",
+      description: "Hl\xFD fleece peysa \xFAr endurvinnum efnum. Fullkomin fyrir fjallg\xF6ngu og daglegt l\xEDf.",
+      priceOriginal: 39900,
+      priceSale: 27900,
+      category: "fatnad",
+      startsAt: "2026-04-17T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-17T23:24:28.940Z",
+      viewCount: 4,
+      images: [{ url: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800&h=600&fit=crop", alt: "Fleece peysa" }]
+    },
+    {
+      id: "52b404d9-d4b1-4abc-8def-111122223342",
+      storeId: "dac35f9b-784a-4bb2-8a20-0365e4af2213",
+      title: "Laugavegur ve\xF0urjakki",
+      description: "Uppf\xE6r\xF0ur Laugavegur jakki me\xF0 fulln\xE6gjandi einangrun og GoreTex yfirbur\xF0um.",
+      priceOriginal: 74900,
+      priceSale: 54900,
+      category: "fatnad",
+      startsAt: "2026-04-20T23:24:28.940Z",
+      endsAt: "2027-12-31T23:59:59.000Z",
+      isActive: true,
+      createdAt: "2026-04-20T23:24:28.940Z",
+      viewCount: 3,
+      images: [{ url: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&h=600&fit=crop", alt: "Ve\xF0urjakki" }]
+    }
+  ]
+};
+async function seedDatabaseIfEmpty() {
+  const dbFile = resolveDbFile2();
+  try {
+    const raw = fs4.readFileSync(dbFile, "utf8");
+    const db = JSON.parse(raw);
+    if (Array.isArray(db.users) && db.users.length > 0) {
+      return;
+    }
+    console.log("[seed] T\xF3mur gagnagrunnur \u2014 set inn upphafsg\xF6gn...");
+    fs4.writeFileSync(dbFile, JSON.stringify(SEED_DATA, null, 2), "utf8");
+    console.log(
+      `[seed] Tilb\xFAi\xF0: ${SEED_DATA.users.length} notendur, ${SEED_DATA.stores.length} verslanir, ${SEED_DATA.posts.length} f\xE6rslur`
+    );
+  } catch (err) {
+    console.error("[seed] Villa vi\xF0 seed:", err.message);
+  }
+}
+
 // server/index.ts
 var PORT = Number(process.env.PORT) || 5e3;
 async function main() {
@@ -2549,6 +2869,7 @@ async function main() {
     console.error("[uncaughtException]", err);
   });
   await initDb();
+  await seedDatabaseIfEmpty();
   const app = express2();
   app.set("trust proxy", 1);
   app.use(
@@ -2567,10 +2888,10 @@ async function main() {
   app.use(sessionTracker);
   console.log("[uploads] UPLOAD_DIR =", UPLOAD_DIR);
   try {
-    if (fs4.existsSync(UPLOAD_DIR)) {
+    if (fs5.existsSync(UPLOAD_DIR)) {
       console.log(
         "[uploads] files on disk:",
-        fs4.readdirSync(UPLOAD_DIR).slice(0, 10)
+        fs5.readdirSync(UPLOAD_DIR).slice(0, 10)
       );
     } else {
       console.warn("[uploads] directory does NOT exist");

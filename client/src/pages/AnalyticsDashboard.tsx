@@ -19,6 +19,7 @@ type DashboardData = {
     unique_users: number;
     searches: number;
     pwa_installs: number;
+    ad_clicks: number;
   };
   top_offers: { offer_id: string; offer_title: string; store_name: string; clicks: number }[];
   per_store: {
@@ -207,10 +208,10 @@ export default function AnalyticsDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3" data-testid="analytics-summary">
-            <StatCard icon={Eye}           label="Heimsóknir"       value={summary?.page_views  ?? 0} />
-            <StatCard icon={Users}         label="Einstaklingar"    value={summary?.unique_users ?? 0} accent="#6366f1" />
-            <StatCard icon={Search}        label="Leitir"           value={summary?.searches    ?? 0} accent="#0ea5e9" />
-            <StatCard icon={Smartphone}    label="Sett á heimaskjá" value={summary?.pwa_installs ?? 0} accent="#10b981" />
+            <StatCard icon={Eye}              label="Heimsóknir"       value={summary?.page_views   ?? 0} />
+            <StatCard icon={Users}            label="Einstaklingar"    value={summary?.unique_users ?? 0} accent="#6366f1" />
+            <StatCard icon={MousePointerClick} label="Smellir"          value={summary?.ad_clicks    ?? 0} accent="#ff4d00" />
+            <StatCard icon={Search}           label="Leitir"           value={summary?.searches     ?? 0} accent="#0ea5e9" />
           </div>
         )}
 

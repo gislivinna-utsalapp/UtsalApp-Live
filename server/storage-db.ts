@@ -49,8 +49,23 @@ function loadDatabase(): DatabaseShape {
   };
 }
 
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingDb: DatabaseShape | null = null;
+
 function saveDatabase(db: DatabaseShape) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+  _pendingDb = db;
+  if (_saveTimer) return; // already scheduled
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    const data = _pendingDb;
+    _pendingDb = null;
+    if (!data) return;
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
+    } catch (err: any) {
+      console.error("[storage-db] Save failed:", err.message);
+    }
+  }, 300); // batch within 300 ms
 }
 
 export class DbStorage {

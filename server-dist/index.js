@@ -1,7 +1,7 @@
 // server/index.ts
 import express2 from "express";
 import { createServer } from "http";
-import fs5 from "fs";
+import fs6 from "fs";
 import session from "express-session";
 
 // server/routes.ts
@@ -11,8 +11,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import crypto2 from "crypto";
-import path3 from "path";
-import fs3 from "fs";
+import path4 from "path";
+import fs4 from "fs";
 
 // server/storage-db.ts
 import fs from "fs";
@@ -47,8 +47,22 @@ function loadDatabase() {
     posts: raw.posts ?? []
   };
 }
+var _saveTimer = null;
+var _pendingDb = null;
 function saveDatabase(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), "utf8");
+  _pendingDb = db;
+  if (_saveTimer) return;
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    const data = _pendingDb;
+    _pendingDb = null;
+    if (!data) return;
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
+    } catch (err) {
+      console.error("[storage-db] Save failed:", err.message);
+    }
+  }, 300);
 }
 var DbStorage = class {
   db;
@@ -355,15 +369,15 @@ function writeSessionId(res, sessionId) {
     path: "/"
   });
 }
-function classifyPath(method, path5, hasQuery = false) {
-  if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path5))
+function classifyPath(method, path6, hasQuery = false) {
+  if (method === "GET" && /^\/api\/v1\/posts\/[^/]+$/.test(path6))
     return "page_view";
-  if (method === "GET" && /\/posts/.test(path5) && hasQuery)
+  if (method === "GET" && /\/posts/.test(path6) && hasQuery)
     return "search";
-  if (method === "GET" && /\/posts/.test(path5)) return "page_view";
-  if (method === "GET" && /\/stores/.test(path5)) return "page_view";
-  if (/analyze-search/.test(path5)) return "search";
-  if (/^\/api\//.test(path5)) return "api_request";
+  if (method === "GET" && /\/posts/.test(path6)) return "page_view";
+  if (method === "GET" && /\/stores/.test(path6)) return "page_view";
+  if (/analyze-search/.test(path6)) return "search";
+  if (/^\/api\//.test(path6)) return "api_request";
   return "other";
 }
 var sessionTracker = (req, res, next) => {
@@ -373,15 +387,15 @@ var sessionTracker = (req, res, next) => {
     writeSessionId(res, sessionId);
   }
   req.sessionId = sessionId;
-  const path5 = req.path;
-  const skip = path5.startsWith("/uploads/") || path5 === "/health" || !path5.startsWith("/api/");
+  const path6 = req.path;
+  const skip = path6.startsWith("/uploads/") || path6 === "/health" || !path6.startsWith("/api/");
   if (!skip) {
     const qParam = req.query.q;
     const meta = qParam ? { q: qParam } : void 0;
     storeEvent({
       session_id: sessionId,
-      event_type: classifyPath(req.method, path5, !!qParam),
-      path: path5,
+      event_type: classifyPath(req.method, path6, !!qParam),
+      path: path6,
       method: req.method,
       timestamp: (/* @__PURE__ */ new Date()).toISOString(),
       meta
@@ -417,7 +431,7 @@ function getSessionSummary() {
   }
   const counts = {};
   for (const e of cache) counts[e.path] = (counts[e.path] ?? 0) + 1;
-  const top_paths = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 20).map(([path5, count]) => ({ path: path5, count }));
+  const top_paths = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 20).map(([path6, count]) => ({ path: path6, count }));
   return {
     total_events_cached: cache.length,
     unique_sessions: Object.keys(bySession).length,
@@ -1007,6 +1021,114 @@ function analyzeQuery(rawQuery) {
   };
 }
 
+// server/analytics-storage.ts
+import fs3 from "fs";
+import path3 from "path";
+function resolveAnalyticsFile() {
+  const prodPath = "/var/data/analytics.json";
+  try {
+    if (fs3.existsSync(path3.dirname(prodPath))) return prodPath;
+  } catch {
+  }
+  return path3.join(process.cwd(), "analytics.json");
+}
+var ANALYTICS_FILE = resolveAnalyticsFile();
+var MAX_EVENTS = 5e4;
+var events = loadFromDisk();
+var dirty = false;
+var saveTimer = null;
+function loadFromDisk() {
+  try {
+    if (fs3.existsSync(ANALYTICS_FILE)) {
+      const raw = fs3.readFileSync(ANALYTICS_FILE, "utf8");
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        console.log(`[analytics-storage] Loaded ${parsed.length} events from ${ANALYTICS_FILE}`);
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error("[analytics-storage] Load failed:", err.message);
+  }
+  return [];
+}
+function scheduleSave() {
+  if (saveTimer) return;
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    if (!dirty) return;
+    try {
+      fs3.writeFileSync(ANALYTICS_FILE, JSON.stringify(events), "utf8");
+      dirty = false;
+    } catch (err) {
+      console.error("[analytics-storage] Save failed:", err.message);
+    }
+  }, 2e3);
+}
+function recordEvent(payload) {
+  const e = {
+    id: Math.random().toString(36).slice(2, 10),
+    created_at: (/* @__PURE__ */ new Date()).toISOString(),
+    ...payload
+  };
+  events.push(e);
+  if (events.length > MAX_EVENTS) events = events.slice(-MAX_EVENTS);
+  dirty = true;
+  scheduleSave();
+}
+function queryDashboard(since, until) {
+  let filtered = events;
+  if (since) {
+    const s = since.getTime();
+    filtered = filtered.filter((e) => new Date(e.created_at).getTime() >= s);
+  }
+  if (until) {
+    const u = until.getTime();
+    filtered = filtered.filter((e) => new Date(e.created_at).getTime() <= u);
+  }
+  const nameMap = {};
+  for (const e of filtered) nameMap[e.event_name] = (nameMap[e.event_name] ?? 0) + 1;
+  const by_event_name = Object.entries(nameMap).map(([event_name, count]) => ({ event_name, count })).sort((a, b) => b.count - a.count);
+  const offerMap = {};
+  for (const e of filtered) {
+    if (e.event_name !== "ad_click") continue;
+    const k = e.offer_id ?? "unknown";
+    if (!offerMap[k]) offerMap[k] = { offer_id: k, offer_title: e.offer_title ?? k, store_name: e.store_name ?? "", clicks: 0 };
+    offerMap[k].clicks++;
+  }
+  const top_offers = Object.values(offerMap).sort((a, b) => b.clicks - a.clicks).slice(0, 10);
+  const storeMap = {};
+  for (const e of filtered) {
+    if (!e.store_id) continue;
+    const k = e.store_id;
+    if (!storeMap[k]) storeMap[k] = { store_id: k, store_name: e.store_name ?? k, store_views: 0, ad_clicks: 0, store_clicks: 0, offer_saves: 0 };
+    if (e.event_name === "store_view") storeMap[k].store_views++;
+    if (e.event_name === "ad_click") storeMap[k].ad_clicks++;
+    if (e.event_name === "store_click") storeMap[k].store_clicks++;
+    if (e.event_name === "offer_saved") storeMap[k].offer_saves++;
+  }
+  const per_store = Object.values(storeMap).sort((a, b) => b.ad_clicks - a.ad_clicks);
+  const dailyMap = {};
+  for (const e of filtered) {
+    if (e.event_name !== "ad_click") continue;
+    const day = e.created_at.slice(0, 10);
+    dailyMap[day] = (dailyMap[day] ?? 0) + 1;
+  }
+  const daily_trend = Object.entries(dailyMap).map(([day, count]) => ({ day, count })).sort((a, b) => a.day.localeCompare(b.day));
+  const page_views = filtered.filter((e) => e.event_name === "page_view").length;
+  const unique_users = new Set(filtered.map((e) => e.user_id).filter(Boolean)).size;
+  const searches = filtered.filter((e) => e.event_name === "search").length;
+  const pwa_installs = filtered.filter((e) => e.event_name === "add_to_homescreen").length;
+  const ad_clicks = filtered.filter((e) => e.event_name === "ad_click").length;
+  return {
+    by_event_name,
+    top_offers,
+    per_store,
+    daily_trend,
+    summary: { page_views, unique_users, searches, pwa_installs, ad_clicks }
+  };
+}
+
 // server/routes.ts
 var JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 var upload = multer({
@@ -1015,7 +1137,7 @@ var upload = multer({
       cb(null, UPLOAD_DIR);
     },
     filename: (_req, file, cb) => {
-      const ext = path3.extname(file.originalname) || ".jpg";
+      const ext = path4.extname(file.originalname) || ".jpg";
       cb(null, `${crypto2.randomUUID()}${ext.toLowerCase()}`);
     }
   }),
@@ -2340,122 +2462,27 @@ async function registerRoutes(app) {
         metadata
       } = req.body;
       if (!event_name) return res.status(400).json({ ok: false, error: "Missing event_name" });
-      pool.query(
-        `INSERT INTO analytics_events (event_name, store_id, store_name, offer_id, offer_title, user_id, metadata)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [
-          event_name,
-          store_id ?? null,
-          store_name ?? null,
-          offer_id ?? null,
-          offer_title ?? null,
-          user_id ?? "anonymous",
-          metadata ? JSON.stringify(metadata) : null
-        ]
-      ).catch((err) => console.error("[analytics/event] DB write failed:", err.message));
+      recordEvent({
+        event_name,
+        store_id: store_id ?? null,
+        store_name: store_name ?? null,
+        offer_id: offer_id ?? null,
+        offer_title: offer_title ?? null,
+        user_id: user_id ?? "anonymous",
+        metadata: metadata ?? null
+      });
       return res.json({ ok: true });
     } catch (err) {
       console.error("[analytics/event]", err);
       return res.json({ ok: false });
     }
   });
-  router.get("/admin/analytics/dashboard", authAdmin, async (req, res) => {
+  router.get("/admin/analytics/dashboard", authAdmin, (req, res) => {
     try {
       const since = req.query.since ? new Date(req.query.since) : void 0;
       const until = req.query.until ? new Date(req.query.until) : void 0;
-      const params = [];
-      const conditions = [];
-      if (since) {
-        params.push(since.toISOString());
-        conditions.push(`created_at >= $${params.length}`);
-      }
-      if (until) {
-        params.push(until.toISOString());
-        conditions.push(`created_at <= $${params.length}`);
-      }
-      const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-      const [
-        summaryRes,
-        topOffersRes,
-        perStoreRes,
-        dailyRes,
-        pageViewsRes,
-        uniqueUsersRes,
-        searchesRes,
-        pwaRes
-      ] = await Promise.all([
-        // total events by name
-        pool.query(
-          `SELECT event_name, COUNT(*)::int AS count
-           FROM analytics_events ${where}
-           GROUP BY event_name ORDER BY count DESC`,
-          params
-        ),
-        // top 10 most clicked offers
-        pool.query(
-          `SELECT offer_id, MAX(offer_title) AS offer_title, MAX(store_name) AS store_name,
-                  COUNT(*)::int AS clicks
-           FROM analytics_events
-           WHERE event_name='ad_click' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
-           GROUP BY offer_id ORDER BY clicks DESC LIMIT 10`,
-          params
-        ),
-        // per-store breakdown
-        pool.query(
-          `SELECT store_id, MAX(store_name) AS store_name,
-                  SUM(CASE WHEN event_name='store_view'  THEN 1 ELSE 0 END)::int AS store_views,
-                  SUM(CASE WHEN event_name='ad_click'    THEN 1 ELSE 0 END)::int AS ad_clicks,
-                  SUM(CASE WHEN event_name='store_click' THEN 1 ELSE 0 END)::int AS store_clicks,
-                  SUM(CASE WHEN event_name='offer_saved' THEN 1 ELSE 0 END)::int AS offer_saves
-           FROM analytics_events
-           WHERE store_id IS NOT NULL ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
-           GROUP BY store_id ORDER BY ad_clicks DESC`,
-          params
-        ),
-        // daily ad_click trend
-        pool.query(
-          `SELECT DATE(created_at) AS day, COUNT(*)::int AS count
-           FROM analytics_events
-           WHERE event_name='ad_click' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}
-           GROUP BY day ORDER BY day ASC`,
-          params
-        ),
-        // page views count
-        pool.query(
-          `SELECT COUNT(*)::int AS count FROM analytics_events
-           WHERE event_name='page_view' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`,
-          params
-        ),
-        // unique users
-        pool.query(
-          `SELECT COUNT(DISTINCT user_id)::int AS count FROM analytics_events ${where}`,
-          params
-        ),
-        // searches
-        pool.query(
-          `SELECT COUNT(*)::int AS count FROM analytics_events
-           WHERE event_name='search' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`,
-          params
-        ),
-        // pwa installs
-        pool.query(
-          `SELECT COUNT(*)::int AS count FROM analytics_events
-           WHERE event_name='add_to_homescreen' ${conditions.length ? "AND " + conditions.join(" AND ") : ""}`,
-          params
-        )
-      ]);
-      return res.json({
-        by_event_name: summaryRes.rows,
-        top_offers: topOffersRes.rows,
-        per_store: perStoreRes.rows,
-        daily_trend: dailyRes.rows.map((r) => ({ day: r.day, count: r.count })),
-        summary: {
-          page_views: pageViewsRes.rows[0]?.count ?? 0,
-          unique_users: uniqueUsersRes.rows[0]?.count ?? 0,
-          searches: searchesRes.rows[0]?.count ?? 0,
-          pwa_installs: pwaRes.rows[0]?.count ?? 0
-        }
-      });
+      const dashboard = queryDashboard(since, until);
+      return res.json(dashboard);
     } catch (err) {
       console.error("[analytics/dashboard]", err.message);
       return res.status(500).json({ error: "Villa \xED greiningum" });
@@ -2527,28 +2554,28 @@ async function registerRoutes(app) {
     }
   });
   app.use("/api/v1", router);
-  const clientDistPath = path3.join(process.cwd(), "client", "dist");
-  if (fs3.existsSync(clientDistPath)) {
+  const clientDistPath = path4.join(process.cwd(), "client", "dist");
+  if (fs4.existsSync(clientDistPath)) {
     app.use(express.static(clientDistPath));
     app.get("*", (req, res, next) => {
       if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
         return next();
       }
-      return res.sendFile(path3.join(clientDistPath, "index.html"));
+      return res.sendFile(path4.join(clientDistPath, "index.html"));
     });
   }
 }
 
 // server/seed-db.ts
-import fs4 from "fs";
-import path4 from "path";
+import fs5 from "fs";
+import path5 from "path";
 function resolveDbFile2() {
   const prodPath = "/var/data/database.json";
   try {
-    if (fs4.existsSync(path4.dirname(prodPath))) return prodPath;
+    if (fs5.existsSync(path5.dirname(prodPath))) return prodPath;
   } catch {
   }
-  return path4.join(process.cwd(), "database.json");
+  return path5.join(process.cwd(), "database.json");
 }
 var SEED_DATA = {
   users: [
@@ -2844,13 +2871,13 @@ var SEED_DATA = {
 async function seedDatabaseIfEmpty() {
   const dbFile = resolveDbFile2();
   try {
-    const raw = fs4.readFileSync(dbFile, "utf8");
+    const raw = fs5.readFileSync(dbFile, "utf8");
     const db = JSON.parse(raw);
     if (Array.isArray(db.users) && db.users.length > 0) {
       return;
     }
     console.log("[seed] T\xF3mur gagnagrunnur \u2014 set inn upphafsg\xF6gn...");
-    fs4.writeFileSync(dbFile, JSON.stringify(SEED_DATA, null, 2), "utf8");
+    fs5.writeFileSync(dbFile, JSON.stringify(SEED_DATA, null, 2), "utf8");
     console.log(
       `[seed] Tilb\xFAi\xF0: ${SEED_DATA.users.length} notendur, ${SEED_DATA.stores.length} verslanir, ${SEED_DATA.posts.length} f\xE6rslur`
     );
@@ -2888,10 +2915,10 @@ async function main() {
   app.use(sessionTracker);
   console.log("[uploads] UPLOAD_DIR =", UPLOAD_DIR);
   try {
-    if (fs5.existsSync(UPLOAD_DIR)) {
+    if (fs6.existsSync(UPLOAD_DIR)) {
       console.log(
         "[uploads] files on disk:",
-        fs5.readdirSync(UPLOAD_DIR).slice(0, 10)
+        fs6.readdirSync(UPLOAD_DIR).slice(0, 10)
       );
     } else {
       console.warn("[uploads] directory does NOT exist");

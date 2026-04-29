@@ -136,6 +136,18 @@ export function queryDashboard(since?: Date, until?: Date) {
     .sort((a, b) => a.day.localeCompare(b.day));
 
   // summary counts
+  // top search terms
+  const searchTermMap: Record<string, number> = {};
+  for (const e of filtered) {
+    if (e.event_name !== "search") continue;
+    const term = (e.metadata?.query_text as string | undefined)?.trim().toLowerCase();
+    if (term) searchTermMap[term] = (searchTermMap[term] ?? 0) + 1;
+  }
+  const top_searches = Object.entries(searchTermMap)
+    .map(([term, count]) => ({ term, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
   const page_views   = filtered.filter((e) => e.event_name === "page_view").length;
   const unique_users = new Set(filtered.map((e) => e.user_id).filter(Boolean)).size;
   const searches     = filtered.filter((e) => e.event_name === "search").length;
@@ -147,6 +159,7 @@ export function queryDashboard(since?: Date, until?: Date) {
     top_offers,
     per_store,
     daily_trend,
+    top_searches,
     summary: { page_views, unique_users, searches, pwa_installs, ad_clicks },
   };
 }

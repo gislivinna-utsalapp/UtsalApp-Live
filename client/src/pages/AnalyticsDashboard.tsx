@@ -22,6 +22,7 @@ type DashboardData = {
     ad_clicks: number;
   };
   top_offers: { offer_id: string; offer_title: string; store_name: string; clicks: number }[];
+  top_searches: { term: string; count: number }[];
   per_store: {
     store_id: string;
     store_name: string;
@@ -62,42 +63,71 @@ function rangeToParams(range: Range): { since?: string; until?: string } {
   return {};
 }
 
-// ─── Mini line/bar chart via SVG ──────────────────────────────────────────────
+// ─── Mini bar chart via SVG ───────────────────────────────────────────────────
+
+function padTrend(
+  data: { day: string; count: number }[],
+  days = 7,
+): { day: string; count: number }[] {
+  const map: Record<string, number> = {};
+  for (const d of data) map[d.day] = d.count;
+  const result: { day: string; count: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    result.push({ day: key, count: map[key] ?? 0 });
+  }
+  return result;
+}
 
 function TrendChart({ data }: { data: { day: string; count: number }[] }) {
-  if (!data.length) {
+  // Always show at least 7 days so bars have sensible width
+  const padded = padTrend(data, Math.max(7, data.length));
+  const total = padded.reduce((s, d) => s + d.count, 0);
+
+  if (total === 0) {
     return (
       <div className="h-24 flex items-center justify-center text-xs text-muted-foreground">
         Engin gögn í þessu tímabili
       </div>
     );
   }
-  const maxVal = Math.max(...data.map((d) => d.count), 1);
+
+  const maxVal = Math.max(...padded.map((d) => d.count), 1);
   const W = 300;
-  const H = 80;
-  const pad = 4;
-  const barW = Math.max(2, (W - pad * 2) / data.length - 2);
+  const H = 72;
+  const gap = 3;
+  const n = padded.length;
+  const barW = Math.max(4, Math.floor((W - gap * (n + 1)) / n));
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-20" preserveAspectRatio="none">
-      {data.map((d, i) => {
-        const x = pad + i * ((W - pad * 2) / data.length) + 1;
-        const barH = Math.max(2, ((d.count / maxVal) * (H - pad * 2)));
-        const y = H - pad - barH;
-        return (
-          <rect
-            key={i}
-            x={x}
-            y={y}
-            width={barW}
-            height={barH}
-            rx={1}
-            fill="#ff4d00"
-            opacity={0.85}
-          />
-        );
-      })}
-    </svg>
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 72 }} preserveAspectRatio="none">
+        {padded.map((d, i) => {
+          const barH = d.count > 0 ? Math.max(4, (d.count / maxVal) * (H - 4)) : 2;
+          const x = gap + i * (barW + gap);
+          const y = H - barH;
+          return (
+            <rect
+              key={i}
+              x={x}
+              y={y}
+              width={barW}
+              height={barH}
+              rx={2}
+              fill={d.count > 0 ? "#ff4d00" : "#f3f4f6"}
+              opacity={d.count > 0 ? 0.9 : 1}
+            />
+          );
+        })}
+      </svg>
+      <div className="flex justify-between mt-1 text-[9px] text-muted-foreground px-0.5">
+        {[padded[0], padded[Math.floor(n / 2)], padded[n - 1]].map((d, i) => (
+          <span key={i}>{d?.day?.slice(5)}</span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -162,6 +192,7 @@ export default function AnalyticsDashboard() {
 
   const summary = data?.summary;
   const topOffers = data?.top_offers ?? [];
+  const topSearches = data?.top_searches ?? [];
   const perStore = data?.per_store ?? [];
   const dailyTrend = data?.daily_trend ?? [];
 
@@ -224,15 +255,7 @@ export default function AnalyticsDashboard() {
           {isLoading ? (
             <div className="h-20 bg-muted animate-pulse rounded" />
           ) : (
-            <>
-              <TrendChart data={dailyTrend} />
-              {dailyTrend.length > 0 && (
-                <div className="flex justify-between mt-1 text-[10px] text-muted-foreground">
-                  <span>{dailyTrend[0]?.day?.slice(5)}</span>
-                  <span>{dailyTrend[dailyTrend.length - 1]?.day?.slice(5)}</span>
-                </div>
-              )}
-            </>
+            <TrendChart data={dailyTrend} />
           )}
         </Card>
 
@@ -282,6 +305,44 @@ export default function AnalyticsDashboard() {
                       <ExternalLink className="w-3 h-3" />
                     </Button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Top search terms */}
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Search className="w-4 h-4" style={{ color: "#ff4d00" }} />
+            <h2 className="text-sm font-semibold">Vinsælustu leitaryrði</h2>
+          </div>
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="h-8 bg-muted animate-pulse rounded" />)}
+            </div>
+          ) : topSearches.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-4">
+              Engar leitir skráðar í þessu tímabili
+            </p>
+          ) : (
+            <div className="space-y-0 divide-y divide-border">
+              {topSearches.map((s, i) => (
+                <div
+                  key={s.term}
+                  className="flex items-center justify-between py-2 gap-2"
+                  data-testid={`row-search-${i}`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className="text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-white"
+                      style={{ background: i === 0 ? "#ff4d00" : "#d1d5db" }}
+                    >
+                      {i + 1}
+                    </span>
+                    <span className="text-xs truncate">{s.term}</span>
+                  </div>
+                  <span className="text-sm font-bold flex-shrink-0" style={{ color: "#ff4d00" }}>{s.count}</span>
                 </div>
               ))}
             </div>

@@ -1172,7 +1172,16 @@ export async function registerRoutes(app: Express): Promise<void> {
   // ------------------ POSTS: LIST ALL (MEÐ PLAN RÖÐUN) ------------------
   router.get("/posts", async (req, res) => {
     try {
-      const q = (req.query.q as string)?.toLowerCase() || "";
+      const rawQ = (req.query.q as string) || "";
+
+      // Normalize Icelandic characters so "skor" matches "skór", "stigi" matches "stígi" etc.
+      function normalizeIcelandic(s: string): string {
+        return s.toLowerCase()
+          .replace(/[áä]/g, "a").replace(/[éë]/g, "e").replace(/[íï]/g, "i")
+          .replace(/[óö]/g, "o").replace(/[úü]/g, "u").replace(/[ý]/g, "y")
+          .replace(/[ð]/g, "d").replace(/[þ]/g, "th").replace(/[æ]/g, "ae");
+      }
+      const q = normalizeIcelandic(rawQ);
 
       const [posts, stores] = await Promise.all([
         storage.listPosts(),
@@ -1185,7 +1194,13 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
 
       const filtered = q
-        ? posts.filter((p: any) => (p.title || "").toLowerCase().includes(q))
+        ? posts.filter((p: any) => {
+            const fields = [
+              p.title, p.category, p.description,
+              storesById[p.storeId]?.name, storesById[p.storeId]?.category,
+            ].map((f) => normalizeIcelandic(String(f || "")));
+            return fields.some((f) => f.includes(q));
+          })
         : posts;
 
       // Search results stay chronological; the main feed uses discovery ordering.

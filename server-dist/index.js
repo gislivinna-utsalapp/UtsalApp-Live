@@ -1105,6 +1105,13 @@ function queryDashboard(since, until) {
     dailyMap[day] = (dailyMap[day] ?? 0) + 1;
   }
   const daily_trend = Object.entries(dailyMap).map(([day, count]) => ({ day, count })).sort((a, b) => a.day.localeCompare(b.day));
+  const searchTermMap = {};
+  for (const e of filtered) {
+    if (e.event_name !== "search") continue;
+    const term = e.metadata?.query_text?.trim().toLowerCase();
+    if (term) searchTermMap[term] = (searchTermMap[term] ?? 0) + 1;
+  }
+  const top_searches = Object.entries(searchTermMap).map(([term, count]) => ({ term, count })).sort((a, b) => b.count - a.count).slice(0, 10);
   const page_views = filtered.filter((e) => e.event_name === "page_view").length;
   const unique_users = new Set(filtered.map((e) => e.user_id).filter(Boolean)).size;
   const searches = filtered.filter((e) => e.event_name === "search").length;
@@ -1115,6 +1122,7 @@ function queryDashboard(since, until) {
     top_offers,
     per_store,
     daily_trend,
+    top_searches,
     summary: { page_views, unique_users, searches, pwa_installs, ad_clicks }
   };
 }
@@ -1986,7 +1994,12 @@ async function registerRoutes(app) {
   });
   router.get("/posts", async (req, res) => {
     try {
-      const q = req.query.q?.toLowerCase() || "";
+      let normalizeIcelandic2 = function(s) {
+        return s.toLowerCase().replace(/[áä]/g, "a").replace(/[éë]/g, "e").replace(/[íï]/g, "i").replace(/[óö]/g, "o").replace(/[úü]/g, "u").replace(/[ý]/g, "y").replace(/[ð]/g, "d").replace(/[þ]/g, "th").replace(/[æ]/g, "ae");
+      };
+      var normalizeIcelandic = normalizeIcelandic2;
+      const rawQ = req.query.q || "";
+      const q = normalizeIcelandic2(rawQ);
       const [posts, stores] = await Promise.all([
         storage.listPosts(),
         storage.listStores()
@@ -1995,7 +2008,16 @@ async function registerRoutes(app) {
       for (const s of stores) {
         storesById[s.id] = s;
       }
-      const filtered = q ? posts.filter((p) => (p.title || "").toLowerCase().includes(q)) : posts;
+      const filtered = q ? posts.filter((p) => {
+        const fields = [
+          p.title,
+          p.category,
+          p.description,
+          storesById[p.storeId]?.name,
+          storesById[p.storeId]?.category
+        ].map((f) => normalizeIcelandic2(String(f || "")));
+        return fields.some((f) => f.includes(q));
+      }) : posts;
       let ordered;
       if (q) {
         ordered = [...filtered].sort((a, b) => {
